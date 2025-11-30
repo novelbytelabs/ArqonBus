@@ -1,0 +1,241 @@
+# WebSocket Protocol Contract: ArqonBus v1.0
+
+**Feature**: 001-core-message-bus  
+**Created**: 2025-11-30  
+**Protocol Version**: 1.0
+
+## Overview
+
+The ArqonBus WebSocket protocol defines the message exchange format for real-time communication between clients and the message bus server. All messages must conform to the strict envelope specification.
+
+## Message Envelope Schema
+
+### Required Fields
+All messages MUST include these fields:
+
+```json
+{
+  "version": "1.0",
+  "id": "arq_[unique_identifier]",
+  "type": "event|system|command|private|command_response|telemetry",
+  "room": "string",
+  "channel": "string", 
+  "from": "client_id",
+  "timestamp": "ISO8601_timestamp",
+  "payload": {}
+}
+```
+
+### Optional Fields
+```json
+{
+  "metadata": {}
+}
+```
+
+## Message Types
+
+### 1. Event Messages (`type: "event"`)
+Standard application messages routed to subscribed channels.
+
+**Example**:
+```json
+{
+  "version": "1.0",
+  "id": "arq_7f3a1b2c",
+  "type": "event",
+  "room": "science",
+  "channel": "explore",
+  "from": "client_123",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "payload": {
+    "message": "Hello explorers!",
+    "data": {"type": "greeting"}
+  }
+}
+```
+
+### 2. System Messages (`type: "system"`)
+Server-generated messages for system-wide announcements.
+
+**Example**:
+```json
+{
+  "version": "1.0",
+  "id": "arq_system_001",
+  "type": "system",
+  "room": "*",
+  "channel": "broadcast",
+  "from": "arqonbus_server",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "payload": {
+    "message": "Server maintenance in 5 minutes",
+    "priority": "high"
+  }
+}
+```
+
+### 3. Command Messages (`type: "command"`)
+Client requests for server-side operations.
+
+**Example**:
+```json
+{
+  "version": "1.0",
+  "id": "arq_cmd_001",
+  "type": "command",
+  "room": "science",
+  "channel": "control",
+  "from": "admin_client",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "payload": {
+    "command": "status",
+    "parameters": {}
+  }
+}
+```
+
+### 4. Private Messages (`type: "private"`)
+Direct client-to-client communication.
+
+**Example**:
+```json
+{
+  "version": "1.0",
+  "id": "arq_pm_001",
+  "type": "private",
+  "room": "science",
+  "channel": "pm",
+  "from": "client_a",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "payload": {
+    "message": "Hello client_b",
+    "target": "client_b"
+  }
+}
+```
+
+### 5. Command Response Messages (`type: "command_response"`)
+Server responses to command requests.
+
+**Example**:
+```json
+{
+  "version": "1.0",
+  "id": "arq_resp_001",
+  "type": "command_response",
+  "room": "science",
+  "channel": "control",
+  "from": "arqonbus_server",
+  "timestamp": "2025-01-01T12:00:00.050Z",
+  "payload": {
+    "request_id": "arq_cmd_001",
+    "status": "success",
+    "result": {
+      "active_clients": 25,
+      "rooms": ["science", "chat"],
+      "total_messages": 1543
+    }
+  }
+}
+```
+
+### 6. Telemetry Messages (`type: "telemetry"`)
+Monitoring and observability data.
+
+**Example**:
+```json
+{
+  "version": "1.0",
+  "id": "arq_tel_001",
+  "type": "telemetry",
+  "room": "integriguard",
+  "channel": "telemetry-stream",
+  "from": "arqonbus_server",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "payload": {
+    "eventType": "client_connected",
+    "client_id": "new_client_123",
+    "metrics": {
+      "connection_time": "2025-01-01T12:00:00.000Z",
+      "client_type": "human"
+    }
+  }
+}
+```
+
+## Connection Protocol
+
+### 1. Connection Establishment
+1. Client initiates WebSocket connection to configured host/port
+2. Server performs handshake
+3. Client sends initial identification message
+4. Server validates and accepts connection
+
+### 2. Subscription Management
+Clients subscribe to rooms and channels through:
+- **Join Channel Command**: Explicit subscription to room:channel
+- **Auto-subscription**: Configured default channels
+- **Private Messages**: Temporary subscriptions to pm channels
+
+### 3. Message Routing
+Server routes messages based on:
+- Exact room:channel match
+- Client subscription list
+- Message type and sender permissions
+- Private message targeting rules
+
+### 4. Connection Lifecycle
+- **Connected**: Active WebSocket connection
+- **Active**: Receiving/sending messages
+- **Idle**: Connected but no recent activity
+- **Disconnected**: Connection terminated
+
+## Error Handling
+
+### Protocol Violations
+- Missing required fields
+- Invalid field types
+- Malformed JSON
+- Unknown message types
+- Version mismatches
+
+### Server Responses
+- **400**: Bad Request (malformed message)
+- **401**: Unauthorized (command permissions)
+- **404**: Not Found (invalid room/channel)
+- **429**: Too Many Requests (rate limiting)
+- **500**: Internal Server Error
+
+## Validation Rules
+
+### Field Validation
+- `version`: MUST be "1.0"
+- `id`: MUST start with "arq_" and be unique
+- `timestamp`: MUST be valid ISO8601 format
+- `room`: MUST be valid room identifier
+- `channel`: MUST be valid channel identifier
+- `from`: MUST be valid client_id
+
+### Business Rules
+- Clients can only send to rooms/channels they are subscribed to
+- System messages can only be generated by server
+- Private messages require both sender and target to be connected
+- Admin commands require appropriate authorization
+
+## Performance Considerations
+
+### Latency Requirements
+- Message delivery: p99 < 50ms
+- Command responses: < 100ms
+- Connection establishment: < 1 second
+
+### Throughput Goals
+- Support 5,000 concurrent connections
+- Handle 10,000+ messages per second
+- Zero message loss in normal operation
+
+### Backpressure Handling
+- Client-side message rate limiting
+- Server-side connection throttling
+- Graceful degradation under load
