@@ -27,10 +27,10 @@ description: "Task list for ArqonBus v1.0 Core Message Bus implementation"
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create arqonbus package structure with subdirectories: config/, protocol/, transport/, routing/, commands/, storage/, telemetry/, utils/
-- [ ] T002 Initialize pyproject.toml with dependencies: websockets, aiohttp, redis-py, pydantic, pytest, black, isort, mypy
-- [ ] T003 [P] Create all __init__.py files for proper Python package structure
-- [ ] T004 Set up basic test structure with unit/, integration/, contract/ directories
+- [X] T001 Create arqonbus package structure with subdirectories: config/, protocol/, transport/, routing/, commands/, storage/, telemetry/, utils/
+- [X] T002 Initialize pyproject.toml with dependencies: websockets, aiohttp, redis-py, pydantic, pytest, black, isort, mypy
+- [X] T003 [P] Create all __init__.py files for proper Python package structure
+- [X] T004 Set up basic test structure with unit/, integration/, contract/ directories
 
 ---
 
@@ -40,12 +40,12 @@ description: "Task list for ArqonBus v1.0 Core Message Bus implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement configuration loader in src/arqonbus/config.py with environment variable parsing and validation
-- [ ] T006 [P] Create Envelope dataclass in src/arqonbus/protocol/envelope.py with all required fields
-- [ ] T007 [P] Implement envelope validation, parsing, and JSON serialization methods
-- [ ] T008 [P] Create message ID generator in src/arqonbus/protocol/ids.py with arq_ prefix
-- [ ] T009 Implement storage interface in src/arqonbus/storage/interface.py (append, history methods)
-- [ ] T010 Create abstract base classes and proper interfaces for all storage backends
+- [X] T005 Implement configuration loader in src/arqonbus/config.py with environment variable parsing and validation
+- [X] T006 [P] Create Envelope dataclass in src/arqonbus/protocol/envelope.py with all required fields
+- [X] T007 [P] Implement envelope validation, parsing, and JSON serialization methods
+- [X] T008 [P] Create message ID generator in src/arqonbus/protocol/ids.py with arq_ prefix
+- [X] T009 Implement storage interface in src/arqonbus/storage/interface.py (append, history methods)
+- [X] T010 Create abstract base classes and proper interfaces for all storage backends
 
 **Checkpoint**: Foundation ready - message envelope, configuration, and storage interfaces complete
 
@@ -68,14 +68,14 @@ description: "Task list for ArqonBus v1.0 Core Message Bus implementation"
 
 ### Implementation for User Story 1
 
-- [ ] T015 [P] [US1] Implement WebSocket server in src/arqonbus/transport/websocket_bus.py
-- [ ] T016 [P] [US1] Create room manager in src/arqonbus/routing/rooms.py
-- [ ] T017 [P] [US1] Create channel manager in src/arqonbus/routing/channels.py  
-- [ ] T018 [P] [US1] Implement routing logic in src/arqonbus/routing/router.py
+- [X] T015 [P] [US1] Implement WebSocket server in src/arqonbus/transport/websocket_bus.py
+- [X] T016 [P] [US1] Create room manager in src/arqonbus/routing/rooms.py
+- [X] T017 [P] [US1] Create channel manager in src/arqonbus/routing/channels.py  
+- [X] T018 [P] [US1] Implement routing logic in src/arqonbus/routing/router.py
 - [ ] T019 [P] [US1] Create client registry in src/arqonbus/routing/client_registry.py
-- [ ] T020 [US1] Implement in-memory storage backend in src/arqonbus/storage/memory.py
-- [ ] T021 [US1] Create main server orchestration in src/arqonbus/server.py
-- [ ] T022 [US1] Add structured logging utilities in src/arqonbus/utils/logging.py
+- [X] T020 [US1] Implement in-memory storage backend in src/arqonbus/storage/memory.py
+- [X] T021 [US1] Create main server orchestration in src/arqonbus/server.py
+- [X] T022 [US1] Add structured logging utilities in src/arqonbus/utils/logging.py
 
 **Checkpoint**: User Story 1 complete - basic WebSocket messaging with room/channel routing works independently
 

@@ -1,0 +1,1 @@
+# Protocol module for ArqonBus message envelopes and validation
