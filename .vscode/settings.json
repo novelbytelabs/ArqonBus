@@ -1,0 +1,20 @@
+{
+  "python.defaultInterpreterPath": "/home/irbsurfer/miniconda3/envs/helios-gpu-118/bin/python",
+  "python.terminal.activateEnvironment": true,
+
+  "editor.formatOnSave": true,
+
+  // ESLint
+  "eslint.enable": true,
+  "eslint.run": "onType",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // Files
+  "files.exclude": {
+    "site": true,
+    "**/__pycache__": true,
+    "node_modules": true
+  }
+}
