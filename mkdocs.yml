@@ -1,29 +1,46 @@
-site_name: My New Project
-site_description: Project documentation
-site_url: ""
+site_name: Novel Byte Labs
+site_url: "https://www.novelbytelabs.com"
+repo_url: https://github.com/Emergenics/helios_embed/
+repo_name: helios_embed
 
 theme:
-  name: material
-  language: en
+  name: 'material'
+  palette:
+    scheme: slate
   features:
-    - navigation.instant
-    - navigation.tabs
-    - search.highlight
-    - search.share
+    - navigation.sections
+    - search.suggest       # autocomplete suggestions :contentReference[oaicite:3]{index=3}
+    - search.highlight     # highlight all matches on page load
+    - content.code.annotate
+
 
 nav:
-  - Home: index.md
-
-plugins:
-  - search
-  - awesome-pages
-  - autoreload
+  - 'Home': 'index.md'
+  - 'API Reference': 'api_contract.md'
+  - 'Design & Architecture': 'design.md'
+  - 'Performance':
+    - 'Scalability & Baseline': 'perf_baseline.md'
+    - 'Threading & Concurrency': 'threading_model.md'
+  - 'Validation':
+    - 'Accuracy & Tolerances': 'numerical_tolerances.md'
 
 markdown_extensions:
-  - admonition
-  - codehilite
+  - attr_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - toc:
       permalink: true
+  - tables
+  - admonition
+  - pymdownx.superfences
 
-repo_url: ""
-repo_name: ""
+# Optional: Add a custom CSS file if you want to tweak styles
+# extra_css:
+#  - stylesheets/extra.css
+
+# This tells mkdocs where your documentation source files are
+docs_dir: 'docs'
+
+# This allows GitHub Actions to deploy the site to the gh-pages branch
+edit_uri: edit/main/docs/
+# --- END OF FILE HELIOS_EMBED/mkdocs.yml (Corrected Navigation) ---
