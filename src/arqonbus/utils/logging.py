@@ -273,7 +273,7 @@ def log_client_event(
 
 
 def log_room_event(
-    logger: Logger,
+    logger: logging.Logger,
     event: str,
     room_id: str,
     channel_id: Optional[str] = None,

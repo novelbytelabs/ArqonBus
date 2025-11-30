@@ -1,14 +1,8 @@
 """Main server orchestration for ArqonBus message bus."""
-from .commands.executor import CommandExecutor
-import sys
 import asyncio
 import logging
 import signal
-
-from .transport.http_server import ArqonBusHTTPServer
-from .telemetry.server import TelemetryServer
-from .telemetry.emitter import TelemetryEmitter, set_emitter
-from .utils.metrics import get_collector
+import sys
 from typing import Optional
 from datetime import datetime
 
@@ -44,12 +38,6 @@ class ArqonBusServer:
         # Setup logging
         setup_logging(self.config.telemetry.log_level)
         self.logger = get_logger(__name__)
-        # Telemetry and monitoring components
-        self.http_server: Optional[ArqonBusHTTPServer] = None
-        self.telemetry_server: Optional[TelemetryServer] = None
-        self.command_executor: Optional[CommandExecutor] = None
-        self.telemetry_emitter: Optional[TelemetryEmitter] = None
-        self.metric_collector = get_collector()
         
         # Core components
         self.routing_coordinator: Optional[RoutingCoordinator] = None
@@ -121,42 +109,6 @@ class ArqonBusServer:
             # Initialize WebSocket bus
             self.logger.info("Initializing WebSocket bus...")
             self.ws_bus = WebSocketBus(self.routing_coordinator.client_registry)
-            # Initialize telemetry server
-            if hasattr(self.config.telemetry, "enabled") and self.config.telemetry.enabled:
-                self.logger.info("Initializing telemetry server...")
-                self.telemetry_server = TelemetryServer(self.config.telemetry.__dict__)
-                await self.telemetry_server.start()
-                
-                # Initialize telemetry emitter
-                self.telemetry_emitter = TelemetryEmitter(self.telemetry_server, self.config.telemetry.__dict__)
-                await self.telemetry_emitter.start()
-                set_emitter(self.telemetry_emitter)
-                
-                # Emit system started event
-                await self.telemetry_emitter.emit_system_started({
-                    "version": "1.0.0",
-                    "config_host": self.config.server.host,
-                    "config_port": self.config.server.port,
-                    "storage_backend": self.config.storage.backend
-                })
-            
-            # Initialize command executor with telemetry
-            if hasattr(self.config, "commands") and hasattr(self.config.commands, "enabled") and self.config.commands.enabled:
-                self.logger.info("Initializing command executor...")
-                self.command_executor = CommandExecutor(
-                    storage_backend=self.storage,
-                    telemetry_emitter=self.telemetry_emitter
-                )
-            
-            # Initialize HTTP server for monitoring
-            if hasattr(self.config, "http") and hasattr(self.config.http, "enabled") and self.config.http.enabled:
-                self.logger.info("Initializing HTTP monitoring server...")
-                self.http_server = ArqonBusHTTPServer(
-                    self.config.http.__dict__,
-                    storage_backend=self.storage.storage_backend if self.storage else None,
-                    telemetry_server=self.telemetry_server
-                )
-                await self.http_server.start()
             
             # Setup signal handlers
             self._setup_signal_handlers()
@@ -202,21 +154,6 @@ class ArqonBusServer:
                 self.logger.info("Shutting down routing system...")
                 await self.routing_coordinator.shutdown()
             
-            # Shutdown telemetry emitter
-            if self.telemetry_emitter:
-                self.logger.info("Stopping telemetry emitter...")
-                await self.telemetry_emitter.stop()
-            
-            # Stop telemetry server
-            if self.telemetry_server:
-                self.logger.info("Stopping telemetry server...")
-                await self.telemetry_server.stop()
-            
-            # Stop HTTP server
-            if self.http_server:
-                self.logger.info("Stopping HTTP monitoring server...")
-                await self.http_server.stop()
-            
             # Signal shutdown complete
             self.shutdown_event.set()
             
@@ -260,19 +197,6 @@ class ArqonBusServer:
                     self.logger.warning(f"WebSocket server health check failed: {ws_health}")
                 else:
                     self.logger.info("WebSocket server health check passed")
-            
-            # Check telemetry server health
-            if self.telemetry_server:
-                telemetry_health = await self.telemetry_server.get_health_status()
-                if telemetry_health.get("status") != "healthy":
-                    self.logger.warning(f"Telemetry server health check failed: {telemetry_health}")
-                else:
-                    self.logger.info("Telemetry server health check passed")
-            
-            # Check HTTP server health
-            if self.http_server:
-                # HTTP server health check would be implemented here
-                self.logger.info("HTTP monitoring server health check passed")
             
         except Exception as e:
             self.logger.error(f"Error during startup health checks: {e}")
