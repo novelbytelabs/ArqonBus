@@ -8,36 +8,36 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ┌─────────────────────────────────────────────────────────────┐
 │                     Client Applications                     │
 │              (WebSocket + HTTP Monitoring)                  │
-└─────────────────┬───────────────────────────────────────────┘
-                  │ WebSocket + HTTP
-┌─────────────────┴───────────────────────────────────────────┐
-│                     ArqonBus Core                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │   WebSocket │  │    HTTP     │  │  Telemetry  │         │
-│  │   Server    │  │   Server    │  │   Server    │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              Message Router                            │ │
+└─────────────────┬───────────────────────────────────────────┘ 
+                  │ WebSocket + HTTP                            
+┌─────────────────┴─────────────────────────────────────────────┐
+│                     ArqonBus Core                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │   WebSocket │  │    HTTP     │  │  Telemetry  │            │
+│  │   Server    │  │   Server    │  │   Server    │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │              Message Router                              │ │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │ │
 │  │  │    Rooms    │ │   Channels  │ │  Client Registry    │ │ │
 │  │  │   Manager   │ │   Manager   │ │                     │ │ │
 │  │  └─────────────┘ └─────────────┘ └─────────────────────┘ │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              Command Executor                           │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │              Command Executor                            │ │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │ │
-│  │  │ Built-in    │ │ Authorization│ │   Validation        │ │ │
-│  │  │ Commands    │ │    System    │ │   System            │ │ │
+│  │  │ Built-in    │ │ Authorization│ │   Validation       │ │ │
+│  │  │ Commands    │ │    System    │ │   System           │ │ │
 │  │  └─────────────┘ └─────────────┘ └─────────────────────┘ │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              Storage Backends                           │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │              Storage Backends                            │ │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │ │
-│  │  │   Memory    │ │    Redis    │ │   Storage Interface  │ │ │
+│  │  │   Memory    │ │    Redis    │ │   Storage Interface │ │ │
 │  │  │  Storage    │ │   Streams   │ │                     │ │ │
 │  │  └─────────────┘ └─────────────┘ └─────────────────────┘ │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+│  └──────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ## Core Components
@@ -45,12 +45,14 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ### Transport Layer
 
 **WebSocket Server** (`src/arqonbus/transport/websocket_bus.py`)
+
 - Handles WebSocket connections and message routing
 - Supports connection lifecycle management
 - Implements message validation and protocol enforcement
 - Manages client sessions and heartbeats
 
 **HTTP Server** (`src/arqonbus/transport/http_server.py`)
+
 - Provides REST endpoints for monitoring and administration
 - Health checks and status reporting
 - Metrics collection and Prometheus export
@@ -59,12 +61,14 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ### Protocol Layer
 
 **Message Envelope** (`src/arqonbus/protocol/envelope.py`)
+
 - Structured message format with required fields
 - JSON serialization/deserialization
 - Type-safe message validation
 - ID generation with `arq_` prefix convention
 
 **Message Validator** (`src/arqonbus/protocol/validator.py`)
+
 - Comprehensive message validation
 - Command-specific validation rules
 - Timestamp and ID format validation
@@ -73,24 +77,28 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ### Routing Layer
 
 **Message Router** (`src/arqonbus/routing/router.py`)
+
 - Central routing coordination
 - Room and channel management
 - Message delivery orchestration
 - Routing statistics and monitoring
 
 **Client Registry** (`src/arqonbus/routing/client_registry.py`)
+
 - Client connection tracking
 - Room and channel membership management
 - Connection lifecycle events
 - Client metadata storage
 
 **Rooms Manager** (`src/arqonbus/routing/rooms.py`)
+
 - Room-based message routing
 - Member management
 - Broadcast capabilities
 - Room lifecycle management
 
 **Channels Manager** (`src/arqonbus/routing/channels.py`)
+
 - Channel-based message routing
 - Channel creation and deletion
 - Message broadcasting
@@ -99,18 +107,21 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ### Command System
 
 **Command Executor** (`src/arqonbus/commands/executor.py`)
+
 - Command registration and discovery
 - Parameter validation
 - Execution orchestration
 - Response formatting
 
 **Built-in Commands** (`src/arqonbus/commands/builtin.py`)
+
 - Status reporting
 - Channel management
 - Room operations
 - System information
 
 **Command Authorization** (`src/arqonbus/commands/auth.py`)
+
 - Role-based access control
 - Rate limiting
 - Permission validation
@@ -119,18 +130,21 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ### Storage Layer
 
 **Storage Interface** (`src/arqonbus/storage/interface.py`)
+
 - Abstract storage backend interface
 - Common storage operations
 - Storage health monitoring
 - Backend registry
 
 **Memory Storage** (`src/arqonbus/storage/memory.py`)
+
 - In-memory message storage
 - Thread-safe operations
 - Ring buffer implementation
 - Fast access patterns
 
 **Redis Streams** (`src/arqonbus/storage/redis_streams.py`)
+
 - Redis-based persistent storage
 - Stream-based message organization
 - Automatic fallback to memory storage
@@ -139,18 +153,21 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ### Telemetry Layer
 
 **Telemetry Server** (`src/arqonbus/telemetry/server.py`)
+
 - WebSocket-based telemetry broadcasting
 - Event buffering and batching
 - Client connection management
 - Performance monitoring
 
 **Telemetry Handler** (`src/arqonbus/telemetry/handlers.py`)
+
 - Event validation and enrichment
 - Event filtering and processing
 - Batch processing
 - Event aggregation
 
 **Telemetry Emitter** (`src/arqonbus/telemetry/emitter.py`)
+
 - Centralized event emission
 - Event type definitions
 - Subscriber management
@@ -159,18 +176,21 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ### Monitoring Layer
 
 **Metrics Collector** (`src/arqonbus/utils/metrics.py`)
+
 - System metrics collection
 - Command execution metrics
 - Performance monitoring
 - Histogram and counter tracking
 
 **Prometheus Exporter** (`src/arqonbus/utils/prometheus.py`)
+
 - Prometheus format export
 - Metric naming and labeling
 - Health check integration
 - Performance metrics
 
 **Structured Logging** (`src/arqonbus/utils/logging.py`)
+
 - Structured log formatting
 - Performance logging
 - Business event tracking
@@ -179,6 +199,7 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 ## Configuration Management
 
 **Config System** (`src/arqonbus/config/config.py`)
+
 - Environment-based configuration
 - Configuration validation
 - Default value management

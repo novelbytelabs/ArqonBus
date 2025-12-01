@@ -34,12 +34,16 @@ class ArqonBusServer:
         """Initialize ArqonBus server.
         
         Args:
-            config_override: Optional configuration overrides
+            config_override: Optional configuration overrides dictionary or ArqonBusConfig object
         """
         # Load configuration
         self.config = load_config()
         if config_override:
-            self._apply_config_overrides(config_override)
+            # Handle both dict and ArqonBusConfig objects
+            if hasattr(config_override, 'server'):  # It's an ArqonBusConfig object
+                self.config = config_override
+            else:  # It's a dictionary of overrides
+                self._apply_config_overrides(config_override)
         
         # Setup logging
         setup_logging(self.config.telemetry.log_level)

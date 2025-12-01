@@ -1,0 +1,89 @@
+/* Custom CSS for Science Monkeys CODEX Documentation */
+
+/* Additional spacing and typography improvements */
+.md-content {
+    padding-bottom: 2rem;
+}
+
+/* Custom styling for code blocks */
+.md-typeset pre {
+    border-radius: 8px;
+    border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Enhanced admonition styling */
+.md-typeset .admonition {
+    border-radius: 8px;
+    border-left-width: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Custom task list styling */
+.md-typeset .task-list-item {
+    list-style-type: none;
+}
+
+.md-typeset .task-list-item input {
+    margin-right: 0.5rem;
+}
+
+/* Table improvements */
+.md-typeset table {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.md-typeset table th {
+    background-color: var(--md-default-fg-color--lightest);
+    font-weight: 600;
+}
+
+/* Navigation improvements */
+.md-nav {
+    font-size: 0.9rem;
+}
+
+.md-nav__link {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.md-nav__link:hover {
+    background-color: var(--md-default-fg-color--lightest);
+}
+
+/* Custom focus styles */
+.md-search__input:focus {
+    outline: 2px solid var(--md-accent-fg-color);
+    outline-offset: 2px;
+}
+
+/* Content tab improvements */
+.md-content .tabbed-block {
+    border-radius: 8px;
+    border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Footer improvements */
+.md-footer {
+    margin-top: 2rem;
+    border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Responsive improvements */
+@media screen and (max-width: 768px) {
+    .md-content {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .md-typeset h1 {
+        font-size: 1.8rem;
+    }
+    
+    .md-typeset h2 {
+        font-size: 1.5rem;
+    }
+}

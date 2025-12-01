@@ -139,34 +139,34 @@ class ArqonBusConfig:
         errors = []
         
         # Server validation
-        if config.server.port < 1 or config.server.port > 65535:
-            errors.append(f"Invalid server port: {config.server.port}")
+        if self.server.port < 1 or self.server.port > 65535:
+            errors.append(f"Invalid server port: {self.server.port}")
             
-        if config.server.max_connections < 1:
-            errors.append(f"Invalid max connections: {config.server.max_connections}")
+        if self.server.max_connections < 1:
+            errors.append(f"Invalid max connections: {self.server.max_connections}")
             
         # WebSocket validation
-        if config.websocket.max_message_size < 1024:
-            errors.append(f"Message size too small: {config.websocket.max_message_size}")
+        if self.websocket.max_message_size < 1024:
+            errors.append(f"Message size too small: {self.websocket.max_message_size}")
             
         # Redis validation (only if Redis backend is used)
-        if config.storage.backend == "redis":
-            if not config.redis.host:
+        if self.storage.backend == "redis":
+            if not self.redis.host:
                 errors.append("Redis host is required when using Redis backend")
-            if config.redis.port < 1 or config.redis.port > 65535:
-                errors.append(f"Invalid Redis port: {config.redis.port}")
+            if self.redis.port < 1 or self.redis.port > 65535:
+                errors.append(f"Invalid Redis port: {self.redis.port}")
                 
         # Storage validation
-        if config.storage.max_history_size < 1:
-            errors.append(f"Invalid history size: {config.storage.max_history_size}")
+        if self.storage.max_history_size < 1:
+            errors.append(f"Invalid history size: {self.storage.max_history_size}")
             
         # Telemetry validation
-        if config.telemetry.metrics_interval < 1:
-            errors.append(f"Invalid metrics interval: {config.telemetry.metrics_interval}")
+        if self.telemetry.metrics_interval < 1:
+            errors.append(f"Invalid metrics interval: {self.telemetry.metrics_interval}")
             
         # Security validation
-        if config.security.rate_limit_per_minute < 1:
-            errors.append(f"Invalid rate limit: {config.security.rate_limit_per_minute}")
+        if self.security.rate_limit_per_minute < 1:
+            errors.append(f"Invalid rate limit: {self.security.rate_limit_per_minute}")
             
         return errors
     

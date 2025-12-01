@@ -1,7 +1,8 @@
-site_name: Novel Byte Labs
-site_url: "https://www.novelbytelabs.com"
-repo_url: https://github.com/Emergenics/helios_embed/
-repo_name: helios_embed
+site_name: ArqonBus
+site_url: "https://www.arqoncloud.com"
+repo_url: https://github.com/novelbytelabs/arqonbus/
+repo_name: arqonbus
+dev_addr: 127.0.0.1:8001
 
 theme:
   name: 'material'
@@ -9,20 +10,18 @@ theme:
     scheme: slate
   features:
     - navigation.sections
-    - search.suggest       # autocomplete suggestions :contentReference[oaicite:3]{index=3}
-    - search.highlight     # highlight all matches on page load
+#    - navigation.expand
+#    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
     - content.code.annotate
-
 
 nav:
   - 'Home': 'index.md'
-  - 'API Reference': 'api_contract.md'
-  - 'Design & Architecture': 'design.md'
-  - 'Performance':
-    - 'Scalability & Baseline': 'perf_baseline.md'
-    - 'Threading & Concurrency': 'threading_model.md'
-  - 'Validation':
-    - 'Accuracy & Tolerances': 'numerical_tolerances.md'
+  - 'API Reference': 'api.md'
+  - 'Design & Architecture': 'architecture.md'
+  - 'Completion Report': 'completion_report.md'
 
 markdown_extensions:
   - attr_list
@@ -34,13 +33,12 @@ markdown_extensions:
   - admonition
   - pymdownx.superfences
 
-# Optional: Add a custom CSS file if you want to tweak styles
-# extra_css:
-#  - stylesheets/extra.css
+# Custom CSS file for additional styling
+extra_css:
+  - stylesheets/extra.css
 
 # This tells mkdocs where your documentation source files are
 docs_dir: 'docs'
 
 # This allows GitHub Actions to deploy the site to the gh-pages branch
 edit_uri: edit/main/docs/
-# --- END OF FILE HELIOS_EMBED/mkdocs.yml (Corrected Navigation) ---
