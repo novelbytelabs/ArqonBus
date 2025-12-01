@@ -1,4 +1,4 @@
-# ArqonBus: Enterprise-Grade Message Bus
+# 🛰️ ArqonBus: Enterprise-Grade Message Bus
 
 **ArqonBus** is a lightweight, high-performance WebSocket message bus engineered for enterprise-scale real-time communication. Built with Python 3.11+ and designed for mission-critical applications requiring sub-50ms message routing and 5,000+ concurrent connections.
 
@@ -8,7 +8,7 @@
 
 ---
 
-## 🚀 Why ArqonBus?
+## 🛰️ Why ArqonBus?
 
 While other message buses force you into complex ecosystems or limited protocols, ArqonBus delivers **enterprise-grade power** with **startup simplicity**. Whether you're building AI agents, real-time dashboards, or distributed systems, ArqonBus scales from prototype to production without compromise.
 
@@ -35,19 +35,19 @@ While other message buses force you into complex ecosystems or limited protocols
 
 ## 🎯 Core Capabilities
 
-### 🔌 Real-Time Communication
+### Real-Time Communication
 - **Persistent bi-directional WebSocket connections** with automatic reconnection
 - **Hierarchical routing** with rooms and channels: `room:channel` format
 - **Message types**: System broadcasts, private messages, commands, and events
 - **Automatic cleanup** of broken connections and duplicate delivery prevention
 
-### 🏠 Intelligent Room & Channel Management
+### Intelligent Room & Channel Management
 - **Dynamic channel creation** and management with participant tracking
 - **Rich client metadata**: Type, personality, screen name, avatar, activity tracking
 - **Built-in science workflow** with pre-configured channels:
   - `general`, `explore`, `hypothesize`, `design`, `execute`, `interpret`, `share`
 
-### 🧩 Powerful Command System
+### Powerful Command System
 Built-in administrative commands processed in real-time:
 
 - **`status`** - Server statistics, active channels, connected clients
@@ -58,14 +58,14 @@ Built-in administrative commands processed in real-time:
 - **`ping`** / **`pong`** - Connection health verification
 - **`history`** - Message filtering by room and channel
 
-### 📊 Enterprise Monitoring & Telemetry
+### Enterprise Monitoring & Telemetry
 - **Dual-server architecture** with separate telemetry WebSocket server
 - **Prometheus-compatible metrics** with structured event broadcasting
 - **Real-time activity tracking** for agents and human users
 - **Health endpoints**: `/health`, `/version`, `/metrics`
 - **Structured logging** with contextual client, room, and channel information
 
-### 💾 Flexible Persistence Options
+### Flexible Persistence Options
 - **In-memory mode** for high-performance, ephemeral communication
 - **Redis Streams integration** for guaranteed message delivery and history
 - **Graceful degradation** when Redis is unavailable
@@ -116,21 +116,21 @@ ws.send({
 
 ## 📈 Real-World Use Cases
 
-### 🤖 AI Agent Orchestration
+### AI Agent Orchestration
 Coordinate multiple AI agents across specialized channels with:
 
 - **Agent-specific routing** and load balancing
 - **Telemetry streaming** for model performance monitoring
 - **Command dispatch** for distributed task execution
 
-### 📊 Real-Time Dashboards
+### Real-Time Dashboards
 Build interactive dashboards with:
 
 - **Live data streaming** to multiple visualization components
 - **User-specific channels** for personalized experiences
 - **Historical data queries** through the message history system
 
-### 🔄 Microservice Communication
+### Microservice Communication
 Enable microservices to communicate with:
 
 - **Service discovery** through channel metadata
@@ -148,19 +148,19 @@ Create engaging multiplayer experiences with:
 
 ## 🛡️ Enterprise Features
 
-### 🏢 Production-Ready Infrastructure
+### Production-Ready Infrastructure
 - **Environment-based configuration** with zero hard-coded values
 - **Graceful failure handling** with isolated component failures
 - **Backwards compatibility** through protocol versioning
 - **Comprehensive error handling** with fail-loud programmer errors
 
-### 🔒 Security & Reliability
+### Security & Reliability
 - **Strict message envelope validation** with schema enforcement
 - **Connection cleanup** and memory leak prevention
 - **Rate limiting** and connection throttling capabilities
 - **Audit trails** through structured logging
 
-### 📊 Operational Excellence
+### Operational Excellence
 - **Metrics collection** with Prometheus formatting
 - **Health monitoring** with automatic service discovery
 - **Performance tracking** with p99 latency monitoring
@@ -168,7 +168,7 @@ Create engaging multiplayer experiences with:
 
 ---
 
-## 🎉 Why Choose ArqonBus?
+## 🛰️ Why Choose ArqonBus?
 
 | Feature | Traditional Message Buses | **ArqonBus** |
 |---------|---------------------------|--------------|

@@ -6,6 +6,8 @@ dev_addr: 127.0.0.1:8001
 
 theme:
   name: 'material'
+  logo: assets/logo.svg
+  favicon: assets/favicon.ico
   palette:
     scheme: slate
     primary: blue
@@ -37,6 +39,17 @@ nav:
   - Architecture:
     - Design & Architecture: 'architecture.md'
     - Project Scope: 'arqonbus_v1_scope.md'
+  - Specifications:
+    - Constitution: 'specs/constitution.md'
+    - Core Message Bus:
+      - Specification: 'specs/001-core-message-bus/spec.md'
+      - Implementation Plan: 'specs/001-core-message-bus/plan.md'
+      - Data Model: 'specs/001-core-message-bus/data-model.md'
+      - Quickstart: 'specs/001-core-message-bus/quickstart.md'
+      - Tasks: 'specs/001-core-message-bus/tasks.md'
+      - Requirements Checklist: 'specs/001-core-message-bus/checklists/requirements.md'
+      - HTTP Endpoints Contract: 'specs/001-core-message-bus/contracts/http-endpoints.md'
+      - WebSocket Protocol Contract: 'specs/001-core-message-bus/contracts/websocket-protocol.md'
   - Project Info:
     - Ecosystem: 'arqon_ecosystem.md'
     - Completion Report: 'completion_report.md'
