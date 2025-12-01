@@ -37,6 +37,7 @@ The ArqonTech ecosystem represents a complete, modern approach to real-time comm
 The cornerstone product that powers the entire ecosystem:
 
 **Core Capabilities**:
+
 - WebSocket message bus with sub-50ms routing
 - Room and channel-based message routing
 - Optional Redis Streams persistence
@@ -46,6 +47,7 @@ The cornerstone product that powers the entire ecosystem:
 - Multi-language client SDKs
 
 **Technical Achievement**:
+
 - Handles 5,000+ concurrent connections per instance
 - 100% message reliability with Redis persistence
 - Comprehensive test coverage (1,730+ lines of tests)
@@ -63,6 +65,7 @@ The cornerstone product that powers the entire ecosystem:
 Comprehensive client library suite for seamless integration:
 
 **Supported Languages**:
+
 - JavaScript/TypeScript (Node.js + Browser)
 - Python
 - Go
@@ -70,6 +73,7 @@ Comprehensive client library suite for seamless integration:
 - Swift (iOS/macOS)
 
 **SDK Features**:
+
 - Connection management with auto-reconnection
 - Type-safe message schemas
 - Room/channel helper utilities
@@ -83,6 +87,7 @@ Comprehensive client library suite for seamless integration:
 Extensibility layer that enables agents to interact with external tools:
 
 **Capabilities**:
+
 - Standardized tool execution interface
 - Request/response protocol for agent tools
 - Capability registry and discovery
@@ -101,6 +106,7 @@ Extensibility layer that enables agents to interact with external tools:
 The commercial cloud offering that makes ArqonBus accessible to any organization:
 
 **Core Services**:
+
 - Single-click ArqonBus deployments
 - Auto-scaling WebSocket clusters
 - Managed Redis Streams infrastructure
@@ -109,9 +115,9 @@ The commercial cloud offering that makes ArqonBus accessible to any organization
 - API key authentication and rate limiting
 - Global presence with edge locations
 
-**Business Model**: Usage-based pricing with enterprise plans
-**Competition**: Direct alternative to Pusher, Ably, and Socket.IO Cloud
-**Target**: Companies needing reliable real-time infrastructure without operational overhead
+**Business Model**: Usage-based pricing with enterprise plans  
+**Competition**: Direct alternative to Pusher, Ably, and Socket.IO Cloud  
+**Target**: Companies needing reliable real-time infrastructure without operational overhead  
 
 #### 🕸️ ArqonMesh - Distributed Architecture
 **Status**: 📈 Scaling Solution
@@ -119,6 +125,7 @@ The commercial cloud offering that makes ArqonBus accessible to any organization
 Multi-region, multi-node routing that globalizes ArqonBus:
 
 **Features**:
+
 - Automatic sharding and load balancing
 - Global WebSocket presence
 - Cross-region channel synchronization
@@ -134,6 +141,7 @@ Multi-region, multi-node routing that globalizes ArqonBus:
 Comprehensive observability for everything running on ArqonBus:
 
 **Capabilities**:
+
 - Real-time connection metrics
 - Per-room/channel traffic analysis
 - Latency histograms and performance tracking
@@ -153,6 +161,7 @@ Comprehensive observability for everything running on ArqonBus:
 Security and access control layer for ArqonTech products:
 
 **Features**:
+
 - API key management
 - JWT token support
 - Per-room/channel permissions
@@ -166,6 +175,7 @@ Security and access control layer for ArqonTech products:
 Standardized framework for connecting LLMs, bots, and services to ArqonBus:
 
 **Capabilities**:
+
 - Event handler registration
 - Skill and capability definitions
 - Device and service integrations
@@ -180,6 +190,7 @@ Standardized framework for connecting LLMs, bots, and services to ArqonBus:
 Higher-level orchestration built on top of ArqonBus messaging:
 
 **Features**:
+
 - Event-driven automation pipelines
 - Multi-service workflow coordination
 - Human + AI collaboration support
@@ -198,6 +209,7 @@ Higher-level orchestration built on top of ArqonBus messaging:
 Ultimate destination - a comprehensive hosting platform for agents, automations, and workflows:
 
 **Services**:
+
 - Agent deployment and scaling
 - Workflow hosting and execution
 - Real-time monitoring and management
@@ -215,12 +227,14 @@ Ultimate destination - a comprehensive hosting platform for agents, automations,
 ArqonTech is positioned to capture the real-time communication market with a modern, developer-friendly approach:
 
 **Target Markets**:
+
 - **Real-time Applications**: Chat, collaboration, gaming, IoT
 - **AI/ML Platforms**: Multi-agent systems, LLM applications, AI workflows
 - **Enterprise Software**: Internal tools, dashboards, monitoring systems
 - **Developer Tools**: SDK platforms, integration services, automation tools
 
 **Competitive Advantage**:
+
 - Structured messaging vs ad-hoc WebSocket implementations
 - Built-in persistence vs message loss in traditional systems
 - Enterprise-grade reliability vs consumer-focused alternatives

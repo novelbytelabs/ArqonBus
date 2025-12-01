@@ -8,20 +8,38 @@ theme:
   name: 'material'
   palette:
     scheme: slate
+    primary: blue
+    accent: light blue
   features:
     - navigation.sections
-#    - navigation.expand
+    - navigation.expand
 #    - toc.integrate
     - search.suggest
     - search.highlight
     - content.tabs.link
     - content.code.annotate
+    - navigation.top
+    - announce.dismiss
+    - content.code.copy
+    - content.action.copy
+    - content.action.view
 
 nav:
-  - 'Home': 'index.md'
-  - 'API Reference': 'api.md'
-  - 'Design & Architecture': 'architecture.md'
-  - 'Completion Report': 'completion_report.md'
+  - Home: 'index.md'
+  - Getting Started:
+    - Quick Start Guide: 'quickstart.md'
+    - Tutorial: 'tutorial.md'
+  - Operations:
+    - Operations Runbook: 'runbook.md'
+  - Developer Guide:
+    - Developers Guide: 'developers_guide.md'
+    - API Reference: 'api.md'
+  - Architecture:
+    - Design & Architecture: 'architecture.md'
+    - Project Scope: 'arqonbus_v1_scope.md'
+  - Project Info:
+    - Ecosystem: 'arqon_ecosystem.md'
+    - Completion Report: 'completion_report.md'
 
 markdown_extensions:
   - attr_list
@@ -32,6 +50,19 @@ markdown_extensions:
   - tables
   - admonition
   - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - md_in_html
+  - def_list
+  - pymdownx.snippets
+  - pymdownx.progressbar
+  - pymdownx.magiclink
 
 # Custom CSS file for additional styling
 extra_css:
@@ -42,3 +73,36 @@ docs_dir: 'docs'
 
 # This allows GitHub Actions to deploy the site to the gh-pages branch
 edit_uri: edit/main/docs/
+
+# Additional configuration
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.|'
+
+# Extra configuration
+extra:
+  version: '1.0.0'
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/novelbytelabs/arqonbus
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/arqoncloud
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: 1
+          note: >-
+            Thanks for your feedback!
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: 0
+          note: >-
+            Thanks for your feedback! Help us improve this page by
+            <a href="https://github.com/novelbytelabs/arqonbus/issues/new/?title=[Feedback]+{title}+-+{url}" target="_blank" rel="noopener">telling us what you found helpful or what could be improved</a>.
+
+copyright: 'Copyright &copy; 2025 NovelByte Labs - All rights reserved.'

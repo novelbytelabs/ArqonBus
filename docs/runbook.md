@@ -1,0 +1,422 @@
+# ArqonBus Operations Runbook
+
+## Overview
+
+This runbook provides operational procedures for deploying, managing, and troubleshooting ArqonBus v1.0 Core Message Bus in production environments.
+
+## Quick Reference
+
+### System Information
+- **Version**: v1.0.0
+- **Protocol**: WebSocket-based real-time messaging
+- **Storage**: Memory (development) or Redis Streams (production)
+- **Monitoring**: HTTP endpoints + Prometheus metrics
+- **Authentication**: Optional token-based authentication
+
+### Environment Setup
+
+```bash
+# Required environment variables for production
+export ARQONBUS_STORAGE_BACKEND=redis
+export ARQONBUS_REDIS_HOST=your-redis-host.com
+export ARQONBUS_REDIS_PORT=6379
+export ARQONBUS_REDIS_SSL=true
+export ARQONBUS_REDIS_PASSWORD=your-redis-password
+export ARQONBUS_SERVER_HOST=0.0.0.0
+export ARQONBUS_SERVER_PORT=8765
+export ARQONBUS_MAX_CONNECTIONS=1000
+export ARQONBUS_ENABLE_TELEMETRY=true
+export ARQONBUS_DEBUG=false
+```
+
+## Deployment Procedures
+
+### 1. Production Deployment
+
+#### Prerequisites
+- Redis instance (managed or self-hosted)
+- SSL certificates (for HTTPS/WebSocket connections)
+- System monitoring setup
+
+#### Deployment Steps
+
+1. **Configure Environment Variables**
+   ```bash
+   cp .env.production .env
+   # Edit .env with your production values
+   ```
+
+2. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Verify Redis Connectivity**
+   ```bash
+   python test_redis_connection.py
+   ```
+
+4. **Start ArqonBus Server**
+   ```bash
+   # Using the Python module
+   python -m arqonbus.main
+
+   # Or using the run script
+   ./run_arqonbus.sh start
+
+   # With custom configuration
+   ARQONBUS_STORAGE_BACKEND=redis python -m arqonbus.main --host 0.0.0.0 --port 8765
+   ```
+
+5. **Verify Health**
+   ```bash
+   curl http://localhost:8765/health
+   curl http://localhost:8765/metrics
+   ```
+
+### 2. Development Deployment
+
+```bash
+# Quick start with memory storage
+python -m arqonbus.main
+
+# Start with development logging
+export ARQONBUS_DEBUG=true
+export ARQONBUS_LOG_LEVEL=DEBUG
+python -m arqonbus.main
+```
+
+## Monitoring and Health Checks
+
+### Health Endpoints
+
+- **Health Check**: `GET /health`
+- **Server Status**: `GET /status`
+- **Metrics**: `GET /metrics`
+- **Version**: `GET /version`
+
+### Key Metrics to Monitor
+
+```bash
+# System health
+curl http://localhost:8765/health | jq
+
+# Connection statistics
+curl http://localhost:8765/status | jq '.websocket.connections'
+
+# Storage backend health
+curl http://localhost:8765/status | jq '.storage.health'
+```
+
+### Monitoring Alerts
+
+Set up alerts for:
+- Server health check failures
+- High connection count (>80% of max_connections)
+- Storage backend health failures
+- Memory usage growth patterns
+- WebSocket connection timeouts
+
+### Prometheus Metrics
+
+Available at `/metrics`:
+- `arqonbus_connections_active`
+- `arqonbus_messages_total`
+- `arqonbus_storage_operations_total`
+- `arqonbus_uptime_seconds`
+
+## Operational Procedures
+
+### Daily Operations
+
+#### Server Status Check
+```bash
+# Check if server is running
+ps aux | grep arqonbus
+
+# Check logs
+tail -f logs/arqonbus.log
+
+# Check health endpoints
+curl -s http://localhost:8765/health
+```
+
+#### Log Analysis
+```bash
+# Recent errors
+grep ERROR logs/arqonbus.log | tail -20
+
+# Connection statistics
+grep "connection" logs/arqonbus.log | tail -10
+
+# Memory usage growth
+grep "memory" logs/arqonbus.log | tail -10
+```
+
+### Weekly Operations
+
+#### Capacity Planning
+1. Review connection statistics over the past week
+2. Analyze message throughput patterns
+3. Check Redis memory usage if using Redis backend
+4. Review WebSocket connection durations
+
+#### Performance Review
+1. Check average response times
+2. Review failed connection attempts
+3. Analyze storage backend performance
+4. Check for any memory leaks
+
+### Monthly Operations
+
+#### Security Review
+1. Review authentication logs
+2. Check for unusual connection patterns
+3. Verify SSL certificate expiration
+4. Update dependencies if needed
+
+#### Backup and Recovery
+1. Test Redis backup procedures
+2. Verify log rotation is working
+3. Test disaster recovery procedures
+
+## Troubleshooting Guide
+
+### Common Issues
+
+#### 1. Server Won't Start
+
+**Symptoms**: Server fails to start or crashes immediately
+
+**Diagnosis**:
+```bash
+# Check if port is already in use
+netstat -tulpn | grep 8765
+
+# Check logs for errors
+tail -50 logs/arqonbus.log
+
+# Verify Redis connectivity
+redis-cli -h $REDIS_HOST -p $REDIS_PORT ping
+```
+
+**Solutions**:
+- Change server port if conflict exists
+- Fix Redis connection parameters
+- Check configuration file syntax
+
+#### 2. High Memory Usage
+
+**Symptoms**: Server consuming excessive memory
+
+**Diagnosis**:
+```bash
+# Check process memory usage
+ps aux | grep arqonbus
+
+# Analyze memory storage size
+curl http://localhost:8765/status | jq '.storage.memory_usage'
+
+# Check for memory leaks in logs
+grep "memory" logs/arqonbus.log | tail -20
+```
+
+**Solutions**:
+- Switch to Redis backend for persistence
+- Reduce max_history_size configuration
+- Implement regular restart schedule
+
+#### 3. Connection Timeouts
+
+**Symptoms**: Clients experiencing connection timeouts
+
+**Diagnosis**:
+```bash
+# Check WebSocket statistics
+curl http://localhost:8765/status | jq '.websocket'
+
+# Review connection logs
+grep "timeout" logs/arqonbus.log | tail -10
+
+# Check system resources
+top -p $(pgrep -f arqonbus)
+```
+
+**Solutions**:
+- Increase connection_timeout configuration
+- Check network connectivity
+- Review firewall settings
+
+#### 4. Redis Connection Failures
+
+**Symptoms**: Storage backend health check failures
+
+**Diagnosis**:
+```bash
+# Test Redis connection directly
+redis-cli -h $REDIS_HOST -p $REDIS_PORT ping
+
+# Check Redis logs
+tail -20 /var/log/redis/redis-server.log
+
+# Test with password
+redis-cli -h $REDIS_HOST -p $REDIS_PORT -a $REDIS_PASSWORD ping
+```
+
+**Solutions**:
+- Verify Redis credentials
+- Check network connectivity
+- Switch to memory storage temporarily
+
+### Emergency Procedures
+
+#### Immediate Server Restart
+
+```bash
+# Stop current server
+pkill -f arqonbus
+
+# Clear any stuck processes
+fuser -k 8765/tcp
+
+# Start with memory storage as fallback
+python -m arqonbus.main --storage-backend memory
+```
+
+#### Disaster Recovery
+
+1. **Switch to Memory Mode**
+   ```bash
+   export ARQONBUS_STORAGE_BACKEND=memory
+   python -m arqonbus.main
+   ```
+
+2. **Restore from Backup**
+   ```bash
+   # If using Redis with backups
+   redis-cli --rdb /path/to/backup.rdb
+   ```
+
+3. **Scale Temporarily**
+   - Use multiple ArqonBus instances
+   - Implement client-side load balancing
+
+## Configuration Management
+
+### Environment Variables Reference
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ARQONBUS_SERVER_HOST` | 127.0.0.1 | Server bind address |
+| `ARQONBUS_SERVER_PORT` | 8765 | Server port |
+| `ARQONBUS_MAX_CONNECTIONS` | 1000 | Maximum concurrent connections |
+| `ARQONBUS_STORAGE_BACKEND` | memory | Storage backend (memory/redis) |
+| `ARQONBUS_REDIS_HOST` | localhost | Redis host |
+| `ARQONBUS_REDIS_PORT` | 6379 | Redis port |
+| `ARQONBUS_REDIS_PASSWORD` | None | Redis password |
+| `ARQONBUS_REDIS_SSL` | false | Enable SSL for Redis |
+| `ARQONBUS_MAX_MESSAGE_SIZE` | 1048576 | Maximum WebSocket message size |
+| `ARQONBUS_COMPRESSION` | true | Enable message compression |
+| `ARQONBUS_ENABLE_TELEMETRY` | true | Enable telemetry events |
+| `ARQONBUS_LOG_LEVEL` | INFO | Logging level |
+| `ARQONBUS_DEBUG` | false | Enable debug mode |
+
+### Configuration Validation
+
+```bash
+# Validate current configuration
+python -c "
+from arqonbus.config.config import get_config, validate_config
+config = get_config()
+errors = validate_config()
+if errors:
+    print('Configuration errors:')
+    for error in errors:
+        print(f'  - {error}')
+else:
+    print('Configuration is valid')
+"
+```
+
+## Performance Tuning
+
+### Throughput Optimization
+
+1. **Increase Connection Limits**
+   ```bash
+   export ARQONBUS_MAX_CONNECTIONS=2000
+   export ARQONBUS_MAX_MESSAGE_SIZE=2097152
+   ```
+
+2. **Optimize Redis Settings**
+   ```bash
+   # In redis.conf
+   maxmemory-policy allkeys-lru
+   tcp-keepalive 60
+   save 60 1000
+   ```
+
+3. **Enable Compression**
+   ```bash
+   export ARQONBUS_COMPRESSION=true
+   ```
+
+### Memory Optimization
+
+1. **Limit Memory Storage**
+   ```bash
+   export ARQONBUS_MAX_HISTORY_SIZE=5000
+   ```
+
+2. **Use Redis for Persistence**
+   ```bash
+   export ARQONBUS_STORAGE_BACKEND=redis
+   export ARQONBUS_ENABLE_PERSISTENCE=true
+   ```
+
+## Security Considerations
+
+### Network Security
+
+1. **Use HTTPS/WSS in Production**
+   - Configure SSL certificates
+   - Use WSS protocol for WebSocket connections
+
+2. **Firewall Configuration**
+   ```bash
+   # Allow only necessary ports
+   ufw allow 8765/tcp
+   ufw deny 6379/tcp  # If Redis is external
+   ```
+
+3. **Redis Security**
+   - Use strong passwords
+   - Enable SSL for Redis connections
+   - Restrict Redis network access
+
+### Authentication
+
+1. **Enable Token Authentication**
+   ```bash
+   export ARQONBUS_ENABLE_AUTH=true
+   export ARQONBUS_AUTH_TOKEN=your-secure-token
+   ```
+
+2. **Rate Limiting**
+   ```bash
+   export ARQONBUS_RATE_LIMIT_PER_MINUTE=60
+   ```
+
+## Contact Information
+
+For operational support:
+- **Technical Issues**: Check logs and this runbook first
+- **Escalation**: Contact the development team
+- **Documentation**: See developers_guide.md for detailed API information
+
+## Additional Resources
+
+- **API Documentation**: See api.md
+- **Architecture Guide**: See architecture.md
+- **Developer Guide**: See developers_guide.md
+- **Tutorial**: See tutorial.md
