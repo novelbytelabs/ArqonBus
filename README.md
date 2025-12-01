@@ -1,6 +1,6 @@
 # ArqonBus
 
-**ArqonBus** is a lightweight, structured WebSocket message bus with rooms, channels, and a simple command protocol. It’s designed to be the real-time backbone for applications, services, and agents that need organized, multi-channel communication.
+**ArqonBus** is a lightweight, structured WebSocket message bus with rooms, channels, and a simple command protocol. It's designed to be the real-time backbone for applications, services, and agents that need organized, multi-channel communication.
 
 > Status: **experimental / WIP**
 
@@ -34,13 +34,13 @@
 - Automatic room/channel resolution:
   - explicit `room` / `channel`
   - `room:channel` format
-  - fallback to client’s initial room/channel
+  - fallback to client's initial room/channel
 - Message types:
   - **system** – internal/system broadcasts
   - **private** – direct to target client IDs
   - **command** – processed by the command handler
   - default **event** messages for normal traffic
-- “pm” channel support for private-channel style messaging.
+- "pm" channel support for private-channel style messaging.
 
 ### 📢 Broadcast Helpers
 - `broadcast_to_channel(room, channel, ...)`
@@ -86,6 +86,32 @@ Built-in commands (via `type: "command"`):
 ### 📈 Monitoring & Logging
 - Periodic stats logging (clients, rooms, total messages).
 - Detailed routing, command, and error logs.
+
+---
+
+## 📚 Documentation & Specifications
+
+### Core Specifications
+- **[Feature Specification](specs/001-core-message-bus/spec.md)** - User stories, requirements, and success criteria
+- **[Data Model](specs/001-core-message-bus/data-model.md)** - Entity relationships and validation rules
+- **[Implementation Plan](specs/001-core-message-bus/plan.md)** - Technical architecture and constitutional compliance
+- **[Task Breakdown](specs/001-core-message-bus/tasks.md)** - Detailed implementation tasks and dependencies
+
+### Implementation Guides
+- **[Quickstart Guide](specs/001-core-message-bus/quickstart.md)** - Integration scenarios and testing patterns
+
+### Quality & Requirements
+- **[Requirements Checklist](specs/001-core-message-bus/checklists/requirements.md)** - Specification quality validation
+
+### Technical Contracts
+- **[WebSocket Protocol](specs/001-core-message-bus/contracts/websocket-protocol.md)** - Complete message envelope specification
+- **[HTTP Endpoints](specs/001-core-message-bus/contracts/http-endpoints.md)** - Health, metrics, and monitoring APIs
+
+### Additional Documentation
+- **[Architecture Guide](docs/architecture.md)** - Detailed system architecture and component descriptions
+- **[API Documentation](docs/api.md)** - Complete API reference and usage examples
+- **[ArqonTech Ecosystem](docs/arqon_ecosystem.md)** - Product positioning and roadmap
+- **[ArqonBus v1.0 Scope](docs/arqonbus_v1_scope.md)** - Product evolution plan and gap analysis
 
 ---
 
