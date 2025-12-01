@@ -910,3 +910,493 @@ ArqonBus Python code should follow these structural principles:
 If new code starts to resemble the “Not ArqonBus-Style” patterns, it should be **rejected in review** or immediately refactored.
 
 ---
+
+
+## VIII. Observability, Performance & Operations
+
+CASIL is part of the runtime system and must be observable and operable like any other core layer.
+
+### 1. Metrics & Telemetry
+
+ArqonBus must expose enough signals to operate confidently, including CASIL:
+
+- Core bus metrics:
+  - Active connections, per-room and per-channel usage.
+  - Message throughput and error rates.
+  - History usage and Redis health.
+  - Latency summaries (e.g. p50/p95/p99 for message handling where feasible).
+- CASIL metrics & telemetry:
+  - Counts of classified messages by `kind` and `risk_level`.
+  - Counts of policy outcomes: `allow`, `allow_with_redaction`, `block`.
+  - Counts and rates of:
+    - oversize payloads (inspection skipped or blocked),
+    - “probable secret” detections,
+    - repeated policy violations per client/room/channel.
+  - Suspicious pattern events: which clients/rooms are generating most violations, and what actions CASIL is taking (tag/block).
+
+Telemetry must follow the same hygiene guarantees as logs: **no raw payloads**, redacted fields only, and stable schemas for dashboards.
+
+### 2. Performance & Latency Expectations
+
+While exact numbers depend on deployment, the system should:
+
+- Avoid unbounded memory growth in normal operation.
+- Handle bursts gracefully via backpressure or rate limiting.
+- Make no hidden blocking calls on hot paths that could stall the event loop.
+- Keep CASIL overhead:
+  - bounded by `max_inspect_bytes` and pattern limits,
+  - predictable in the presence of worst-case (but valid) inputs,
+  - near-zero when CASIL is disabled.
+
+Performance characteristics and known limits (including CASIL caps and limits) should be **documented**, not guessed.
+
+### 3. Graceful Degradation
+
+- If Redis Streams is unavailable, the system should fall back to in-memory history where feasible.
+- Telemetry failures must not crash the bus; CASIL telemetry is allowed to drop events under backpressure, with clear warnings.
+- CASIL failures or misconfigurations:
+  - must follow the configured `default_decision` (allow/block),
+  - must emit explicit logs and telemetry (e.g. `CASIL_INTERNAL_ALLOW/BLOCK`),
+  - must never crash the main bus loop.
+- Misconfiguration of core or CASIL settings should produce explicit startup errors rather than silent degradation.
+
+### 4. Configuration & Environment Discipline
+
+- All operational settings must be definable through environment variables or config files, including the CASIL block:
+  - `casil.enabled`, `casil.default_decision`,
+  - `casil.scope.include` / `casil.scope.exclude`,
+  - `casil.limits.*` (max_inspect_bytes, max_policies, max_patterns, oversize behavior),
+  - `casil.persist_metadata_in_history`,
+  - `casil.expose_metadata_to_clients`.
+- There should be a **single, documented** configuration resolution order.
+- Non-default, production-relevant configuration (including hardened CASIL policies) should be reflected in deployment examples.
+- CASIL config changes are **restart-only** in v1; any future live-reload must be designed and documented explicitly.
+
+---
+
+## IX. Documentation
+
+Documentation is a first-class part of ArqonBus, not an afterthought.
+
+If code and behavior change but the docs don’t, the system is effectively **undocumented**.  
+This section defines the required documentation set, who it is for, and what “good” looks like for each artifact.
+
+CASIL (Feature 002) is considered part of the core product and must be covered consistently across docs.
+
+---
+
+### 1. Documentation Principles
+
+- **Docs are part of the product.**  
+  An operator or developer’s first experience of ArqonBus is through its documentation. Sloppy docs imply sloppy internals.
+
+- **Specs are the source of truth; docs are curated views.**  
+  Spec Kit artifacts (`spec.md`, `plan.md`, `tasks.md`) define behavior. Documentation files present that behavior to different audiences in coherent, opinionated forms.
+
+- **Every change that affects users or operators must be reflected in docs.**  
+  This includes protocol changes, CASIL behavior, configuration semantics, telemetry schemas, and operational procedures.
+
+- **Documentation should be as small as possible but no smaller.**  
+  Avoid walls of text. Each document should have a tight purpose, clear structure, and pragmatic examples.
+
+- **CASIL must not be a hidden feature.**  
+  Its purpose (content-aware safety), limits (64 KiB inspection cap, pattern limits), and trade-offs (default allow vs block, oversize behavior) must be clearly explained wherever relevant.
+
+---
+
+### 2. Required Documentation Set
+
+ArqonBus must maintain and ship, at minimum, the following top-level documentation:
+
+- `README.md` – high-level overview and repo entrypoint, including a short CASIL overview and where to read more.
+- `quickstart.md` – “get it running in 10–15 minutes.”
+- `architecture.md` – how ArqonBus is built and how the pieces fit together, including where CASIL sits in the pipeline.
+- `developers_guide.md` – how to work on ArqonBus itself as a contributor, including how to extend or adjust CASIL safely.
+- `runbook.md` – operational guide for running ArqonBus in real environments, including CASIL tuning, incident levers, and error/telemetry interpretation.
+- `tutorial.md` – a narrative, end-to-end walkthrough building something small but realistic on top of ArqonBus, ideally showing an example of CASIL in action (e.g., blocking secrets or oversize messages).
+- Protocol & command reference (can be in `specs/` or a dedicated doc) – authoritative API documentation, including error codes (`CASIL_POLICY_BLOCKED`, etc.) and any CASIL-related metadata fields.
+
+All of these documents must be discoverable from the `README.md`.
+
+---
+
+### 3. `quickstart.md` – First Contact
+
+**Audience:** New users who want to try ArqonBus with minimal context.
+
+**Goals:**
+
+- Get a working instance running locally or in a simple container environment.
+- Demonstrate the *minimum viable flow*: connect client → join room → send and receive a message.
+- Optionally show that CASIL can be turned on with a single config flag, without going into deep policy details.
+
+**Must include:**
+
+- Prerequisites (runtime, Python version, Docker optional, Redis optional).
+- A minimal “run the server” example.
+- A minimal client snippet (JS/TS and/or Python) that:
+  - connects,  
+  - joins a room,  
+  - sends a message,  
+  - logs a received message.
+- A short “next steps” section pointing to:
+  - `architecture.md` for deeper understanding,  
+  - `tutorial.md` for a guided build,  
+  - `runbook.md` for real deployment,
+  - a pointer to CASIL docs (e.g., “see Security & CASIL section in architecture/runbook”).
+
+The quickstart must be **copy-pasteable** and should be re-run whenever the protocol or startup process changes.
+
+---
+
+### 4. `architecture.md` – How ArqonBus Works
+
+**Audience:** Engineers who need to understand ArqonBus internals to operate, extend, or integrate with it at a deeper level.
+
+**Goals:**
+
+- Explain the major components and how they interact.
+- Reflect the layered model from the constitution (transport, routing, commands, storage, telemetry, CASIL).
+- Make it possible to reason about performance, failure modes, and extension points.
+
+**Must include:**
+
+- A high-level diagram of the core architecture:
+  - WebSocket entrypoints  
+  - routing core  
+  - CASIL inspection & policy layer (between validation and routing/persistence)  
+  - command handling  
+  - storage adapters  
+  - telemetry outputs
+- A clear explanation of:
+  - connection lifecycle,  
+  - message flow from client → server → recipients,  
+  - how history works (in-memory vs Redis Streams),  
+  - how CASIL affects persistence (blocked vs redacted vs original),  
+  - how telemetry is emitted, including CASIL events.
+- Description of extension points:
+  - how to add a new command,  
+  - how to add a new storage backend,  
+  - how to hook into telemetry,  
+  - how to extend CASIL classification or policy rules safely.
+- Explicit notes on:
+  - concurrency/async model,  
+  - ordering guarantees (or the lack thereof),  
+  - persistence guarantees.
+
+`architecture.md` must be updated whenever there are meaningful architectural changes (including CASIL behavior changes).
+
+---
+
+### 5. `developers_guide.md` – Contributing to ArqonBus
+
+**Audience:** Core contributors and external developers working on ArqonBus itself.
+
+**Goals:**
+
+- Make the contributor experience predictable and low-friction.
+- Encode the practical application of the constitution, SDD, TDD, and CASIL rules into daily workflow.
+- Standardize how features and fixes are added.
+
+**Must include (in addition to existing points):**
+
+- How CASIL is structured in the codebase (package layout, main entrypoints).
+- How to:
+  - add or modify CASIL policies,
+  - add new classification rules,
+  - update CASIL telemetry schemas,
+  - adjust limits (max_inspect_bytes, oversize behavior) without breaking guarantees.
+- Requirements for changes that touch CASIL:
+  - tests and docs required,
+  - when to update security/observability sections,
+  - how to validate that CASIL does not leak sensitive data.
+
+The developers’ guide should make it hard to “accidentally” bypass or weaken CASIL.
+
+---
+
+### 6. `runbook.md` – Operating ArqonBus in the Wild
+
+**Audience:** SREs, ops engineers, and developers on call.
+
+**Goals:**
+
+- Provide step-by-step, low-drama procedures for common situations.
+- Document what “normal” looks like and how to recognize “not normal.”
+- Reduce guesswork when something breaks at 3 a.m.
+
+**Must include (in addition to existing points):**
+
+- CASIL-specific operational guidance:
+  - how to enable/disable CASIL safely,
+  - how to tighten or relax policies during an incident,
+  - how to interpret CASIL error codes and telemetry events,
+  - how to handle oversize payload spikes or secret-detection bursts.
+- Example CASIL configs for common scenarios:
+  - “never log payloads for secure rooms,”
+  - “block probable API keys,”
+  - “tag but allow large AI messages” (if enabled).
+- Procedures for CASIL-related incidents:
+  - misconfigured policies blocking critical traffic,
+  - telemetry sinks failing under load,
+  - suspected leaks requiring immediate tightening of CASIL settings.
+
+If a production incident reveals missing CASIL instructions, `runbook.md` must be updated as part of the resolution.
+
+---
+
+### 7. `tutorial.md` – A Guided Build
+
+**Audience:** Developers who learn best by building something concrete.
+
+**Goals:**
+
+- Demonstrate how to use ArqonBus to build a small but realistic feature end-to-end.
+- Show recommended patterns and avoid anti-patterns.
+- Bridge the gap between quickstart snippets and full applications.
+
+**CASIL expectation:**
+
+- At least one tutorial path should showcase CASIL in a realistic scenario (e.g., a chat or AI integration where CASIL:
+  - blocks obviously secret-like content,
+  - or enforces size limits and shows what the client sees).
+
+---
+
+### 8. Maintenance Rules
+
+- **Docs must change when behavior changes.**  
+  Any PR that alters externally visible behavior (protocol, commands, CASIL behavior, config, telemetry, performance characteristics) must update:
+  - at least one of: `README.md`, `quickstart.md`, `architecture.md`, `developers_guide.md`, `runbook.md`, `tutorial.md`,  
+  - and/or the protocol/reference/specs.
+
+- **Broken docs are bugs.**  
+  If something in the docs is wrong, out of date, or misleading (especially around CASIL safety guarantees), it is treated as a defect.
+
+- **Examples must compile (or run).**  
+  Code examples, including CASIL examples, should be extractable or validated where practical.
+
+- **Documentation debt is tracked.**  
+  If a feature ships with minimal or temporary documentation, a follow-up task must be captured in Spec Kit and the backlog.
+
+---
+
+### 9. Good vs Bad Documentation (ArqonBus Style)
+
+**ArqonBus-style documentation:**
+
+- Shows a complete minimal example, not a half-snippet.
+- Explains *why* a feature exists and when to use it, including when to use CASIL and how to configure it safely.
+- Points to other documents for deeper understanding instead of repeating content.
+- Stays consistent with terminology (rooms, channels, envelope, commands, telemetry, CASIL).
+
+**Not ArqonBus-style documentation:**
+
+- Mentions CASIL (or any feature) in passing without showing how to use it safely.
+- Uses terms not found in the protocol or architecture.
+- Leaves out critical configuration details needed to reproduce examples.
+- Buries important operational caveats (e.g., CASIL limits) in a footnote or not at all.
+
+---
+
+## X. Security & Safety Baseline
+
+ArqonBus is infrastructure. If it is insecure, nothing built on top of it can be trusted.
+
+Security is not a layer sprinkled on later, or a “nice to have.”  
+It is a **design constraint** that applies from protocol to code to deployment.
+
+This section defines the minimum, non-negotiable security posture for ArqonBus.
+
+---
+
+### 1. Security by Design
+
+- **Security considerations must be part of every spec and plan.**  
+  For any new feature, the specification and plan must answer:
+  - What can go wrong if this is abused?  
+  - How does this interact with authentication/authorization?  
+  - Does this increase the attack surface?
+
+- **Secure by default, configurable by experts.**  
+  Defaults must be conservative:
+  - reasonable message size limits,  
+  - sane rate limits,  
+  - safe timeouts,  
+  - telemetry that does not leak sensitive content.
+
+- **No feature ships without a security story.**  
+  A feature that cannot be secured is either redesigned or rejected.
+
+---
+
+### 2. Least Privilege & Isolation
+
+- **Principle of Least Privilege (PoLP).**
+  - The ArqonBus process should run with the minimum OS and network privileges required.
+  - Access to Redis, logs, and config must be scoped to exactly what is needed.
+
+- **Separation of concerns at runtime.**
+  - Operational concerns (metrics, telemetry, admin endpoints) should be logically isolated from user message flow (e.g., separate ports / paths / roles where appropriate).
+  - Admin operations (e.g. shutting down, draining connections, introspecting state) must not be exposed through the same channels and permissions as regular client traffic.
+
+- **Multi-tenant awareness (when applicable).**
+  - If ArqonBus is run in a multi-tenant configuration, tenant boundaries must be explicit in the design (e.g. separate namespaces, auth scopes, routing constraints).
+  - No tenant should be able to infer or affect the existence, activity, or data of another tenant via timing, error messages, or protocol behavior.
+
+---
+
+### 3. Authentication & Authorization
+
+- **Pluggable but explicit auth.**
+  - ArqonBus itself should not hard-code a single auth scheme, but it must:
+    - define clear hooks for authentication and authorization, and  
+    - document how to integrate with common schemes (JWT, API keys, OIDC-backed gateways, etc.).
+
+- **Auth decisions are centralized and auditable.**
+  - Logic that decides “who can connect / join / send / subscribe” must be:
+    - centralized (not sprinkled throughout the code),  
+    - testable,  
+    - observable (with structured logs, not guesswork).
+
+- **No assumptions of implicit trust.**
+  - All client connections are untrusted by default.
+  - Any operation that changes server state (joining rooms, creating channels, invoking commands) must be guarded by explicit checks.
+
+---
+
+### 4. Input Handling & Protocol Robustness
+
+- **Strict validation at the edge.**
+  - All incoming data (handshakes, envelopes, payloads) must be validated before being processed or stored.
+  - Invalid or malformed messages must be rejected with clear error semantics, not partially processed.
+
+- **Defensive limits.**
+  - Message size limits must be in place and configurable.
+  - Per-connection and per-IP rate limiting must be possible (even if implemented via external infra, ArqonBus must support the necessary hooks / signals).
+  - Resource-intensive operations (e.g., history retrieval) must have bounded parameters and sane defaults.
+
+- **Robust against malicious patterns.**
+  - Known attack vectors (flooding, slowloris-style behavior, repeated malformed messages, room-join abuse) must be considered in design and tests.
+  - Where feasible, the system should:
+    - temporarily or permanently block abusive clients, and  
+    - surface actionable diagnostics to operators.
+
+---
+
+### 5. Secrets, Configuration & Logging
+
+- **Secrets are never hard-coded.**
+  - API keys, tokens, passwords, and certificates must not appear in source code or defaults.
+  - Secrets are provided via environment variables, secret management systems, or explicitly designated config files.
+
+- **Sensitive data is protected in logs.**
+  - No secret material (tokens, passwords, auth headers, private keys) may be logged at INFO or WARN levels.
+  - DEBUG logging that may reveal sensitive payloads must:
+    - be clearly marked as such, and  
+    - be opt-in via configuration.
+
+- **Configuration footprint is explicit and documented.**
+  - Every security-impacting configuration option (limits, timeouts, auth hooks, TLS settings) must be:
+    - documented,  
+    - have clear defaults,  
+    - and be safe if misconfigured in common ways.
+
+---
+
+### 6. Transport Security
+
+- **TLS is the expected norm.**
+  - ArqonBus must be able to run behind TLS-terminating proxies or with TLS enabled directly.
+  - Documentation must clearly spell out secure deployment modes (reverse proxies, trusted networks, mTLS if applicable).
+
+- **No “security through obscurity.”**
+  - Relying on “hidden ports” or “nobody will find this endpoint” is not considered acceptable security posture.
+
+---
+
+### 7. Security Testing & Review
+
+- **Security scenarios must be part of tests.**
+  - Tests should include:
+    - malformed envelopes,  
+    - oversized payloads,  
+    - high-frequency bursts,  
+    - invalid command sequences,  
+    - unauthorized access attempts.
+
+- **Security impact is reviewed with changes.**
+  - Any PR that:
+    - introduces a new external dependency,  
+    - changes auth behavior,  
+    - modifies routing logic, or  
+    - alters how data is persisted  
+    must explicitly call out security implications.
+
+- **Dependency hygiene.**
+  - Dependencies must be kept up to date with security patches.
+  - Known vulnerable versions must not be used.
+  - Where possible, supply chain risks (e.g. unmaintained libraries) must be minimized or replaced.
+
+---
+
+### 8. Incident Response & Safety
+
+- **Security incidents are first-class incidents.**
+  - If a behavior could lead to data leakage, unauthorized access, or system compromise, it must be treated as a priority issue.
+
+- **Clear operator playbooks.**
+  - `runbook.md` must contain:
+    - steps for revoking compromised secrets,  
+    - steps for tightening configuration in an emergency,  
+    - guidance for temporarily restricting access (e.g. disabling certain commands or endpoints).
+
+- **Safe failure modes.**
+  - When in doubt, the system should fail **closed** (deny) rather than fail open (allow) for security decisions.
+
+---
+
+Security is **not a bolt-on feature**.  
+It is part of what makes ArqonBus a serious piece of infrastructure.
+
+Any feature, change, or optimization that compromises these principles is **not acceptable**, regardless of convenience.
+
+---
+
+## XI. Governance & Scope Protection
+
+### 1. Decision-Making Rules
+
+- Architectural changes must be justified in a spec before implementation.
+- Any proposal that pushes ArqonBus outside its defined scope (e.g. turning it into a workflow engine or orchestration layer) must be:
+  - rejected from core, or  
+  - split into a **separate project** in the Arqon ecosystem.
+
+### 2. Scope Protection
+
+- ArqonBus is **transport infrastructure**, not an application runtime.
+- Higher-level systems (e.g. ArqonBus Workbench, proto-intelligent agents, etc.) must live in separate repositories or modules built on top of the bus.
+
+### 3. Constitution Authority
+
+- This constitution is binding for all core work.
+- Specs, plans, tasks, and implementations must align with these principles.
+- When in doubt, defer to:
+  1. Scope boundaries  
+  2. Protocol stability  
+  3. Simplicity and clarity  
+
+### 4. Amendments
+
+- Changing this constitution requires:
+  - A clear motivation (what is broken / missing).  
+  - A spec entry describing the impact.  
+  - A version bump of this document.  
+  - Consensus from maintainers.
+
+---
+
+**Version**: 1.1.0  
+**Ratified**: 2025-12-01  
+**Last Amended**: 2025-12-01
+**Author**: Mike Young
