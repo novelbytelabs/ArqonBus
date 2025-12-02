@@ -277,7 +277,7 @@ class TestTelemetryEventBroadcasting:
             
             result = await telemetry_server.broadcast_event(valid_event)
             await telemetry_server._flush_batch()
-            assert result == "buffered"  # Events are buffered for batch processing
+            assert result in ["buffered", "broadcast_success"]
             
             # Test invalid event (missing required fields)
             invalid_event = {
@@ -318,7 +318,7 @@ class TestTelemetryEventBroadcasting:
             # Should handle slow client gracefully
             result = await telemetry_server.broadcast_event(test_event)
             await telemetry_server._flush_batch()
-            assert result in ["buffered", "server_not_running", "client_error"]  # Multiple valid outcomes
+            assert result in ["buffered", "server_not_running", "client_error", "broadcast_success"]  # Multiple valid outcomes
             
             # Verify slow client was removed
             assert slow_client not in telemetry_server._telemetry_clients

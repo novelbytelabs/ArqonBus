@@ -9,6 +9,7 @@ import asyncio
 import json
 import time
 import statistics
+import itertools
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import AsyncMock
 from datetime import datetime, timezone
@@ -18,6 +19,19 @@ import psutil
 from arqonbus.server import ArqonBusServer
 from arqonbus.protocol.envelope import Envelope
 from arqonbus.protocol.ids import generate_message_id
+from arqonbus.config.config import load_config
+
+_port_sequence = itertools.count(42000)
+
+
+def _next_port() -> int:
+    return next(_port_sequence)
+
+
+def _perf_ws_uri(config: dict) -> str:
+    host = config["server"]["host"]
+    port = config["server"]["port"]
+    return f"ws://{host}:{port}"
 
 
 class TestPerformanceScenarios:
@@ -26,32 +40,39 @@ class TestPerformanceScenarios:
     @pytest.fixture
     def performance_config(self):
         """Server configuration for performance testing."""
-        return {
-            "server": {"host": "localhost", "port": 8765},
-            "websocket": {"host": "localhost", "port": 8765},
+        ws_port = _next_port()
+        telemetry_port = _next_port()
+        http_port = _next_port()
+        config = {
+            "server": {"host": "127.0.0.1", "port": ws_port},
+            "websocket": {"host": "127.0.0.1", "port": ws_port},
             "storage": {"backend": "memory", "max_history_size": 10000},
             "telemetry": {
                 "enabled": False,  # Disable for performance testing
-                "host": "localhost",
-                "port": 8081
+                "host": "127.0.0.1",
+                "port": telemetry_port
             },
             "http": {
                 "enabled": False,  # Disable for performance testing
-                "host": "localhost",
-                "port": 8080
+                "host": "127.0.0.1",
+                "port": http_port
             },
             "commands": {"enabled": True}
         }
+        try:
+            yield config
+        finally:
+            load_config()
     
     @pytest.mark.performance
     @pytest.mark.asyncio
     async def test_concurrent_websocket_connections(self, performance_config):
         """Test performance with many concurrent WebSocket connections."""
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=performance_config)
         await server.start()
         
         try:
-            uri = f"ws://localhost:8765"
+            uri = _perf_ws_uri(performance_config)
             num_connections = 100
             
             # Measure connection setup time
@@ -100,11 +121,11 @@ class TestPerformanceScenarios:
     @pytest.mark.asyncio
     async def test_message_throughput(self, performance_config):
         """Test message throughput performance."""
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=performance_config)
         await server.start()
         
         try:
-            uri = f"ws://localhost:8765"
+            uri = _perf_ws_uri(performance_config)
             num_messages = 1000
             
             # Single client for throughput testing
@@ -146,11 +167,11 @@ class TestPerformanceScenarios:
     @pytest.mark.asyncio
     async def test_command_execution_performance(self, performance_config):
         """Test command execution performance."""
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=performance_config)
         await server.start()
         
         try:
-            uri = f"ws://localhost:8765"
+            uri = _perf_ws_uri(performance_config)
             num_commands = 500
             
             async with websockets.connect(uri) as client_ws:
@@ -209,7 +230,7 @@ class TestPerformanceScenarios:
     @pytest.mark.asyncio
     async def test_memory_usage_under_load(self, performance_config):
         """Test memory usage under sustained load."""
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=performance_config)
         await server.start()
         
         try:
@@ -217,7 +238,7 @@ class TestPerformanceScenarios:
             process = psutil.Process()
             baseline_memory = process.memory_info().rss
             
-            uri = f"ws://localhost:8765"
+            uri = _perf_ws_uri(performance_config)
             num_messages = 5000
             
             # Create multiple clients for load
@@ -278,11 +299,11 @@ class TestPerformanceScenarios:
     @pytest.mark.asyncio
     async def test_sustained_load_test(self, performance_config):
         """Test sustained load over time."""
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=performance_config)
         await server.start()
         
         try:
-            uri = f"ws://localhost:8765"
+            uri = _perf_ws_uri(performance_config)
             test_duration = 30  # seconds
             messages_per_second = 50
             
@@ -346,7 +367,7 @@ class TestPerformanceScenarios:
     @pytest.mark.asyncio
     async def test_storage_performance(self, performance_config):
         """Test storage backend performance."""
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=performance_config)
         await server.start()
         
         try:
@@ -405,11 +426,11 @@ class TestPerformanceScenarios:
     @pytest.mark.asyncio
     async def test_concurrent_message_routing(self, performance_config):
         """Test concurrent message routing performance."""
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=performance_config)
         await server.start()
         
         try:
-            uri = f"ws://localhost:8765"
+            uri = _perf_ws_uri(performance_config)
             num_routes = 200
             
             # Create multiple routing scenarios

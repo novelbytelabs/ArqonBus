@@ -50,7 +50,7 @@ Organizations need optional message durability for important conversations and o
 **Acceptance Scenarios**:
 
 1. **Given** Redis Streams is configured, **When** clients send messages to channels, **Then** messages persist beyond client connections and can be retrieved using the history command with configurable retention periods
-2. **Given** telemetry is enabled, **When** clients connect, send messages, and disconnect, **Then** activity events are broadcast to the integriguard:telemetry-stream and agent_activity events are sent to dashboard-events
+2. **Given** telemetry is enabled, **When** clients connect, send messages, and disconnect, **Then** activity events are broadcast on the default `arqonbus.telemetry` stream (or configured rooms) and agent/lifecycle events are emitted for dashboards and observability clients
 3. **Given** HTTP endpoints are available, **When** requests are made to /health, /metrics, and /version, **Then** appropriate responses are returned with current system status, Prometheus-formatted metrics, and version information
 
 ### Edge Cases
@@ -67,9 +67,9 @@ Organizations need optional message durability for important conversations and o
 
 - **FR-001**: System MUST provide a real-time WebSocket server that handles persistent, bi-directional connections with configurable host and port settings
 - **FR-002**: System MUST support structured routing through rooms (logical namespaces) and channels (sub-streams within rooms) using room:channel format
-- **FR-003**: System MUST implement a strict, versioned message envelope with required fields: version, id, type, room, channel, from, timestamp, payload, and optional metadata
+- **FR-003**: System MUST implement a strict, versioned message envelope with required core fields (`id`, `type`, `version`, `timestamp`, and type-specific content such as `payload` or `command`). Routing fields (`room`, `channel`, `sender`) remain optional so system messages, commands, and broadcast events continue to function when a room/channel is not required. Legacy aliases (`from_client`, `to_client`) MUST be preserved for backward compatibility.
 - **FR-004**: System MUST provide built-in server commands: status, create_channel, delete_channel, join_channel, leave_channel, list_channels, channel_info, ping, and history
-- **FR-005**: System MUST support optional persistence via Redis Streams while defaulting to in-memory FIFO ring buffer with configurable size
+- **FR-005**: System MUST support optional persistence via Redis Streams while defaulting to an in-memory FIFO ring buffer with configurable size, and MUST gracefully fall back to memory when Redis is unavailable at startup or during runtime.
 - **FR-006**: System MUST implement separate telemetry WebSocket server on configurable port for monitoring and activity event broadcasting
 - **FR-007**: System MUST expose minimal HTTP endpoints: /health (liveness), /version (server/protocol versions), /metrics (Prometheus format)
 - **FR-008**: System MUST support client types (human, ai-agent, dashboard, service) with metadata including client_id, screen_name, avatar, personality, connected_at, last_activity
@@ -77,6 +77,7 @@ Organizations need optional message durability for important conversations and o
 - **FR-010**: System MUST reject malformed message envelopes and disconnect clients on repeated protocol violations
 - **FR-011**: System MUST validate telemetry events with required eventType and payload fields, broadcasting to integriguard:telemetry-stream
 - **FR-012**: System MUST emit lightweight agent_activity events for AI agents to integriguard:dashboard-events channel
+- **FR-013**: System MUST expose configuration override/reset mechanisms so that tests and multi-instance deployments can specify distinct host/port/telemetry settings without polluting global defaults, and MUST provide a reliable way (e.g., `load_config()`) to restore canonical settings between runs.
 
 ### Key Entities
 
