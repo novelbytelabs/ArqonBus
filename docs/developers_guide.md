@@ -164,7 +164,7 @@ config = ArqonBusConfig()
 
 # Server configuration
 config.server.host = "0.0.0.0"
-config.server.port = 8765
+config.server.port = 9100
 config.server.max_connections = 1000
 
 # Storage configuration
@@ -259,7 +259,7 @@ class ArqonBusClient:
 
 # Usage
 async def main():
-    async with ArqonBusClient("ws://localhost:8765") as client:
+    async with ArqonBusClient("ws://localhost:9100") as client:
         await client.send({
             "type": "message",
             "channel": "general",
@@ -787,7 +787,7 @@ from arqonbus.config.config import ArqonBusConfig
 @pytest.fixture
 async def test_server():
     config = ArqonBusConfig()
-    config.server.port = 8766  # Different port for testing
+    config.server.port = 9101  # Different port for testing
     config.storage.backend = "memory"
     
     server = ArqonBusServer(config)
@@ -800,7 +800,7 @@ async def test_server_health(test_server):
     # Test server health endpoint
     import aiohttp
     async with aiohttp.ClientSession() as session:
-        async with session.get("http://localhost:8766/health") as resp:
+        async with session.get("http://localhost:9101/health") as resp:
             data = await resp.json()
             assert data["status"] == "healthy"
 
@@ -809,7 +809,7 @@ async def test_message_routing(test_server):
     # Test message routing
     import websockets
     
-    async with websockets.connect("ws://localhost:8766") as websocket:
+    async with websockets.connect("ws://localhost:9101") as websocket:
         # Send a test message
         message = {
             "type": "message",
@@ -848,7 +848,7 @@ async def test_multiple_clients():
     import asyncio
     
     async def client_task(client_id):
-        async with websockets.connect("ws://localhost:8766") as websocket:
+        async with websockets.connect("ws://localhost:9101") as websocket:
             # Client logic here
             pass
             
@@ -866,7 +866,7 @@ import asyncio
 async def test_message_throughput():
     async def send_messages(num_messages):
         start_time = time.time()
-        async with websockets.connect("ws://localhost:8766") as websocket:
+        async with websockets.connect("ws://localhost:9101") as websocket:
             for i in range(num_messages):
                 message = {
                     "type": "message",
@@ -979,7 +979,7 @@ spec:
         - name: ARQONBUS_REDIS_HOST
           value: "redis-service"
         ports:
-        - containerPort: 8765
+        - containerPort: 9100
 ---
 apiVersion: v1
 kind: Service
@@ -989,8 +989,8 @@ spec:
   selector:
     app: arqonbus
   ports:
-  - port: 8765
-    targetPort: 8765
+  - port: 9100
+    targetPort: 9100
   type: LoadBalancer
 ```
 
@@ -1048,7 +1048,7 @@ class MicroserviceBus:
 
 # Usage
 async def user_service():
-    bus = MicroserviceBus("user-service", "ws://localhost:8765")
+    bus = MicroserviceBus("user-service", "ws://localhost:9100")
     await bus.register_service()
     
     async def handle_notification(event):
@@ -1094,7 +1094,7 @@ class DashboardClient:
 
 # Dashboard web interface
 async def dashboard_app():
-    client = DashboardClient("ws://localhost:8765")
+    client = DashboardClient("ws://localhost:9100")
     await client.connect()
     
     def update_ui(channel, content):

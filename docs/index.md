@@ -84,14 +84,14 @@ pip install arqonbus
 # Start the message bus
 python -m arqonbus.server \
   --host 0.0.0.0 \
-  --port 8765 \
-  --telemetry-port 8766
+  --port 9100 \
+  --telemetry-port 9101
 ```
 
 ### Connect Your First Client
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8765');
+const ws = new WebSocket('ws://localhost:9100');
 
 // Join a channel
 ws.send({

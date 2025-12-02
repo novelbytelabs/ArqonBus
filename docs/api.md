@@ -10,7 +10,7 @@ ArqonBus provides a WebSocket-based message bus with REST endpoints for monitori
 
 Connect to the WebSocket endpoint:
 ```
-ws://localhost:8765
+ws://localhost:9100
 ```
 
 ### Message Envelope Format
@@ -614,7 +614,7 @@ arqonbus_command_executions_total{command="ping"} 50
     "persistence": true
   },
   "endpoints": {
-    "websocket": "ws://localhost:8765",
+    "websocket": "ws://localhost:9100",
     "http": "http://localhost:8080",
     "telemetry": "ws://localhost:8081"
   }
@@ -630,7 +630,7 @@ arqonbus_command_executions_total{command="ping"} 50
 {
   "server": {
     "host": "localhost",
-    "port": 8765,
+    "port": 9100,
     "enabled": true
   },
   "storage": {
@@ -739,7 +739,7 @@ Error response format:
 
 ### WebSocket Connection
 
-1. Establish WebSocket connection to `ws://localhost:8765`
+1. Establish WebSocket connection to `ws://localhost:9100`
 2. Send messages using the envelope format
 3. Receive responses and events
 4. Handle connection close gracefully
@@ -779,7 +779,7 @@ Response:
 import WebSocket from 'ws';
 
 class ArqonBusClient {
-  constructor(url = 'ws://localhost:8765') {
+  constructor(url = 'ws://localhost:9100') {
     this.url = url;
     this.ws = null;
     this.reconnectDelay = 1000;
@@ -835,7 +835,7 @@ import websockets
 import json
 
 class ArqonBusClient:
-    def __init__(self, url='ws://localhost:8765'):
+    def __init__(self, url='ws://localhost:9100'):
         self.url = url
         self.websocket = None
         

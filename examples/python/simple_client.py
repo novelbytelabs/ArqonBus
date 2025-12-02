@@ -42,7 +42,7 @@ class ArqonBusClient:
     and sending/receiving messages.
     """
     
-    def __init__(self, host: str = "localhost", port: int = 8765, client_id: Optional[str] = None):
+    def __init__(self, host: str = "localhost", port: int = 9100, client_id: Optional[str] = None):
         """
         Initialize ArqonBus client.
         
@@ -380,7 +380,7 @@ async def main():
     """Example usage of ArqonBus client."""
     
     # Create client
-    client = ArqonBusClient(host="localhost", port=8765, client_id="arq_client_demo")
+    client = ArqonBusClient(host="localhost", port=9100, client_id="arq_client_demo")
     
     try:
         # Connect to ArqonBus

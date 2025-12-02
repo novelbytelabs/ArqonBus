@@ -59,7 +59,7 @@ import json
 
 async def test_connection():
     try:
-        uri = "ws://localhost:8765"
+        uri = "ws://localhost:9100"
         async with websockets.connect(uri) as websocket:
             print("✅ Connected to ArqonBus successfully!")
             
@@ -513,7 +513,7 @@ async def main():
     
     username = input("Enter your username: ")
     password = input("Enter password (optional): ") or None
-    server_url = "ws://localhost:8765"
+    server_url = "ws://localhost:9100"
     
     # Create and connect client
     client = ChatClient(server_url, username, password)
@@ -646,7 +646,7 @@ class FileSharer:
 # Usage in chat client
 async def enhanced_chat_main():
     username = input("Username: ")
-    client = ChatClient("ws://localhost:8765", username)
+    client = ChatClient("ws://localhost:9100", username)
     
     await client.connect()
     
@@ -1031,7 +1031,7 @@ class CollaborativeEditor:
 async def interactive_editor():
     """Interactive collaborative editor."""
     doc_id = input("Document ID (or press Enter for 'demo'): ").strip() or "demo"
-    server_url = "ws://localhost:8765"
+    server_url = "ws://localhost:9100"
     
     editor = CollaborativeEditor(doc_id, server_url)
     
@@ -1477,7 +1477,7 @@ class IoTDataPublisher:
 
 # Run the IoT simulator
 async def main():
-    publisher = IoTDataPublisher("ws://localhost:8765")
+    publisher = IoTDataPublisher("ws://localhost:9100")
     await publisher.run_simulation()
 
 if __name__ == "__main__":
@@ -1719,7 +1719,7 @@ class IoTDashboard:
 # Interactive dashboard
 async def interactive_dashboard():
     """Interactive IoT dashboard."""
-    dashboard = IoTDashboard("ws://localhost:8765")
+    dashboard = IoTDashboard("ws://localhost:9100")
     
     try:
         await dashboard.connect()

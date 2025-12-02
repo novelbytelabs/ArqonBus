@@ -118,4 +118,4 @@ Built-in commands (via `type: "command"`):
 ## Getting Started (Very Rough)
 
 ```bash
-python websocket_bus.py --host localhost --port 8765 --telemetry-port 8766
+python websocket_bus.py --host localhost --port 9100 --telemetry-port 9101

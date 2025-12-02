@@ -389,7 +389,7 @@ class ArqonBusHTTPServer:
                     "persistence": True
                 },
                 "endpoints": {
-                    "websocket": "ws://localhost:8765",
+                    "websocket": "ws://localhost:9100",
                     "http": f"http://{self.host}:{self.port}",
                     "telemetry": f"ws://{self.host}:8081"
                 }

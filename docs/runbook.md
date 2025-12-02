@@ -23,7 +23,7 @@ export ARQONBUS_REDIS_PORT=6379
 export ARQONBUS_REDIS_SSL=true
 export ARQONBUS_REDIS_PASSWORD=your-redis-password
 export ARQONBUS_SERVER_HOST=0.0.0.0
-export ARQONBUS_SERVER_PORT=8765
+export ARQONBUS_SERVER_PORT=9100
 export ARQONBUS_MAX_CONNECTIONS=1000
 export ARQONBUS_ENABLE_TELEMETRY=true
 export ARQONBUS_DEBUG=false
@@ -65,13 +65,13 @@ export ARQONBUS_DEBUG=false
    ./run_arqonbus.sh start
 
    # With custom configuration
-   ARQONBUS_STORAGE_BACKEND=redis python -m arqonbus.main --host 0.0.0.0 --port 8765
+   ARQONBUS_STORAGE_BACKEND=redis python -m arqonbus.main --host 0.0.0.0 --port 9100
    ```
 
 5. **Verify Health**
    ```bash
-   curl http://localhost:8765/health
-   curl http://localhost:8765/metrics
+   curl http://localhost:9100/health
+   curl http://localhost:9100/metrics
    ```
 
 ### 2. Development Deployment
@@ -99,13 +99,13 @@ python -m arqonbus.main
 
 ```bash
 # System health
-curl http://localhost:8765/health | jq
+curl http://localhost:9100/health | jq
 
 # Connection statistics
-curl http://localhost:8765/status | jq '.websocket.connections'
+curl http://localhost:9100/status | jq '.websocket.connections'
 
 # Storage backend health
-curl http://localhost:8765/status | jq '.storage.health'
+curl http://localhost:9100/status | jq '.storage.health'
 ```
 
 ### Monitoring Alerts
@@ -176,7 +176,7 @@ ps aux | grep arqonbus
 tail -f logs/arqonbus.log
 
 # Check health endpoints
-curl -s http://localhost:8765/health
+curl -s http://localhost:9100/health
 ```
 
 #### Log Analysis
@@ -229,7 +229,7 @@ grep "memory" logs/arqonbus.log | tail -10
 **Diagnosis**:
 ```bash
 # Check if port is already in use
-netstat -tulpn | grep 8765
+netstat -tulpn | grep 9100
 
 # Check logs for errors
 tail -50 logs/arqonbus.log
@@ -253,7 +253,7 @@ redis-cli -h $REDIS_HOST -p $REDIS_PORT ping
 ps aux | grep arqonbus
 
 # Analyze memory storage size
-curl http://localhost:8765/status | jq '.storage.memory_usage'
+curl http://localhost:9100/status | jq '.storage.memory_usage'
 
 # Check for memory leaks in logs
 grep "memory" logs/arqonbus.log | tail -20
@@ -271,7 +271,7 @@ grep "memory" logs/arqonbus.log | tail -20
 **Diagnosis**:
 ```bash
 # Check WebSocket statistics
-curl http://localhost:8765/status | jq '.websocket'
+curl http://localhost:9100/status | jq '.websocket'
 
 # Review connection logs
 grep "timeout" logs/arqonbus.log | tail -10
@@ -315,7 +315,7 @@ redis-cli -h $REDIS_HOST -p $REDIS_PORT -a $REDIS_PASSWORD ping
 pkill -f arqonbus
 
 # Clear any stuck processes
-fuser -k 8765/tcp
+fuser -k 9100/tcp
 
 # Start with memory storage as fallback
 python -m arqonbus.main --storage-backend memory
@@ -346,7 +346,7 @@ python -m arqonbus.main --storage-backend memory
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ARQONBUS_SERVER_HOST` | 127.0.0.1 | Server bind address |
-| `ARQONBUS_SERVER_PORT` | 8765 | Server port |
+| `ARQONBUS_SERVER_PORT` | 9100 | Server port |
 | `ARQONBUS_MAX_CONNECTIONS` | 1000 | Maximum concurrent connections |
 | `ARQONBUS_STORAGE_BACKEND` | memory | Storage backend (memory/redis) |
 | `ARQONBUS_REDIS_HOST` | localhost | Redis host |
@@ -423,7 +423,7 @@ else:
 2. **Firewall Configuration**
    ```bash
    # Allow only necessary ports
-   ufw allow 8765/tcp
+   ufw allow 9100/tcp
    ufw deny 6379/tcp  # If Redis is external
    ```
 

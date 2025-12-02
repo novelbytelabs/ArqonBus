@@ -6,7 +6,7 @@
 3. Defaults (see below)
 
 ## Core Defaults (unchanged)
-- Server: host `127.0.0.1`, port `8765`, max_connections `1000`
+- Server: host `127.0.0.1`, port `9100`, max_connections `1000`
 - WebSocket: max_message_size `1MB`, compression `true`
 - Storage: backend `memory`, max_history_size `10000`, enable_persistence `false`
 - Telemetry: enable `true`, telemetry_room `arqonbus.telemetry`
