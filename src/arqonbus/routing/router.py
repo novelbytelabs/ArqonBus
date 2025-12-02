@@ -498,7 +498,7 @@ class RoutingCoordinator:
     
     @property
     def router(self) -> MessageRouter:
-        """Alias for message_router maintained for compatibility."""
+        """Alias for message_router used by some callers."""
         return self._router
     
     @property
