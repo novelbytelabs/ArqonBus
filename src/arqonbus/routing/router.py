@@ -450,13 +450,13 @@ class RoutingCoordinator:
     
     def __init__(self):
         """Initialize routing coordinator."""
-        self.client_registry = ClientRegistry()
-        self.room_manager = RoomManager()
-        self.channel_manager = ChannelManager()
+        self._client_registry = ClientRegistry()
+        self._room_manager = RoomManager()
+        self._channel_manager = ChannelManager()
         self.router = MessageRouter(
-            self.client_registry,
-            self.room_manager,
-            self.channel_manager
+            self._client_registry,
+            self._room_manager,
+            self._channel_manager
         )
     
     async def initialize(self):
@@ -500,13 +500,28 @@ class RoutingCoordinator:
     def client_registry(self) -> ClientRegistry:
         """Get the client registry."""
         return self._client_registry
+
+    @client_registry.setter
+    def client_registry(self, value: ClientRegistry):
+        """Set the client registry (used for testing/integration)."""
+        self._client_registry = value
     
     @property
     def room_manager(self) -> RoomManager:
         """Get the room manager."""
         return self._room_manager
+
+    @room_manager.setter
+    def room_manager(self, value: RoomManager):
+        """Set the room manager (used for testing/integration)."""
+        self._room_manager = value
     
     @property
     def channel_manager(self) -> ChannelManager:
         """Get the channel manager."""
         return self._channel_manager
+
+    @channel_manager.setter
+    def channel_manager(self, value: ChannelManager):
+        """Set the channel manager (used for testing/integration)."""
+        self._channel_manager = value

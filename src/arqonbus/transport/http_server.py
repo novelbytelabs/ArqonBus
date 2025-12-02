@@ -20,6 +20,16 @@ except ImportError:
     web_request = None
     web_response = None
     HTTP_SERVER_AVAILABLE = False
+    # Lightweight stubs for type hints to avoid attribute errors in tests
+    class _StubRequest:
+        pass
+    class _StubResponse:
+        pass
+    class _StubNamespace:
+        Request = _StubRequest
+        Response = _StubResponse
+    web_request = _StubNamespace()
+    web_response = _StubNamespace()
 
 from ..utils.logging import get_logger
 from ..utils.metrics import get_all_metrics, export_prometheus_format

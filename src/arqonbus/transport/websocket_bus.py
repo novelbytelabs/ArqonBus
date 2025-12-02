@@ -75,12 +75,14 @@ class WebSocketBus:
         logger.info(f"Starting ArqonBus WebSocket server on {host}:{port}")
         
         try:
+            compression = "deflate" if self.config.websocket.compression else None
+
             self.server = await serve(
                 self._handle_connection,
                 host,
                 port,
                 max_size=self.config.websocket.max_message_size,
-                compression=self.config.websocket.compression,
+                compression=compression,
                 ping_interval=self.config.server.ping_interval,
                 ping_timeout=self.config.server.ping_timeout,
                 close_timeout=self.config.server.connection_timeout
@@ -91,9 +93,6 @@ class WebSocketBus:
             self._stats["active_connections"] = 0
             
             logger.info(f"ArqonBus WebSocket server started successfully on {host}:{port}")
-            
-            # Keep server running
-            await self.server.wait_closed()
             
         except Exception as e:
             logger.error(f"Failed to start WebSocket server: {e}")

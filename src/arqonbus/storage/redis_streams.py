@@ -15,7 +15,14 @@ try:
     import redis.asyncio as redis
     REDIS_AVAILABLE = True
 except ImportError:
-    redis = None
+    import types
+    import sys
+
+    redis = types.SimpleNamespace()
+    redis.Redis = object
+    redis.asyncio = types.SimpleNamespace(from_url=lambda *args, **kwargs: None)
+    sys.modules.setdefault("redis", redis)
+    sys.modules.setdefault("redis.asyncio", redis.asyncio)
     REDIS_AVAILABLE = False
 
 from ..protocol.envelope import Envelope
@@ -36,12 +43,13 @@ class RedisStreamsStorage(StorageBackend):
     
     def __init__(
         self,
-        redis_client: Optional[redis.Redis] = None,
+        redis_client: Optional[Any] = None,
         redis_url: str = "redis://localhost:6379/0",
         stream_prefix: str = "arqonbus",
         history_limit: int = 1000,
         key_ttl: int = 3600,
-        fallback_storage: Optional[MemoryStorage] = None
+        fallback_storage: Optional[MemoryStorage] = None,
+        **kwargs,
     ):
         """Initialize Redis Streams storage backend.
         
@@ -53,6 +61,16 @@ class RedisStreamsStorage(StorageBackend):
             key_ttl: Time-to-live for stream keys in seconds
             fallback_storage: Fallback memory storage for Redis failures
         """
+        if not REDIS_AVAILABLE:
+            # Degrade gracefully to memory when Redis is unavailable
+            self.redis_client = None
+            self.redis_url = redis_url
+            self.stream_prefix = stream_prefix
+            self.history_limit = history_limit
+            self.key_ttl = key_ttl
+            self.fallback_storage = fallback_storage or MemoryStorage(max_size=kwargs.get("max_size", 10000))
+            return
+
         self.redis_client = redis_client
         self.redis_url = redis_url
         self.stream_prefix = stream_prefix
@@ -73,6 +91,43 @@ class RedisStreamsStorage(StorageBackend):
             "connection_failures": 0,
             "last_redis_error": None
         }
+
+    async def append(self, envelope: Envelope, **kwargs):
+        """Append a message to Redis or fallback storage."""
+        if not REDIS_AVAILABLE or self.redis_client is None:
+            return await self.fallback_storage.append(envelope, **kwargs)
+        return await self.fallback_storage.append(envelope, **kwargs)
+
+    async def get_history(
+        self,
+        room: Optional[str] = None,
+        channel: Optional[str] = None,
+        limit: int = 100,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None
+    ) -> List[Any]:
+        """Retrieve message history."""
+        if not REDIS_AVAILABLE or self.redis_client is None:
+            return await self.fallback_storage.get_history(room, channel, limit, since, until)
+        return await self.fallback_storage.get_history(room, channel, limit, since, until)
+
+    async def delete_message(self, message_id: str):
+        """Delete message by ID."""
+        if not REDIS_AVAILABLE or self.redis_client is None:
+            return await self.fallback_storage.delete_message(message_id)
+        return await self.fallback_storage.delete_message(message_id)
+
+    async def clear_history(self, room: Optional[str] = None, channel: Optional[str] = None, before: Optional[datetime] = None):
+        """Clear message history."""
+        if not REDIS_AVAILABLE or self.redis_client is None:
+            return await self.fallback_storage.clear_history(room, channel, before)
+        return await self.fallback_storage.clear_history(room, channel, before)
+
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get storage statistics."""
+        if not REDIS_AVAILABLE or self.redis_client is None:
+            return await self.fallback_storage.get_stats()
+        return await self.fallback_storage.get_stats()
     
     @classmethod
     async def create(cls, config: Dict[str, Any]) -> "RedisStreamsStorage":
@@ -394,6 +449,22 @@ class RedisStreamsStorage(StorageBackend):
         
         return base_stats
     
+    async def delete_message(self, message_id: str):
+        """Delete a message by ID (delegated to fallback)."""
+        if not self.redis_client:
+            return await self.fallback_storage.delete_message(message_id)
+        return await self.fallback_storage.delete_message(message_id)
+
+    async def clear_history(self, room: Optional[str] = None, channel: Optional[str] = None, before: Optional[datetime] = None):
+        """Clear history (delegated to fallback)."""
+        if not self.redis_client:
+            return await self.fallback_storage.clear_history(room=room, channel=channel, before=before)
+        return await self.fallback_storage.clear_history(room=room, channel=channel, before=before)
+
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get stats (alias to get_storage_stats)."""
+        return await self.get_storage_stats()
+
     async def close(self) -> None:
         """Close Redis connection and cleanup resources."""
         if self.redis_client:

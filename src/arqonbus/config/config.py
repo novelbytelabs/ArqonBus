@@ -392,3 +392,6 @@ def validate_config() -> List[str]:
     """
     config = get_config()
     return config.validate()
+
+# Backward compatibility alias for older tests/config consumers
+Config = ArqonBusConfig

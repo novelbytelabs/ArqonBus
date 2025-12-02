@@ -419,3 +419,7 @@ class MemoryStorageBackend(StorageBackend):
                 success=False,
                 error_message=str(e)
             )
+
+
+# Backward compatibility alias expected by other modules/tests
+MemoryStorage = MemoryStorageBackend

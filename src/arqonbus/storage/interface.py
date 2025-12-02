@@ -394,4 +394,7 @@ class StorageRegistry:
 
 # Register built-in backends
 from .memory import MemoryStorageBackend
+from .redis_streams import RedisStreamsStorage
+
 StorageRegistry.register("memory", MemoryStorageBackend)
+StorageRegistry.register("redis", RedisStreamsStorage)
