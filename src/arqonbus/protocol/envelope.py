@@ -22,6 +22,9 @@ class Envelope:
     room: Optional[str] = None  # Target room for routing
     channel: Optional[str] = None  # Target channel within room
     sender: Optional[str] = None  # Client ID who sent this message
+    # Legacy aliases for backwards compatibility
+    from_client: Optional[str] = None
+    to_client: Optional[str] = None
     
     # Message content
     payload: Dict[str, Any] = field(default_factory=dict)  # Message data
@@ -60,6 +63,10 @@ class Envelope:
             data["channel"] = self.channel
         if self.sender is not None:
             data["sender"] = self.sender
+        if self.from_client is not None:
+            data["from_client"] = self.from_client
+        if self.to_client is not None:
+            data["to_client"] = self.to_client
         if self.command is not None:
             data["command"] = self.command
         if self.request_id is not None:
@@ -79,6 +86,15 @@ class Envelope:
         # Handle datetime parsing
         if "timestamp" in data:
             data["timestamp"] = datetime.fromisoformat(data["timestamp"])
+
+        # Map legacy fields
+        if "from_client" in data and "sender" not in data:
+            data["sender"] = data.get("from_client")
+        if "to_client" in data and "metadata" not in data:
+            # Store as metadata for backwards compatibility
+            metadata = data.get("metadata", {}) or {}
+            metadata["to_client"] = data.get("to_client")
+            data["metadata"] = metadata
         
         return cls(**data)
     

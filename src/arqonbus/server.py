@@ -245,7 +245,7 @@ class ArqonBusServer:
             # Check storage health
             if self.storage:
                 storage_healthy = await self.storage.is_healthy()
-                if not storage_healthy:
+                if storage_healthy is False:
                     self.logger.warning("Storage backend health check failed")
                 else:
                     self.logger.info("Storage backend health check passed")

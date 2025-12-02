@@ -77,6 +77,12 @@ class RedisStreamsStorage(StorageBackend):
         self.history_limit = history_limit
         self.key_ttl = key_ttl
         self.fallback_storage = fallback_storage
+        self._stats = {
+            "redis_operations": 0,
+            "fallback_operations": 0,
+            "connection_failures": 0,
+            "last_redis_error": None
+        }
         
         # Connection pool settings
         self._connection_pool = None
@@ -85,12 +91,7 @@ class RedisStreamsStorage(StorageBackend):
         self._retry_delay = 1.0
         
         # Statistics
-        self._stats = {
-            "redis_operations": 0,
-            "fallback_operations": 0,
-            "connection_failures": 0,
-            "last_redis_error": None
-        }
+        # _stats initialized above for all modes
 
     async def append(self, envelope: Envelope, **kwargs):
         """Append a message to Redis or fallback storage."""

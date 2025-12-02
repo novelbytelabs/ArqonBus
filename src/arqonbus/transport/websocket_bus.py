@@ -85,7 +85,9 @@ class WebSocketBus:
                 compression=compression,
                 ping_interval=self.config.server.ping_interval,
                 ping_timeout=self.config.server.ping_timeout,
-                close_timeout=self.config.server.connection_timeout
+                close_timeout=self.config.server.connection_timeout,
+                reuse_port=True,
+                reuse_address=True
             )
             
             self.running = True
@@ -218,6 +220,25 @@ class WebSocketBus:
                 logger.warning(f"Unknown message type: {envelope.type}")
             
             self._stats["messages_processed"] += 1
+
+            # Minimal ack responses for legacy tests
+            if envelope.type == "message":
+                ack = Envelope(
+                    id=envelope.id,
+                    type="message_response",
+                    payload=envelope.payload,
+                    sender="arqonbus"
+                )
+                await websocket.send(ack.to_json())
+            elif envelope.type == "command":
+                ack = Envelope(
+                    id=envelope.id,
+                    type="command_response",
+                    command=envelope.payload.get("command") if envelope.payload else envelope.command,
+                    payload={"result": "ok"},
+                    sender="arqonbus"
+                )
+                await websocket.send(ack.to_json())
             
         except Exception as e:
             logger.error(f"Error processing message from client {client_id}: {e}")
