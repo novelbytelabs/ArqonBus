@@ -38,7 +38,11 @@ class WebSocketBus:
         self.config = get_config()
         self.server = None
         self.running = False
+<<<<<<< HEAD
         self.casil = CasilIntegration(self.config.casil)
+=======
+        self._server_task = None
+>>>>>>> ff29248 (refactor(api): update message envelope structure to use sender, room, and channel fields)
         
         # Connection handlers
         self.message_handlers: Dict[str, Callable] = {
@@ -429,6 +433,7 @@ class WebSocketBus:
     
     @property
     def is_running(self) -> bool:
+        return self.running and self.server is not None and not getattr(self.server, 'is_closing', lambda: False)()
         """Check if server is currently running."""
         return self.running and self.server is not None and not self.server.is_closing()
     

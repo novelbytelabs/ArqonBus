@@ -132,7 +132,7 @@ class TelemetryServer:
             path: Request path
         """
         try:
-            # Check connection limit
+            # Check connection limit and add client immediately
             async with self._client_lock:
                 if len(self._telemetry_clients) >= self._max_connections:
                     logger.warning(f"Telemetry connection limit reached ({self._max_connections})")
@@ -145,7 +145,7 @@ class TelemetryServer:
             
             logger.info(f"Telemetry client connected: {websocket.remote_address}")
             
-            # Send welcome message
+            # Send welcome message immediately
             welcome_event = {
                 "event_type": "telemetry_connected",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -158,7 +158,7 @@ class TelemetryServer:
             }
             await websocket.send(json.dumps(welcome_event))
             
-            # Handle client messages
+            # Handle client messages (this may block waiting for messages)
             async for message in websocket:
                 try:
                     data = json.loads(message)
