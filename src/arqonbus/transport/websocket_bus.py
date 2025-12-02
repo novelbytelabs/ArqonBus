@@ -36,6 +36,7 @@ class WebSocketBus:
         self.config = get_config()
         self.server = None
         self.running = False
+        self._server_task = None
         
         # Connection handlers
         self.message_handlers: Dict[str, Callable] = {
@@ -88,9 +89,6 @@ class WebSocketBus:
             self._stats["active_connections"] = 0
             
             logger.info(f"ArqonBus WebSocket server started successfully on {host}:{port}")
-            
-            # Keep server running
-            await self.server.wait_closed()
             
         except Exception as e:
             logger.error(f"Failed to start WebSocket server: {e}")
@@ -388,6 +386,7 @@ class WebSocketBus:
     
     @property
     def is_running(self) -> bool:
+        return self.running and self.server is not None and not getattr(self.server, 'is_closing', lambda: False)()
         """Check if server is currently running."""
         return self.running and self.server is not None and not self.server.is_closing()
     
