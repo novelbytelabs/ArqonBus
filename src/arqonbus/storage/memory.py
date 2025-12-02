@@ -13,6 +13,7 @@ from ..protocol.envelope import Envelope
 logger = logging.getLogger(__name__)
 
 
+
 class MemoryStorageBackend(StorageBackend):
     """In-memory storage backend using thread-safe collections.
     
@@ -419,7 +420,6 @@ class MemoryStorageBackend(StorageBackend):
                 success=False,
                 error_message=str(e)
             )
-
 
 # Backward compatibility alias expected by other modules/tests
 MemoryStorage = MemoryStorageBackend

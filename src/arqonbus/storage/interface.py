@@ -393,8 +393,15 @@ class StorageRegistry:
 
 
 # Register built-in backends
-from .memory import MemoryStorageBackend
-from .redis_streams import RedisStreamsStorage
-
-StorageRegistry.register("memory", MemoryStorageBackend)
-StorageRegistry.register("redis", RedisStreamsStorage)
+# Import inside a try block to avoid hard dependency loops.
+try:
+    from .memory import MemoryStorageBackend
+    from .redis_streams import RedisStreamsStorage
+    
+    StorageRegistry.register("memory", MemoryStorageBackend)
+    StorageRegistry.register("memory_storage", MemoryStorageBackend)
+    StorageRegistry.register("redis", RedisStreamsStorage)
+    StorageRegistry.register("redis_streams", RedisStreamsStorage)
+except ImportError:
+    # Backends remain unregistered if optional deps are missing.
+    pass

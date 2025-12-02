@@ -6,11 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "arqonbus"
 version = "0.1.0"
 description = "ArqonBus service"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "websockets",
     "aiohttp",
-    "redis-py",
+    "redis",
     "pydantic"
 ]
 

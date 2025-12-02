@@ -453,7 +453,7 @@ class RoutingCoordinator:
         self._client_registry = ClientRegistry()
         self._room_manager = RoomManager()
         self._channel_manager = ChannelManager()
-        self.router = MessageRouter(
+        self._router = MessageRouter(
             self._client_registry,
             self._room_manager,
             self._channel_manager
@@ -463,12 +463,12 @@ class RoutingCoordinator:
         """Initialize routing system components."""
         # Create default room and channel
         try:
-            default_room_id = await self.room_manager.create_room(
+            default_room_id = await self._room_manager.create_room(
                 name="general",
                 description="Default general discussion room"
             )
             
-            await self.channel_manager.create_channel(
+            await self._channel_manager.create_channel(
                 room_id=default_room_id,
                 name="general",
                 description="Default general channel"
@@ -484,7 +484,7 @@ class RoutingCoordinator:
         """Shutdown routing system components."""
         try:
             # Cleanup resources
-            await self.client_registry.cleanup_disconnected_clients()
+            await self._client_registry.cleanup_disconnected_clients()
             
             logger.info("Routing system shutdown complete")
             
@@ -494,7 +494,12 @@ class RoutingCoordinator:
     @property
     def message_router(self) -> MessageRouter:
         """Get the message router."""
-        return self.router
+        return self._router
+    
+    @property
+    def router(self) -> MessageRouter:
+        """Alias for message_router maintained for compatibility."""
+        return self._router
     
     @property
     def client_registry(self) -> ClientRegistry:
