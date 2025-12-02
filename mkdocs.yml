@@ -31,6 +31,12 @@ nav:
   - Getting Started:
     - Quick Start Guide: 'quickstart.md'
     - Tutorial: 'tutorial.md'
+    - WebSocket & CASIL Walkthrough: 'guides/test_websocket_and_casil.md'
+  - Setup Guide:
+    - MkDocs Setup: 'mkdocs_setup.md'
+  - Configuration:
+    - Configuration Guide: 'configuration.md'
+    - Telemetry Reference: 'telemetry.md'
   - Operations:
     - Operations Runbook: 'runbook.md'
   - Developer Guide:
@@ -50,6 +56,15 @@ nav:
       - Requirements Checklist: 'specs/001-core-message-bus/checklists/requirements.md'
       - HTTP Endpoints Contract: 'specs/001-core-message-bus/contracts/http-endpoints.md'
       - WebSocket Protocol Contract: 'specs/001-core-message-bus/contracts/websocket-protocol.md'
+    - Content-Aware Safety Inspection (CASIL):
+      - Implementation Plan: 'specs/002-content-aware-safety-inspection/plan.md'
+      - Quickstart: 'specs/002-content-aware-safety-inspection/quickstart.md'
+      - Specification: 'specs/002-content-aware-safety-inspection/spec.md'
+      - Tasks: 'specs/002-content-aware-safety-inspection/tasks.md'
+      - CASIL Contract: 'specs/002-content-aware-safety-inspection/contracts/casil.md'
+  - Projects:
+    - Proto-Intelligence Initial: 'projects/proto-intelligence-initial.md'
+    - Six Steps: 'projects/six_steps.md'
   - Project Info:
     - Ecosystem: 'arqon_ecosystem.md'
     - Completion Report: 'completion_report.md'

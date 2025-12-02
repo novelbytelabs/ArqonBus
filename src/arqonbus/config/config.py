@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ServerConfig:
     """Server configuration settings."""
     host: str = "127.0.0.1"
-    port: int = 8765
+    port: int = 9100
     max_connections: int = 1000
     connection_timeout: float = 30.0
     ping_interval: float = 20.0

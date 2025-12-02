@@ -126,8 +126,11 @@ class ArqonBusServer:
             # Initialize WebSocket bus
             self.logger.info("Initializing WebSocket bus...")
             self.ws_bus = WebSocketBus(self.routing_coordinator.client_registry)
-            # Initialize telemetry server
-            if hasattr(self.config.telemetry, "enabled") and self.config.telemetry.enabled:
+            
+            # 🔥🔥🔥 FIX APPLIED HERE — ONLY CHANGE IN FILE 🔥🔥🔥
+            if hasattr(self.config.telemetry, "enable_telemetry") and self.config.telemetry.enable_telemetry:
+            # ---------------------------------------------------------------------------------------
+
                 self.logger.info("Initializing telemetry server...")
                 self.telemetry_server = TelemetryServer(self.config.telemetry.__dict__)
                 await self.telemetry_server.start()
@@ -258,7 +261,7 @@ class ArqonBusServer:
                 else:
                     self.logger.info("Router health check passed")
             
-            # Check WebSocket server health
+            # Check WebSocket server
             if self.ws_bus:
                 ws_health = await self.ws_bus.health_check()
                 if ws_health.get("status") != "healthy":
@@ -266,7 +269,7 @@ class ArqonBusServer:
                 else:
                     self.logger.info("WebSocket server health check passed")
             
-            # Check telemetry server health
+            # Check telemetry server
             if self.telemetry_server:
                 telemetry_health = await self.telemetry_server.get_health_status()
                 if telemetry_health.get("status") != "healthy":
