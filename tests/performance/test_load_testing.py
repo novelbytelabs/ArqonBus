@@ -487,6 +487,7 @@ class TestResourceUtilization:
         assert current_cpu < 80  # Under 80% CPU
     
     @pytest.mark.performance
+    @pytest.mark.asyncio
     async def test_memory_leak_detection(self):
         """Test for memory leaks over time."""
         process = psutil.Process()
