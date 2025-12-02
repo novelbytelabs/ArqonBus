@@ -23,7 +23,7 @@ class ServerConfig:
 class WebSocketConfig:
     """WebSocket connection configuration."""
     max_message_size: int = 1024 * 1024  # 1MB
-    compression: bool = True
+    compression: Optional[str] = None
     ssl_context: Optional[Dict[str, Any]] = None
     allowed_origins: List[str] = field(default_factory=list)
 
@@ -104,7 +104,8 @@ class ArqonBusConfig:
         
         # WebSocket configuration  
         config.websocket.max_message_size = int(os.getenv("ARQONBUS_MAX_MESSAGE_SIZE", config.websocket.max_message_size))
-        config.websocket.compression = os.getenv("ARQONBUS_COMPRESSION", "true").lower() == "true"
+        compression_val = os.getenv("ARQONBUS_COMPRESSION", "false").lower()
+        config.websocket.compression = "deflate" if compression_val == "true" else None
         
         # Redis configuration
         config.redis.host = os.getenv("ARQONBUS_REDIS_HOST", config.redis.host)
@@ -210,6 +211,9 @@ class ArqonBusConfig:
             "debug": self.debug
         }
 
+
+# Alias for backward compatibility and test compatibility
+Config = ArqonBusConfig
 
 # Global configuration instance
 _config: Optional[ArqonBusConfig] = None

@@ -393,5 +393,18 @@ class StorageRegistry:
 
 
 # Register built-in backends
-from .memory import MemoryStorageBackend
-StorageRegistry.register("memory", MemoryStorageBackend)
+# Import backends here to avoid circular imports
+try:
+    from .memory import MemoryStorageBackend
+    from .redis_streams import RedisStreamsStorage
+    
+    # Register backends
+    StorageRegistry.register('memory', MemoryStorageBackend)
+    StorageRegistry.register('memory_storage', MemoryStorageBackend)
+    StorageRegistry.register('redis', RedisStreamsStorage)
+    StorageRegistry.register('redis_streams', RedisStreamsStorage)
+    
+except ImportError as e:
+    # If backends can't be imported, registry will remain empty
+    # This allows the interface to be imported without dependencies
+    pass

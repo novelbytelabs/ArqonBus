@@ -7,7 +7,7 @@ for scalable message persistence and history retrieval.
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Union
 import time
 
@@ -20,8 +20,8 @@ except ImportError:
 
 from ..protocol.envelope import Envelope
 from ..utils.logging import get_logger
-from .interface import StorageBackend
-from .memory import MemoryStorage
+from .interface import StorageBackend, StorageResult, HistoryEntry
+from .memory import MemoryStorageBackend
 
 logger = get_logger(__name__)
 
@@ -36,16 +36,18 @@ class RedisStreamsStorage(StorageBackend):
     
     def __init__(
         self,
+        max_size: int = 1000,
         redis_client: Optional[redis.Redis] = None,
         redis_url: str = "redis://localhost:6379/0",
         stream_prefix: str = "arqonbus",
         history_limit: int = 1000,
         key_ttl: int = 3600,
-        fallback_storage: Optional[MemoryStorage] = None
+        fallback_storage: Optional[MemoryStorageBackend] = None
     ):
         """Initialize Redis Streams storage backend.
         
         Args:
+            max_size: Maximum number of messages to keep (for compatibility)
             redis_client: Optional pre-configured Redis client
             redis_url: Redis connection URL
             stream_prefix: Prefix for Redis Stream keys
@@ -53,12 +55,13 @@ class RedisStreamsStorage(StorageBackend):
             key_ttl: Time-to-live for stream keys in seconds
             fallback_storage: Fallback memory storage for Redis failures
         """
+        self.max_size = max_size
         self.redis_client = redis_client
         self.redis_url = redis_url
         self.stream_prefix = stream_prefix
         self.history_limit = history_limit
         self.key_ttl = key_ttl
-        self.fallback_storage = fallback_storage
+        self.fallback_storage = fallback_storage or MemoryStorageBackend(max_size=max_size)
         
         # Connection pool settings
         self._connection_pool = None
@@ -91,9 +94,10 @@ class RedisStreamsStorage(StorageBackend):
         stream_prefix = config.get("stream_prefix", "arqonbus")
         history_limit = config.get("history_limit", 1000)
         key_ttl = config.get("key_ttl", 3600)
+        max_size = config.get("max_size", 1000)
         
         # Create fallback memory storage
-        fallback_storage = MemoryStorage()
+        fallback_storage = MemoryStorageBackend(max_size=max_size)
         
         # Attempt to create Redis client
         redis_client = None
@@ -101,6 +105,7 @@ class RedisStreamsStorage(StorageBackend):
             if not REDIS_AVAILABLE:
                 logger.warning("Redis not available, falling back to memory storage")
                 return cls(
+                    max_size=max_size,
                     redis_client=None,
                     redis_url=redis_url,
                     stream_prefix=stream_prefix,
@@ -126,6 +131,7 @@ class RedisStreamsStorage(StorageBackend):
             
             # Return with failed connection, use fallback
             return cls(
+                max_size=max_size,
                 redis_client=None,
                 redis_url=redis_url,
                 stream_prefix=stream_prefix,
@@ -135,6 +141,7 @@ class RedisStreamsStorage(StorageBackend):
             )
         
         return cls(
+            max_size=max_size,
             redis_client=redis_client,
             redis_url=redis_url,
             stream_prefix=stream_prefix,
@@ -143,19 +150,20 @@ class RedisStreamsStorage(StorageBackend):
             fallback_storage=fallback_storage
         )
     
-    async def append(self, envelope: Envelope) -> str:
+    async def append(self, envelope: Envelope, **kwargs) -> StorageResult:
         """Append message to Redis Streams.
         
         Args:
             envelope: Message envelope to store
+            **kwargs: Additional parameters (ignored for Redis)
             
         Returns:
-            Operation result identifier
+            StorageResult indicating success/failure
         """
         # Use fallback storage if Redis unavailable
         if not self.redis_client:
             self._stats["fallback_operations"] += 1
-            return await self.fallback_storage.append(envelope)
+            return await self.fallback_storage.append(envelope, **kwargs)
         
         try:
             self._stats["redis_operations"] += 1
@@ -164,9 +172,8 @@ class RedisStreamsStorage(StorageBackend):
             message_data = {
                 "id": envelope.id,
                 "type": envelope.type,
-                "timestamp": envelope.timestamp,
-                "from_client": envelope.from_client,
-                "to_client": envelope.to_client or "",
+                "timestamp": envelope.timestamp.isoformat() if isinstance(envelope.timestamp, datetime) else str(envelope.timestamp),
+                "sender": envelope.sender or "",
                 "room": envelope.room or "",
                 "channel": envelope.channel or "",
                 "payload": json.dumps(envelope.payload) if envelope.payload else "{}"
@@ -176,13 +183,10 @@ class RedisStreamsStorage(StorageBackend):
             main_stream = f"{self.stream_prefix}:messages"
             await self.redis_client.xadd(main_stream, message_data)
             
-            # Client-specific streams for history
-            from_client_stream = f"{self.stream_prefix}:client_{envelope.from_client}"
-            await self.redis_client.xadd(from_client_stream, message_data)
-            
-            if envelope.to_client:
-                to_client_stream = f"{self.stream_prefix}:client_{envelope.to_client}"
-                await self.redis_client.xadd(to_client_stream, message_data)
+            # Sender-specific streams for history
+            if envelope.sender:
+                sender_stream = f"{self.stream_prefix}:sender_{envelope.sender}"
+                await self.redis_client.xadd(sender_stream, message_data)
             
             # Room/channel streams if applicable
             if envelope.room:
@@ -195,16 +199,19 @@ class RedisStreamsStorage(StorageBackend):
             
             # Set TTL on streams for cleanup
             await self.redis_client.expire(main_stream, self.key_ttl)
-            await self.redis_client.expire(from_client_stream, self.key_ttl)
-            if envelope.to_client:
-                await self.redis_client.expire(to_client_stream, self.key_ttl)
+            if envelope.sender:
+                await self.redis_client.expire(sender_stream, self.key_ttl)
             if envelope.room:
                 await self.redis_client.expire(room_stream, self.key_ttl)
             if envelope.channel:
                 await self.redis_client.expire(channel_stream, self.key_ttl)
             
             logger.debug(f"Stored message {envelope.id} in Redis Streams")
-            return "stream_success"
+            return StorageResult(
+                success=True,
+                message_id=envelope.id,
+                timestamp=datetime.utcnow()
+            )
             
         except Exception as e:
             logger.error(f"Redis storage error: {e}")
@@ -213,37 +220,39 @@ class RedisStreamsStorage(StorageBackend):
             
             # Fallback to memory storage
             self._stats["fallback_operations"] += 1
-            return await self.fallback_storage.append(envelope)
+            return await self.fallback_storage.append(envelope, **kwargs)
     
     async def get_history(
         self,
-        client_id: Optional[str] = None,
         room: Optional[str] = None,
         channel: Optional[str] = None,
-        limit: int = 50
-    ) -> List[Envelope]:
+        limit: int = 100,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None
+    ) -> List[HistoryEntry]:
         """Retrieve message history from Redis Streams.
         
         Args:
-            client_id: Client ID to get history for
             room: Room ID to get history for
             channel: Channel ID to get history for
             limit: Maximum number of messages to retrieve
+            since: Only return messages after this time
+            until: Only return messages before this time
             
         Returns:
-            List of message envelopes in chronological order
+            List of history entries in chronological order
         """
         # Use fallback storage if Redis unavailable
         if not self.redis_client:
             self._stats["fallback_operations"] += 1
-            return await self.fallback_storage.get_history(client_id, room, channel, limit)
+            return await self.fallback_storage.get_history(room, channel, limit, since, until)
         
         try:
             self._stats["redis_operations"] += 1
             
             # Determine which stream to query
-            if client_id:
-                stream_name = f"{self.stream_prefix}:client_{client_id}"
+            if room and channel:
+                stream_name = f"{self.stream_prefix}:room_{room}_channel_{channel}"
             elif room:
                 stream_name = f"{self.stream_prefix}:room_{room}"
             elif channel:
@@ -257,27 +266,49 @@ class RedisStreamsStorage(StorageBackend):
                 count=min(limit, self.history_limit)
             )
             
-            # Convert Redis Stream messages to Envelope objects
-            envelopes = []
+            # Convert Redis Stream messages to HistoryEntry objects
+            history_entries = []
             for msg_id, msg_data in messages:
                 try:
+                    # Parse timestamp
+                    timestamp_str = msg_data.get("timestamp", "")
+                    if timestamp_str:
+                        try:
+                            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        except ValueError:
+                            timestamp = datetime.utcnow()
+                    else:
+                        timestamp = datetime.utcnow()
+                    
+                    # Skip if outside time range
+                    if since and timestamp <= since:
+                        continue
+                    if until and timestamp >= until:
+                        continue
+                    
                     envelope = Envelope(
                         id=msg_data.get("id", ""),
                         type=msg_data.get("type", ""),
-                        timestamp=msg_data.get("timestamp", ""),
-                        from_client=msg_data.get("from_client", ""),
-                        to_client=msg_data.get("to_client") or None,
+                        timestamp=timestamp,
+                        sender=msg_data.get("sender") or None,
                         room=msg_data.get("room") or None,
                         channel=msg_data.get("channel") or None,
                         payload=json.loads(msg_data.get("payload", "{}"))
                     )
-                    envelopes.append(envelope)
+                    
+                    history_entry = HistoryEntry(
+                        envelope=envelope,
+                        stored_at=timestamp,
+                        storage_metadata={"backend": "redis_streams", "stream": stream_name}
+                    )
+                    history_entries.append(history_entry)
+                    
                 except Exception as e:
                     logger.warning(f"Failed to parse message {msg_id}: {e}")
                     continue
             
-            logger.debug(f"Retrieved {len(envelopes)} messages from {stream_name}")
-            return envelopes
+            logger.debug(f"Retrieved {len(history_entries)} messages from {stream_name}")
+            return history_entries[:limit]
             
         except Exception as e:
             logger.error(f"Redis history retrieval error: {e}")
@@ -286,74 +317,87 @@ class RedisStreamsStorage(StorageBackend):
             
             # Fallback to memory storage
             self._stats["fallback_operations"] += 1
-            return await self.fallback_storage.get_history(client_id, room, channel, limit)
+            return await self.fallback_storage.get_history(room, channel, limit, since, until)
     
-    async def cleanup_streams(self, max_age: Optional[int] = None) -> Dict[str, int]:
-        """Clean up old messages from Redis Streams.
+    async def delete_message(self, message_id: str) -> StorageResult:
+        """Delete a specific message by ID.
         
         Args:
-            max_age: Maximum age in seconds for messages (uses instance default if None)
+            message_id: ID of message to delete
             
         Returns:
-            Dictionary with cleanup statistics
+            StorageResult indicating success/failure
         """
+        # Use fallback storage if Redis unavailable
         if not self.redis_client:
             self._stats["fallback_operations"] += 1
-            return {"cleanup_operations": 0}
-        
-        max_age = max_age or self.key_ttl
-        cutoff_time = int(time.time()) - max_age
+            return await self.fallback_storage.delete_message(message_id)
         
         try:
             self._stats["redis_operations"] += 1
             
-            # Clean up main message stream
-            main_stream = f"{self.stream_prefix}:messages"
-            await self.redis_client.xtrim(main_stream, min_id=cutoff_time)
+            # Note: Redis Streams doesn't support direct deletion by message ID
+            # We would need to use XDEL with specific stream IDs, but we don't have those
+            # For now, fall back to memory storage for deletion operations
             
-            # Get all stream keys with our prefix
-            pattern = f"{self.stream_prefix}:*"
-            stream_keys = await self.redis_client.keys(pattern)
-            
-            cleaned_streams = 0
-            total_trimmed = 0
-            
-            for stream_key in stream_keys:
-                # Trim each stream
-                trimmed = await self.redis_client.xtrim(stream_key, min_id=cutoff_time)
-                if trimmed > 0:
-                    cleaned_streams += 1
-                    total_trimmed += trimmed
-            
-            # Remove empty streams
-            for stream_key in stream_keys:
-                length = await self.redis_client.xlen(stream_key)
-                if length == 0:
-                    await self.redis_client.delete(stream_key)
-            
-            result = {
-                "cleaned_streams": cleaned_streams,
-                "total_messages_trimmed": total_trimmed,
-                "cutoff_time": cutoff_time
-            }
-            
-            logger.info(f"Cleaned up {cleaned_streams} streams, trimmed {total_trimmed} messages")
-            return result
+            # Fallback to memory storage
+            self._stats["fallback_operations"] += 1
+            return await self.fallback_storage.delete_message(message_id)
             
         except Exception as e:
-            logger.error(f"Redis cleanup error: {e}")
+            logger.error(f"Redis delete message error: {e}")
             self._stats["connection_failures"] += 1
             self._stats["last_redis_error"] = str(e)
             
-            # Fallback does nothing for cleanup
+            # Fallback to memory storage
             self._stats["fallback_operations"] += 1
-            return {"cleanup_operations": 0}
+            return await self.fallback_storage.delete_message(message_id)
     
-    async def get_storage_stats(self) -> Dict[str, Any]:
-        """Get storage backend statistics.
+    async def clear_history(
+        self,
+        room: Optional[str] = None,
+        channel: Optional[str] = None,
+        before: Optional[datetime] = None
+    ) -> StorageResult:
+        """Clear message history.
+        
+        Args:
+            room: Room to clear (None for all rooms)
+            channel: Channel to clear (None for all channels)
+            before: Only clear messages before this time
+            
+        Returns:
+            StorageResult indicating success/failure
+        """
+        # Use fallback storage if Redis unavailable
+        if not self.redis_client:
+            self._stats["fallback_operations"] += 1
+            return await self.fallback_storage.clear_history(room, channel, before)
+        
+        try:
+            self._stats["redis_operations"] += 1
+            
+            # For Redis Streams, we can't easily clear by time range
+            # Fallback to memory storage for complex operations
+            
+            # Fallback to memory storage
+            self._stats["fallback_operations"] += 1
+            return await self.fallback_storage.clear_history(room, channel, before)
+            
+        except Exception as e:
+            logger.error(f"Redis clear history error: {e}")
+            self._stats["connection_failures"] += 1
+            self._stats["last_redis_error"] = str(e)
+            
+            # Fallback to memory storage
+            self._stats["fallback_operations"] += 1
+            return await self.fallback_storage.clear_history(room, channel, before)
+    
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get storage statistics.
         
         Returns:
-            Dictionary with storage statistics
+            Dictionary of storage statistics
         """
         base_stats = {
             "backend_type": "redis_streams",
@@ -362,7 +406,8 @@ class RedisStreamsStorage(StorageBackend):
                 "redis_url": self.redis_url,
                 "stream_prefix": self.stream_prefix,
                 "history_limit": self.history_limit,
-                "key_ttl": self.key_ttl
+                "key_ttl": self.key_ttl,
+                "max_size": self.max_size
             },
             "stats": self._stats.copy()
         }
@@ -394,7 +439,24 @@ class RedisStreamsStorage(StorageBackend):
         
         return base_stats
     
-    async def close(self) -> None:
+    async def health_check(self) -> bool:
+        """Check if storage backend is healthy.
+        
+        Returns:
+            True if healthy, False otherwise
+        """
+        try:
+            if self.redis_client:
+                # Check Redis connection
+                await self.redis_client.ping()
+                return True
+            else:
+                # Check fallback storage
+                return await self.fallback_storage.health_check()
+        except Exception:
+            return False
+    
+    async def close(self):
         """Close Redis connection and cleanup resources."""
         if self.redis_client:
             try:
@@ -402,65 +464,10 @@ class RedisStreamsStorage(StorageBackend):
                 logger.info("Redis connection closed")
             except Exception as e:
                 logger.warning(f"Error closing Redis connection: {e}")
-    
-    async def health_check(self) -> Dict[str, Any]:
-        """Perform health check on storage backend.
         
-        Returns:
-            Dictionary with health check results
-        """
-        health = {
-            "status": "healthy",
-            "backend": "redis_streams",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "checks": {}
-        }
-        
-        # Check Redis connection
-        if self.redis_client:
-            try:
-                start_time = time.time()
-                await self.redis_client.ping()
-                response_time = time.time() - start_time
-                
-                health["checks"]["redis_connection"] = {
-                    "status": "healthy",
-                    "response_time_ms": round(response_time * 1000, 2)
-                }
-                
-            except Exception as e:
-                health["checks"]["redis_connection"] = {
-                    "status": "unhealthy",
-                    "error": str(e)
-                }
-                health["status"] = "degraded"
-        else:
-            health["checks"]["redis_connection"] = {
-                "status": "unavailable",
-                "reason": "Redis client not configured"
-            }
-            health["status"] = "degraded"
-        
-        # Check fallback storage
-        try:
-            fallback_health = await self.fallback_storage.health_check()
-            health["checks"]["fallback_storage"] = fallback_health
-        except Exception as e:
-            health["checks"]["fallback_storage"] = {
-                "status": "unhealthy",
-                "error": str(e)
-            }
-            health["status"] = "unhealthy"
-        
-        # Overall status determination
-        if self.redis_client:
-            health["status"] = "healthy"
-        elif health["checks"]["fallback_storage"]["status"] == "healthy":
-            health["status"] = "degraded"
-        else:
-            health["status"] = "unhealthy"
-        
-        return health
+        # Close fallback storage
+        if self.fallback_storage:
+            await self.fallback_storage.close()
 
 
 # Export factory function for backward compatibility

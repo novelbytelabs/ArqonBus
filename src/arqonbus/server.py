@@ -251,7 +251,7 @@ class ArqonBusServer:
             
             # Check routing system health
             if self.routing_coordinator:
-                router_health = await self.routing_coordinator.router.health_check()
+                router_health = await self.routing_coordinator.message_router.health_check()
                 if router_health.get("status") != "healthy":
                     self.logger.warning(f"Router health check failed: {router_health}")
                 else:
@@ -343,7 +343,7 @@ class ArqonBusServer:
             
             # Check routing system
             if self.routing_coordinator:
-                router_health = await self.routing_coordinator.router.health_check()
+                router_health = await self.routing_coordinator.message_router.health_check()
                 health["components"]["routing"] = router_health
                 if router_health.get("status") != "healthy":
                     health["overall_checks"].append({"type": "error", "component": "routing", "message": router_health})
