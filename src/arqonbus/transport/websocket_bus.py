@@ -38,11 +38,8 @@ class WebSocketBus:
         self.config = get_config()
         self.server = None
         self.running = False
-<<<<<<< HEAD
-        self.casil = CasilIntegration(self.config.casil)
-=======
         self._server_task = None
->>>>>>> ff29248 (refactor(api): update message envelope structure to use sender, room, and channel fields)
+        self.casil = CasilIntegration(self.config.casil)
         
         # Connection handlers
         self.message_handlers: Dict[str, Callable] = {
@@ -61,7 +58,7 @@ class WebSocketBus:
             "started_at": None,
             "last_activity": None
         }
-    
+
     async def start_server(self, host: Optional[str] = None, port: Optional[int] = None):
         """Start the WebSocket server.
         
