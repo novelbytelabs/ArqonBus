@@ -1,0 +1,65 @@
+"""CASIL policy evaluation."""
+
+import json
+import re
+from typing import Any, Dict
+
+from ..protocol.envelope import Envelope
+from ..config.config import CASILConfig
+from .errors import CASIL_POLICY_BLOCKED_SECRET, CASIL_POLICY_OVERSIZE, CASIL_POLICY_REDACTED, CASIL_POLICY_ALLOWED
+
+
+def _serialized_length(payload: Any) -> int:
+    try:
+        return len(json.dumps(payload, ensure_ascii=True))
+    except Exception:
+        return len(str(payload))
+
+
+def _detect_probable_secret(payload: Any, patterns, max_inspect_bytes: int) -> bool:
+    try:
+        data = json.dumps(payload, ensure_ascii=True)
+    except Exception:
+        data = str(payload)
+    data = data[:max_inspect_bytes]
+    for pattern in patterns:
+        if re.search(pattern, data):
+            return True
+    return False
+
+
+def evaluate_policies(
+    envelope: Envelope, casil_config: CASILConfig, classification_flags: Dict[str, bool]
+) -> Dict[str, Any]:
+    """Evaluate CASIL policies and return decision hints."""
+    decision = CASIL_POLICY_ALLOWED
+    should_block = False
+    should_redact = False
+    reason_code = CASIL_POLICY_ALLOWED
+    flags = dict(classification_flags)
+
+    payload_len = _serialized_length(envelope.payload)
+    if casil_config.policies.max_payload_bytes and payload_len > casil_config.policies.max_payload_bytes:
+        flags["oversize_payload"] = True
+        should_block = True
+        reason_code = CASIL_POLICY_OVERSIZE
+    patterns = (casil_config.policies.redaction.patterns or [])[: casil_config.limits.max_patterns or None]
+    if casil_config.policies.block_on_probable_secret or casil_config.mode == "enforce":
+        if _detect_probable_secret(envelope.payload, patterns, casil_config.limits.max_inspect_bytes):
+            flags["contains_probable_secret"] = True
+            should_block = should_block or casil_config.policies.block_on_probable_secret
+            reason_code = CASIL_POLICY_BLOCKED_SECRET if casil_config.policies.block_on_probable_secret else reason_code
+            should_redact = True
+
+    if not should_block and should_redact:
+        decision = CASIL_POLICY_REDACTED
+        reason_code = CASIL_POLICY_REDACTED
+    elif should_block:
+        decision = reason_code
+
+    return {
+        "should_block": should_block,
+        "should_redact": should_redact,
+        "reason_code": reason_code,
+        "flags": flags,
+    }

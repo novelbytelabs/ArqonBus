@@ -14,6 +14,7 @@ from datetime import datetime
 
 from .config.config import get_config, load_config
 from .transport.websocket_bus import WebSocketBus
+from .casil.integration import CasilIntegration
 from .routing.router import RoutingCoordinator
 from .storage.interface import MessageStorage, StorageRegistry
 from .utils.logging import setup_logging, get_logger
@@ -384,6 +385,8 @@ class ArqonBusServer:
             if self.ws_bus:
                 # WebSocket server will pick up new config on next restart
                 self.logger.info("WebSocket server will use new configuration on restart")
+                self.ws_bus.config = self.config
+                self.ws_bus.casil = CasilIntegration(self.config.casil)
             
             # Update logging level
             setup_logging(self.config.telemetry.log_level)

@@ -125,6 +125,44 @@ Available at `/metrics`:
 - `arqonbus_storage_operations_total`
 - `arqonbus_uptime_seconds`
 
+## CASIL Operations (Feature 002)
+
+### Defaults & Recommended Bounds
+- `casil.enabled=false` (opt-in)
+- `casil.mode=monitor` (no blocking)
+- `casil.default_decision=allow` (fail-open on internal errors)
+- `casil.limits.max_inspect_bytes=65536` (recommended upper bound: 262144)
+- `casil.limits.max_patterns=32` (recommended upper bound: 64)
+- `casil.policies.max_payload_bytes=262144` (tighten for sensitive channels)
+- Metadata exposure: logs/telemetry on; envelope opt-in (`casil.metadata.to_envelope=false`)
+
+### Enable / Tighten / Relax
+1. **Enable in monitor mode (safe rollout)**  
+   `ARQONBUS_CASIL_ENABLED=true`  
+   `ARQONBUS_CASIL_MODE=monitor`  
+   `ARQONBUS_CASIL_SCOPE_INCLUDE="secure-*"`
+
+2. **Tighten during incident (enforce + stricter policies)**  
+   `ARQONBUS_CASIL_MODE=enforce`  
+   `ARQONBUS_CASIL_BLOCK_ON_PROBABLE_SECRET=true`  
+   `ARQONBUS_CASIL_MAX_PAYLOAD_BYTES=<lower>`  
+   `ARQONBUS_CASIL_REDACTION_PATTERNS="token,secret,api_key"`  
+   Restart or reload configuration to apply (server reload reinitializes CASIL).
+
+3. **Relax / disable**  
+   Switch back to `monitor` or set `ARQONBUS_CASIL_ENABLED=false` and restart.
+
+### Incident Steps
+- Switch monitor → enforce and lower size limits for affected channels.
+- Confirm CASIL telemetry for reason codes (`CASIL_POLICY_BLOCKED_SECRET`, `CASIL_POLICY_OVERSIZE`).
+- Verify blocked messages are not delivered/persisted (history stays unchanged).
+- After containment, relax to monitor mode and review logs/telemetry for hotspots (room/channel/client).
+
+### Performance Benchmarks
+- Targets: CASIL disabled ≈ baseline throughput/latency (±1%); CASIL monitor mode adds <5ms p99 per inspected message at default `max_inspect_bytes`.
+- Benchmarks: `pytest tests/performance/test_casil_benchmarks.py -m performance`
+- Record results per environment (date, machine, baseline vs CASIL monitor) and update this section after each run.
+
 ## Operational Procedures
 
 ### Daily Operations

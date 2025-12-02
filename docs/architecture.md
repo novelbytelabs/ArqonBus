@@ -159,6 +159,17 @@ ArqonBus is built on a layered, modular architecture designed for reliability, s
 - Client connection management
 - Performance monitoring
 
+### Inspection & Safety Layer (CASIL)
+
+**CASIL** (`src/arqonbus/casil/`)
+
+- Optional, bounded inspection layer invoked **after envelope validation and before routing/commands/history**.
+- Config-driven activation: `casil.enabled`, `casil.mode` (`monitor`|`enforce`), scoped include/exclude patterns.
+- Deterministic classification (`kind`, `risk_level`, `flags`) within `max_inspect_bytes`; no external I/O.
+- Policy decisions: allow / allow with redaction / block; default decision controls fail-open vs fail-closed on internal errors.
+- Redaction applies to observability targets by default; transport-level redaction is opt-in and preserves well-formed JSON.
+- Telemetry/logging emit reason codes without leaking sensitive payloads; blocked messages are not persisted.
+
 **Telemetry Handler** (`src/arqonbus/telemetry/handlers.py`)
 
 - Event validation and enrichment

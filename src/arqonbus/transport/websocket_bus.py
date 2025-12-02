@@ -10,6 +10,8 @@ from ..protocol.envelope import Envelope
 from ..protocol.validator import EnvelopeValidator
 from ..routing.client_registry import ClientRegistry
 from ..config.config import get_config
+from ..casil.integration import CasilIntegration
+from ..casil.outcome import CASILDecision
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,7 @@ class WebSocketBus:
         self.config = get_config()
         self.server = None
         self.running = False
+        self.casil = CasilIntegration(self.config.casil)
         
         # Connection handlers
         self.message_handlers: Dict[str, Callable] = {
@@ -189,6 +192,24 @@ class WebSocketBus:
             # Update client activity
             await self.client_registry.update_client_activity(client_id)
             self._stats["last_activity"] = asyncio.get_event_loop().time()
+
+            # CASIL inspection (post-validation, pre-routing)
+            if envelope.type in ("message", "command"):
+                context = {"client_id": client_id, "room": envelope.room, "channel": envelope.channel}
+                casil_outcome = await self.casil.process(envelope, context)
+                if casil_outcome.decision == CASILDecision.BLOCK:
+                    error_msg = Envelope(
+                        type="error",
+                        request_id=envelope.id,
+                        error="CASIL blocked message",
+                        error_code=casil_outcome.reason_code,
+                        payload={"reason": casil_outcome.reason_code},
+                        sender="arqonbus",
+                        room=envelope.room,
+                        channel=envelope.channel,
+                    )
+                    await websocket.send(error_msg.to_json())
+                    return
             
             # Route message based on type
             handler = self.message_handlers.get(envelope.type)

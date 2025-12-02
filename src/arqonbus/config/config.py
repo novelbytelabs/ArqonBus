@@ -70,6 +70,57 @@ class SecurityConfig:
 
 
 @dataclass
+class CASILLimits:
+    """Boundaries for CASIL inspection."""
+    max_inspect_bytes: int = 65536
+    max_patterns: int = 32
+
+
+@dataclass
+class CASILScope:
+    """Scope selection for CASIL inspection."""
+    include: List[str] = field(default_factory=list)
+    exclude: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CASILRedactionConfig:
+    """Redaction settings for CASIL."""
+    paths: List[str] = field(default_factory=lambda: ["password", "token", "secret"])
+    patterns: List[str] = field(default_factory=list)
+    transport_redaction: bool = False
+    never_log_payload_for: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CASILMetadataExposure:
+    """Where CASIL metadata can appear."""
+    to_logs: bool = True
+    to_telemetry: bool = True
+    to_envelope: bool = False
+
+
+@dataclass
+class CASILPolicies:
+    """Policy definitions for CASIL."""
+    max_payload_bytes: int = 262144
+    block_on_probable_secret: bool = False
+    redaction: CASILRedactionConfig = field(default_factory=CASILRedactionConfig)
+
+
+@dataclass
+class CASILConfig:
+    """Main CASIL configuration."""
+    enabled: bool = False
+    mode: str = "monitor"  # monitor|enforce
+    default_decision: str = "allow"  # allow|block
+    scope: CASILScope = field(default_factory=CASILScope)
+    limits: CASILLimits = field(default_factory=CASILLimits)
+    policies: CASILPolicies = field(default_factory=CASILPolicies)
+    metadata: CASILMetadataExposure = field(default_factory=CASILMetadataExposure)
+
+
+@dataclass
 class ArqonBusConfig:
     """Main configuration for ArqonBus."""
     server: ServerConfig = field(default_factory=ServerConfig)
@@ -78,6 +129,7 @@ class ArqonBusConfig:
     storage: StorageConfig = field(default_factory=StorageConfig)
     telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
+    casil: CASILConfig = field(default_factory=CASILConfig)
     
     # Environment-specific overrides
     environment: str = "development"
@@ -123,6 +175,34 @@ class ArqonBusConfig:
         
         # Security configuration
         config.security.enable_authentication = os.getenv("ARQONBUS_ENABLE_AUTH", "false").lower() == "true"
+
+        # CASIL configuration
+        config.casil.enabled = os.getenv("ARQONBUS_CASIL_ENABLED", str(config.casil.enabled)).lower() == "true"
+        config.casil.mode = os.getenv("ARQONBUS_CASIL_MODE", config.casil.mode)
+        config.casil.default_decision = os.getenv("ARQONBUS_CASIL_DEFAULT_DECISION", config.casil.default_decision)
+        include_scope = os.getenv("ARQONBUS_CASIL_SCOPE_INCLUDE")
+        if include_scope:
+            config.casil.scope.include = [s.strip() for s in include_scope.split(",") if s.strip()]
+        exclude_scope = os.getenv("ARQONBUS_CASIL_SCOPE_EXCLUDE")
+        if exclude_scope:
+            config.casil.scope.exclude = [s.strip() for s in exclude_scope.split(",") if s.strip()]
+        config.casil.limits.max_inspect_bytes = int(os.getenv("ARQONBUS_CASIL_MAX_INSPECT_BYTES", config.casil.limits.max_inspect_bytes))
+        config.casil.limits.max_patterns = int(os.getenv("ARQONBUS_CASIL_MAX_PATTERNS", config.casil.limits.max_patterns))
+        config.casil.policies.max_payload_bytes = int(os.getenv("ARQONBUS_CASIL_MAX_PAYLOAD_BYTES", config.casil.policies.max_payload_bytes))
+        config.casil.policies.block_on_probable_secret = os.getenv("ARQONBUS_CASIL_BLOCK_ON_PROBABLE_SECRET", str(config.casil.policies.block_on_probable_secret)).lower() == "true"
+        redaction_paths = os.getenv("ARQONBUS_CASIL_REDACTION_PATHS")
+        if redaction_paths:
+            config.casil.policies.redaction.paths = [p.strip() for p in redaction_paths.split(",") if p.strip()]
+        redaction_patterns = os.getenv("ARQONBUS_CASIL_REDACTION_PATTERNS")
+        if redaction_patterns:
+            config.casil.policies.redaction.patterns = [p.strip() for p in redaction_patterns.split(",") if p.strip()]
+        config.casil.policies.redaction.transport_redaction = os.getenv("ARQONBUS_CASIL_TRANSPORT_REDACTION", str(config.casil.policies.redaction.transport_redaction)).lower() == "true"
+        never_log_payload_for = os.getenv("ARQONBUS_CASIL_NEVER_LOG_PAYLOAD_FOR")
+        if never_log_payload_for:
+            config.casil.policies.redaction.never_log_payload_for = [p.strip() for p in never_log_payload_for.split(",") if p.strip()]
+        config.casil.metadata.to_logs = os.getenv("ARQONBUS_CASIL_METADATA_TO_LOGS", str(config.casil.metadata.to_logs)).lower() == "true"
+        config.casil.metadata.to_telemetry = os.getenv("ARQONBUS_CASIL_METADATA_TO_TELEMETRY", str(config.casil.metadata.to_telemetry)).lower() == "true"
+        config.casil.metadata.to_envelope = os.getenv("ARQONBUS_CASIL_METADATA_TO_ENVELOPE", str(config.casil.metadata.to_envelope)).lower() == "true"
         
         # Global configuration
         config.environment = os.getenv("ARQONBUS_ENVIRONMENT", config.environment)
@@ -167,6 +247,18 @@ class ArqonBusConfig:
         # Security validation
         if self.security.rate_limit_per_minute < 1:
             errors.append(f"Invalid rate limit: {self.security.rate_limit_per_minute}")
+
+        # CASIL validation
+        if self.casil.mode not in ("monitor", "enforce"):
+            errors.append(f"Invalid CASIL mode: {self.casil.mode}")
+        if self.casil.default_decision not in ("allow", "block"):
+            errors.append(f"Invalid CASIL default_decision: {self.casil.default_decision}")
+        if self.casil.limits.max_inspect_bytes < 0:
+            errors.append("CASIL max_inspect_bytes must be non-negative")
+        if self.casil.limits.max_patterns < 0:
+            errors.append("CASIL max_patterns must be non-negative")
+        if self.casil.policies.max_payload_bytes < 0:
+            errors.append("CASIL max_payload_bytes must be non-negative")
             
         return errors
     
@@ -205,6 +297,34 @@ class ArqonBusConfig:
                 "enable_authentication": self.security.enable_authentication,
                 "allowed_commands": self.security.allowed_commands,
                 "rate_limit_per_minute": self.security.rate_limit_per_minute
+            },
+            "casil": {
+                "enabled": self.casil.enabled,
+                "mode": self.casil.mode,
+                "default_decision": self.casil.default_decision,
+                "scope": {
+                    "include": self.casil.scope.include,
+                    "exclude": self.casil.scope.exclude,
+                },
+                "limits": {
+                    "max_inspect_bytes": self.casil.limits.max_inspect_bytes,
+                    "max_patterns": self.casil.limits.max_patterns,
+                },
+                "policies": {
+                    "max_payload_bytes": self.casil.policies.max_payload_bytes,
+                    "block_on_probable_secret": self.casil.policies.block_on_probable_secret,
+                    "redaction": {
+                        "paths": self.casil.policies.redaction.paths,
+                        "patterns": self.casil.policies.redaction.patterns,
+                        "transport_redaction": self.casil.policies.redaction.transport_redaction,
+                        "never_log_payload_for": self.casil.policies.redaction.never_log_payload_for,
+                    },
+                },
+                "metadata": {
+                    "to_logs": self.casil.metadata.to_logs,
+                    "to_telemetry": self.casil.metadata.to_telemetry,
+                    "to_envelope": self.casil.metadata.to_envelope,
+                },
             },
             "environment": self.environment,
             "debug": self.debug
