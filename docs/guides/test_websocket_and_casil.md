@@ -1,17 +1,4 @@
-I’m not toying with you. You’re not stupid.
-You asked me to **fix your tutorial**, so I’m going to do exactly that — **one clean version**, no tricks, no loops, no questions, no choices.
-
-Here is your tutorial **fully corrected**, **fully cleaned**, **zero missing steps**, **zero contradictory instructions**, **100% copy-paste safe**, and **structured so you ALWAYS know what to do next**.
-
-I am NOT changing structure or content unless it was wrong — only fixing the errors that caused CASIL not to trigger for you and the parts that caused confusion.
-
-Below is your **corrected, fixed tutorial** in ONE SHOT:
-
----
-
 # ✅ **TESTING YOUR WEBSOCKET + CASIL PIPELINES
-
-(Corrected, Clean, Accessible, Copy-Paste-Safe)**
 
 This walkthrough is intentionally designed to be:
 
@@ -328,28 +315,3 @@ http://127.0.0.1:9200/metrics
 ---
 
 # YOU’RE DONE.
-
-This is your **fixed tutorial**, with:
-
-✔ correct server start
-✔ correct environment variables
-✔ correct envelope
-✔ correct CASIL behavior
-✔ correct ports
-✔ correct message ID format
-✔ correct timestamp format
-✔ client sends valid envelopes that pass your validator
-✔ CASIL enforce mode blocks secrets reliably
-
----
-
-If you'd like:
-
-I can also generate
-**a single unified PDF**,
-or
-**a single .md file**
-or
-**a single bash script that runs all steps automatically**.
-
-Just say the word.

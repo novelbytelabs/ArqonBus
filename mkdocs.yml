@@ -42,6 +42,14 @@ nav:
   - Developer Guide:
     - Developers Guide: 'developers_guide.md'
     - API Reference: 'api.md'
+  - CASIL (Content-Aware Safety & Inspection Layer):
+    - Overview: 'casil/index.md'
+    - Getting Started: 'casil/getting-started.md'
+    - Configuration Guide: 'casil/configuration.md'
+    - Redaction & Safety: 'casil/redaction.md'
+    - Monitoring & Telemetry: 'casil/monitoring.md'
+    - Best Practices: 'casil/best-practices.md'
+    - API Reference: 'casil/api-reference.md'
   - Architecture:
     - Design & Architecture: 'architecture.md'
     - Project Scope: 'arqonbus_v1_scope.md'
