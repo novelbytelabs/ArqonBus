@@ -1,5 +1,7 @@
 # ArqonBus
 
+![ArqonBus Logo](docs/assets/large-logo.png)
+
 **ArqonBus** is a lightweight, structured WebSocket message bus with rooms, channels, and a simple command protocol. It's designed to be the real-time backbone for applications, services, and agents that need organized, multi-channel communication.
 
 > Status: **experimental / WIP**

@@ -87,6 +87,7 @@ CASIL automatically classifies messages by type and risk level:
 ## When to Use CASIL
 
 CASIL is recommended for:
+
 - ✅ Production deployments with sensitive data
 - ✅ Compliance requirements (PCI-DSS, HIPAA, GDPR)
 - ✅ Multi-tenant applications
@@ -95,6 +96,7 @@ CASIL is recommended for:
 - ✅ Organizations with strict data governance
 
 CASIL is not needed for:
+
 - ❌ Development/test environments
 - ❌ Public chat applications
 - ❌ Low-risk internal tools
@@ -106,13 +108,6 @@ CASIL is not needed for:
 - **Compatibility**: ArqonBus v1.0+
 - **Python Version**: 3.11+
 - **Last Updated**: 2025-12-03
-
-## Getting Help
-
-- 📚 [Configuration Guide](configuration.md) - Setup and configuration
-- 🐛 [Issue Tracker](https://github.com/arqonbus/arqonbus/issues) - Bug reports and feature requests
-- 💬 [Community Support](https://github.com/arqonbus/arqonbus/discussions) - Questions and discussions
-- 📖 [ArqonBus Documentation](../index.md) - General ArqonBus documentation
 
 ---
 
