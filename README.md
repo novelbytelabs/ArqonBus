@@ -91,6 +91,23 @@ Built-in commands (via `type: "command"`):
 
 ---
 
+## 🛡️ CASIL Safety Layer (Content-Aware Safety & Inspection)
+- Optional but production-focused message inspection with **monitor** (no blocking) and **enforce** (blocking/redaction) modes.
+- Scope-aware: target only certain rooms/channels via `ARQONBUS_CASIL_SCOPE_INCLUDE`/`EXCLUDE`.
+- Policies: payload size limits, probable-secret detection (regex + classifier flags), configurable redaction paths/patterns, and transport vs observability redaction.
+- Bounded, deterministic processing with configurable inspect limits to keep overhead low; falls back safely with default decisions.
+- Rich telemetry and metadata: emits CASIL decision events, attaches classification flags to envelopes (when enabled), and logs redaction/block decisions.
+- Quick start:
+  ```bash
+  ARQONBUS_CASIL_ENABLED=true \
+  ARQONBUS_CASIL_MODE=monitor \
+  ARQONBUS_CASIL_SCOPE_INCLUDE="secure-*,pii-*" \
+  python websocket_bus.py --host localhost --port 9100 --telemetry-port 9101
+  ```
+- Full manual: see `docs/casil/index.md` for configuration, redaction, and API details.
+
+---
+
 ## 📚 Documentation & Specifications
 
 ### Core Specifications

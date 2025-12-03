@@ -2,7 +2,7 @@
 
 import json
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ..protocol.envelope import Envelope
 from ..config.config import CASILConfig
@@ -30,9 +30,8 @@ def _detect_probable_secret(payload: Any, patterns, max_inspect_bytes: int) -> b
 
 def evaluate_policies(
     envelope: Envelope,
-    scopes: Dict[str, Any],
-    classification_flags: Dict[str, bool],
     casil_config: CASILConfig,
+    classification_flags: Optional[Dict[str, bool]] = None,
 ) -> Dict[str, Any]:
     """
     Evaluate CASIL policies for the given envelope.
@@ -45,7 +44,7 @@ def evaluate_policies(
     - If block_on_probable_secret is True, any probable secret causes a block.
     - Otherwise, probable secrets cause redaction but not a hard block.
     """
-    flags: Dict[str, bool] = dict(classification_flags)
+    flags: Dict[str, bool] = dict(classification_flags or {})
     payload_len = _serialized_length(envelope.payload)
 
     should_block = False
@@ -98,4 +97,3 @@ def evaluate_policies(
         "reason_code": reason_code,
         "flags": flags,
     }
-
