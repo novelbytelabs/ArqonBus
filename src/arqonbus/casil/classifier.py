@@ -15,6 +15,9 @@ DEFAULT_SECRET_PATTERNS = [
     r"(?i)token",
     r"(?i)password",
     r"(?i)bearer\s+[A-Za-z0-9\-\._]+",
+    # Common key formats (Stripe-style, etc.)
+    r"sk_(live|test)_[0-9a-zA-Z]{16,}",
+    r"pk_(live|test)_[0-9a-zA-Z]{16,}",
 ]
 
 
@@ -51,15 +54,18 @@ def classify(envelope: Envelope, casil_config: CASILConfig, context: Dict[str, A
 
     serialized = _flatten_payload(envelope.payload, casil_config.limits.max_inspect_bytes)
     patterns = casil_config.policies.redaction.patterns or DEFAULT_SECRET_PATTERNS
+
     if _detect_secret(serialized, patterns):
         classification.flags["contains_probable_secret"] = True
         classification.risk_level = "high"
 
     if context.get("oversize_payload"):
         classification.flags["oversize_payload"] = True
-        classification.risk_level = "medium" if classification.risk_level == "low" else classification.risk_level
+        if classification.risk_level == "low":
+            classification.risk_level = "medium"
 
     if casil_config.mode == "enforce" and classification.flags:
-        classification.risk_level = "high" if classification.flags.get("contains_probable_secret") else classification.risk_level
+        if classification.flags.get("contains_probable_secret"):
+            classification.risk_level = "high"
 
     return classification

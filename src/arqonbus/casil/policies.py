@@ -29,33 +29,68 @@ def _detect_probable_secret(payload: Any, patterns, max_inspect_bytes: int) -> b
 
 
 def evaluate_policies(
-    envelope: Envelope, casil_config: CASILConfig, classification_flags: Dict[str, bool]
+    envelope: Envelope,
+    scopes: Dict[str, Any],
+    classification_flags: Dict[str, bool],
+    casil_config: CASILConfig,
 ) -> Dict[str, Any]:
-    """Evaluate CASIL policies and return decision hints."""
-    decision = CASIL_POLICY_ALLOWED
+    """
+    Evaluate CASIL policies for the given envelope.
+
+    The logic here is intentionally conservative:
+    - Oversize payloads can be blocked regardless of content.
+    - "Probable secret" detection comes from:
+        * classifier flags (contains_probable_secret), and/or
+        * regex patterns in casil.policies.redaction.patterns
+    - If block_on_probable_secret is True, any probable secret causes a block.
+    - Otherwise, probable secrets cause redaction but not a hard block.
+    """
+    flags: Dict[str, bool] = dict(classification_flags)
+    payload_len = _serialized_length(envelope.payload)
+
     should_block = False
     should_redact = False
     reason_code = CASIL_POLICY_ALLOWED
-    flags = dict(classification_flags)
 
-    payload_len = _serialized_length(envelope.payload)
+    # 1) Oversize payload check
     if casil_config.policies.max_payload_bytes and payload_len > casil_config.policies.max_payload_bytes:
         flags["oversize_payload"] = True
         should_block = True
         reason_code = CASIL_POLICY_OVERSIZE
-    patterns = (casil_config.policies.redaction.patterns or [])[: casil_config.limits.max_patterns or None]
-    if casil_config.policies.block_on_probable_secret or casil_config.mode == "enforce":
-        if _detect_probable_secret(envelope.payload, patterns, casil_config.limits.max_inspect_bytes):
-            flags["contains_probable_secret"] = True
-            should_block = should_block or casil_config.policies.block_on_probable_secret
-            reason_code = CASIL_POLICY_BLOCKED_SECRET if casil_config.policies.block_on_probable_secret else reason_code
-            should_redact = True
 
+    # 2) Probable-secret detection
+    #    Start with what the classifier already decided…
+    probable_secret = bool(flags.get("contains_probable_secret"))
+
+    #    …then OR in any matches from configured redaction patterns
+    patterns = (casil_config.policies.redaction.patterns or [])[: casil_config.limits.max_patterns or None]
+    if patterns and (casil_config.policies.block_on_probable_secret or casil_config.mode == "enforce"):
+        try:
+            if _detect_probable_secret(envelope.payload, patterns, casil_config.limits.max_inspect_bytes):
+                probable_secret = True
+                flags["contains_probable_secret"] = True
+        except ValueError:
+            # If payload can't be inspected, leave probable_secret as-is
+            pass
+
+    # 3) Apply policy based on probable_secret + mode/config
+    if (casil_config.policies.block_on_probable_secret or casil_config.mode == "enforce") and probable_secret:
+        # We always redact when we think it's a secret
+        should_redact = True
+
+        # And optionally block, depending on config
+        if casil_config.policies.block_on_probable_secret:
+            should_block = True
+            reason_code = CASIL_POLICY_BLOCKED_SECRET
+
+    # 4) Final decision outcome
     if not should_block and should_redact:
         decision = CASIL_POLICY_REDACTED
         reason_code = CASIL_POLICY_REDACTED
     elif should_block:
         decision = reason_code
+    else:
+        decision = CASIL_POLICY_ALLOWED
 
     return {
         "should_block": should_block,
@@ -63,3 +98,4 @@ def evaluate_policies(
         "reason_code": reason_code,
         "flags": flags,
     }
+

@@ -23,7 +23,7 @@ async def main():
             "version": "1.0",
             "room": "secure-payments",
             "channel": "alerts",
-            "payload": {"content": "leaked api_key=sk-demo-123456"},
+            "payload": {"content": "leaked api_key=sk_live_24784t0987fh0qhg3509-87q4t0hi987"},
             "args": {},
             "metadata": {}
         }
