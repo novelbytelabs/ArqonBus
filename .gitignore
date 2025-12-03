@@ -44,11 +44,6 @@ node_modules/
 *.tar
 *.tar.gz
 *.7z
-*.png
-*.jpg
-*.jpeg
-*.bmp
-*.tiff
 *.mp4
 *.avi
 *.mkv
