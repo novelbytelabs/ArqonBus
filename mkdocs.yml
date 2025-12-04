@@ -71,8 +71,31 @@ nav:
       - Tasks: 'specs/002-content-aware-safety-inspection/tasks.md'
       - CASIL Contract: 'specs/002-content-aware-safety-inspection/contracts/casil.md'
   - Projects:
-    - Proto-Intelligence Initial: 'projects/proto-intelligence-initial.md'
-    - Six Steps: 'projects/six_steps.md'
+    - Platform Overview:
+      - ArqonTech Vision: 'projects/arqontech.md'
+      - ArqonTech Ecosystem 2.1: 'projects/arqon_ecosystem.md'
+      - Problems & Promise: 'projects/problems_promise.md'
+      - Who Arqon is For: 'projects/who_for.md'
+    - Core Concepts: 'projects/concepts/index.md'
+    - Platform Architecture:
+      - ArqonMesh: 'projects/arqonmesh.md'
+    - Developers Guide:
+      - Overview: 'projects/guides/dev/overview.md'
+    - Operations Guide:
+      - Overview: 'projects/guides/ops/overview.md'
+    - Packaged Business Capabilities:
+      - Overview: 'projects/pb'
+    - Delta Framework:
+      - Delta Control Levers: 'projects/levers.md'
+      - Delta Fabric: 'projects/fabric.md'
+      - Deltas Example: 'projects/deltas_example.md'
+      - Deltas: 'projects/deltas.md'
+    - Research Projects:
+      - Network Automaton: 'projects/network_automaton.md'
+      - Grid: 'projects/grid.md'
+      - Moonshots: 'projects/moonshots.md'
+      - Proto-Intelligence Initial: 'projects/proto-intelligence-initial.md'
+      - Six Steps: 'projects/six_steps.md'
   - Project Info:
     - Ecosystem: 'arqon_ecosystem.md'
     - Completion Report: 'completion_report.md'
