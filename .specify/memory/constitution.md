@@ -1,12 +1,12 @@
 <!-- 
-Sync Impact Report - ArqonBus Constitution v1.2.0
+Sync Impact Report - ArqonBus Constitution v2.0.0
 =================================================
-Version change: 1.1.0 → 1.2.0
-Modified principles: Product Identity, Vision and Scope, Architecture Principles, Protocol Guarantees, Code Quality, Development Process, Observability, Security, Governance
-Added concepts: CASIL (Content-Aware Safety & Inspection Layer) as an optional inspection & safety layer within ArqonBus
+Version change: 1.2.0 → 2.0.0
+Modified principles: Product Identity, Vision and Scope, Architecture Principles, Protocol & Compatibility, Security (Multi-tenant), Governance
+Added concepts: Voltron deployment pattern as normative architecture (Shield/Spine/Brain/Storage), Protobuf-first wire protocol with JSON reserved for admin/UI, future-proofing hooks for MAS (capabilities, intents, embeddings), stronger multi-tenant scoping rules
 Removed sections: None
-Templates requiring updates: Specs and plans for features that introduce or extend CASIL behavior
-Follow-up TODOs: Ensure Feature 002 spec and plan explicitly reference CASIL and align with this constitution
+Templates requiring updates: Specs and plans that describe protocol format, deployment architecture, or tenant isolation; any Feature 001/002 docs that assumed JSON envelope instead of Protobuf
+Follow-up TODOs: Align Feature 001 (core message bus) spec with Protobuf-first envelope and Voltron pattern; ensure Feature 002 (CASIL) spec clarifies Protobuf inspection path and MAS hooks
 -->
 
 # ArqonBus Constitution
@@ -22,20 +22,27 @@ If a decision conflicts with this constitution, **the decision is wrong**.
 ## I. Product Identity
 
 ### 1. ArqonBus in One Sentence
-> **ArqonBus is a small, sharp, reliable WebSocket message bus for structured, real-time communication, with an optional content-aware safety & inspection layer.**
+> **ArqonBus is a small, sharp, Protobuf-first WebSocket message bus for structured, real-time communication in multi-agent systems, with an optional content-aware safety & inspection layer.**
 
 It is **not** a framework, ESB, or application platform.  
-It is **just powerful enough** to be an excellent transport layer, and no more.
+It is **just powerful enough** to be an excellent transport layer and Voltron-style system backbone, and no more.
+
+ArqonBus is designed as the **Spine** of a normative four-part architecture (the “Voltron Pattern”):
+
+- **The Shield (Edge)** – typically Rust or a similarly capable runtime – terminates connections, performs TLS and auth integration, and normalizes incoming protocols. It holds **no business state** and speaks the ArqonBus protocol.  
+- **The Spine (Bus)** – ArqonBus itself – carries all structured, high-volume traffic between components over WebSockets using **Protocol Buffers on the wire**.  
+- **The Brain (Control)** – typically Elixir/OTP or an actor model runtime – owns long-lived, domain-level state (presence, rooms, authorization, workflows) and interacts exclusively via ArqonBus.  
+- **The Storage (State)** – durable stores like PostgreSQL and fast stores like Valkey/Redis – persist configuration and ephemeral counters, accessed by services that themselves are ArqonBus clients.
 
 ArqonBus may include an optional **Content-Aware Safety & Inspection Layer (CASIL)**:
 
-- CASIL inspects structured messages in-flight in a lightweight, bounded way.
-- CASIL applies **safety and hygiene policies** (classification, redaction, blocking) at the transport level.
-- CASIL produces metadata and telemetry that help operators understand and control message flows.
+- CASIL inspects Protobuf-encoded messages in-flight in a lightweight, bounded way.
+- CASIL applies **transport-level safety and hygiene policies** (classification, redaction, blocking) without embedding business logic.
+- CASIL produces metadata and telemetry that help operators understand and control message flows, especially in multi-agent environments.
 
 CASIL is:
 
-- about **content awareness**, not AI reasoning or agent orchestration;
+- about **content awareness and safety**, not AI reasoning or agent orchestration;
 - a **layer**, not a platform;
 - **optional and configurable** – ArqonBus must function correctly with CASIL disabled.
 
@@ -55,12 +62,13 @@ If we ever violate this promise, we have broken ArqonBus.
 ## II. Vision and Scope
 
 ### 1. Vision
-Build a message bus that:
+Build a WebSocket message bus that:
 
-- Embeds easily into existing stacks.
-- Plays nicely with modern infra (containers, Kubernetes, managed Redis, etc.).
+- Embeds easily into existing stacks and Voltron-style architectures (Shield, Spine, Brain, Storage).
+- Plays nicely with modern infra (containers, Kubernetes, managed Redis/Valkey, PostgreSQL, etc.).
 - Can be operated by a small team without a dedicated SRE army.
-- Is **good enough** to serve as the backbone for serious systems, including AI-native and multi-agent environments, **without forcing them into our worldview**.
+- Is **good enough** to serve as the backbone for serious systems, especially AI-native and multi-agent environments, **without forcing them into our worldview**.
+- Treats **Protocol Buffers as the first-class wire format** for all high-volume, internal and agent-to-agent traffic, with JSON reserved for human-facing admin and observability surfaces.
 - Offers **built-in, transport-level safety and insight** via CASIL so teams don’t have to bolt on ad-hoc filters and scrubbing layers around ArqonBus.
 
 ### 2. In Scope (v1.x and early v2.x)
@@ -69,7 +77,7 @@ ArqonBus **shall provide**:
 
 - A **WebSocket server** for bi-directional, real-time messaging.
 - First-class support for **rooms** and **channels** as routing primitives.
-- A **structured JSON message envelope** and a **small set of built-in commands**.
+- A **strict, versioned Protocol Buffers message envelope** on the wire and a **small set of built-in commands**.
 - Optional **Redis Streams integration** for durable history and replay.
 - Lightweight **telemetry**: health, metrics, and activity streams suitable for dashboards.
 - **CASIL – Content-Aware Safety & Inspection Layer**, optionally enabled, that:
@@ -109,6 +117,7 @@ ArqonBus must remain **strictly layered**:
 
 1. **Transport Layer**  
    - Handles WebSocket connections, handshakes, heartbeats, and disconnects.  
+   - Encodes and decodes **Protocol Buffers envelopes** on the wire.  
    - Knows nothing about domain semantics.
 
 2. **Routing Layer**  
@@ -117,7 +126,7 @@ ArqonBus must remain **strictly layered**:
 
 3. **Command Layer**  
    - Implements built-in commands (status, history, channel management, ping, etc.).  
-   - Treats commands as part of a public, versioned protocol.
+   - Treats commands as part of a public, versioned protocol defined in `.proto` files.
 
 4. **Storage Layer**  
    - Provides in-memory history by default.  
@@ -129,7 +138,7 @@ ArqonBus must remain **strictly layered**:
    - Must not be able to crash the core bus if misconfigured or offline.
 
 6. **Inspection & Safety Layer (CASIL)**  
-   - Optionally inspects structured messages at or near the routing/command boundary.  
+   - Optionally inspects structured, Protobuf-based messages at or near the routing/command boundary.  
    - Applies **content-aware safety & inspection policies**:
      - classification and tagging;
      - redaction/masking;
@@ -146,6 +155,30 @@ CASIL in particular must not:
 - reach directly into application logic;
 - bypass Transport, Routing, or Command contracts;
 - change message semantics in undocumented ways.
+
+### 1.1 Voltron Deployment Pattern (Architectural Invariance)
+
+ArqonBus is designed to be the **Spine** in a normative deployment pattern for multi-agent and real-time systems:
+
+- **The Shield (Edge)**  
+  - Terminates TLS and incoming connections (including non-WebSocket protocols that are upgraded at the edge).  
+  - Performs authentication and basic request normalization.  
+  - Holds **no domain state** and does not implement business workflows.  
+  - Speaks the ArqonBus protocol over WebSockets using Protobuf envelopes to the Spine.
+
+- **The Spine (Bus)**  
+  - ArqonBus itself: the sole, authoritative message bus for internal and agent-to-agent traffic.  
+  - Enforces the protocol contract, routing semantics, CASIL policies, and telemetry guarantees defined in this constitution.
+
+- **The Brain (Control)**  
+  - Runs stateful, domain-level logic (presence, rooms, workflows, authorization decisions) in runtimes such as Elixir/OTP.  
+  - Subscribes to rooms/channels on ArqonBus and emits events back; it does **not** bypass the Spine via private backchannels for core flows.
+
+- **The Storage (State)**  
+  - Uses durable (PostgreSQL) and ephemeral (Valkey/Redis) stores for configuration, history, and counters.  
+  - Access is mediated by services that are themselves ArqonBus clients, ensuring state changes are reflected as bus events when relevant.
+
+This pattern is the **default architectural expectation** for serious deployments. Other topologies must justify themselves in specs and must not violate ArqonBus’ protocol, safety, or observability guarantees.
 
 ### 2. Stateless Where Possible
 
@@ -181,21 +214,44 @@ CASIL in particular must not:
 
 ## IV. Protocol & Compatibility Guarantees
 
-### 1. Envelope as Public Contract
+### 1. Envelope as Public Contract (Protobuf-First)
 
-The message envelope schema is a **public API**. For each protocol version:
+The **Protocol Buffers message envelope** is a **public API and source of truth** for ArqonBus. For each protocol version:
 
-- Required fields, optional fields, and types are clearly defined.
-- Invalid messages are rejected with explicit errors.
+- Required fields, optional fields, and types are defined in `.proto` files that are treated as canonical.  
+- Invalid messages (including schema violations, missing required fields, or version mismatches) are rejected with explicit errors.
 - Version mismatches are handled predictably (graceful errors, not silent drops).
+
+JSON is reserved for:
+
+- human-facing administrative and debug APIs (HTTP, dashboards, consoles);  
+- serialized views of internal state and telemetry for operators.
+
+All high-volume, internal, and agent-to-agent traffic carried by ArqonBus uses **Protobuf on the wire**.
 
 When CASIL is enabled, it may attach **additional, optional metadata** to messages (e.g., classification tags, risk flags, policy result codes). These must:
 
-- be clearly documented as optional fields or substructures;
+- be clearly documented as optional fields or substructures in the Protobuf schema;
 - never change the meaning of existing fields;
 - be safe to ignore for clients that do not understand them.
 
-### 2. Semantic Versioning for Protocol
+### 2. Future-Proofing Hooks for Multi-Agent Systems
+
+To support future multi-agent and AI-native capabilities without breaking existing clients:
+
+- **Identity Hooks**  
+  - Envelopes and auth metadata must support **capability-style descriptors** (e.g., lists of agent capabilities) alongside traditional roles.  
+  - These are represented as optional fields in the Protobuf schema and interpreted by higher-level services, not by the core bus.
+
+- **Routing Hooks**  
+  - Envelopes may reserve or define optional fields for **semantic vectors** (embeddings) and **intents**.  
+  - These fields are strictly additive, optional, and safe to ignore; they must not change routing semantics unless explicitly configured in higher layers.
+
+- **Middleware Hooks**  
+  - The protocol and architecture must support a **chain-of-responsibility** style of inspection and safety, implemented via CASIL within the bus and optional safety middleware at the Shield.  
+  - Any such middleware must remain bounded in cost and respect ArqonBus’ guarantees about protocol stability, observability, and failure modes.
+
+### 3. Semantic Versioning for Protocol
 
 - `MAJOR` – breaking changes to envelope, commands, or core behavior.
 - `MINOR` – new commands, additive fields, new telemetry, non-breaking logic.
@@ -208,7 +264,7 @@ CASIL-related additions (e.g., new metadata fields, new error codes for blocked 
 - additive and optional in `MINOR`;
 - removal or semantic change requires a `MAJOR` bump.
 
-### 3. Backwards Compatibility Rules
+### 4. Backwards Compatibility Rules
 
 - Once v1.0 is released, **existing fields cannot change meaning**.
 - Removal of fields, commands, or behaviors requires:
@@ -875,6 +931,8 @@ This section defines the minimum, non-negotiable security posture for ArqonBus.
 
 - **Multi-tenant awareness (when applicable).**
   - If ArqonBus is run in a multi-tenant configuration, tenant boundaries must be explicit in the design (e.g. separate namespaces, auth scopes, routing constraints).
+  - Every room, channel namespace, and persisted key or row (in Redis/Valkey and PostgreSQL) must be scoped or indexable by a `tenant_id` such that cross-tenant access becomes an explicit, reviewable violation rather than an accident.
+  - Wildcard subscriptions and system observers must be tenant-scoped or clearly marked as operator-only views with strong access controls.
   - No tenant should be able to infer or affect the existence, activity, or data of another tenant via timing, error messages, or protocol behavior.
 
 ---
@@ -1004,11 +1062,15 @@ Any feature, change, or optimization that compromises these principles is **not 
 - Any proposal that pushes ArqonBus outside its defined scope (e.g. turning it into a workflow engine or orchestration layer) must be:
   - rejected from core, or  
   - split into a **separate project** in the Arqon ecosystem.
+- Any proposal that changes the **wire protocol model** (away from Protobuf-first) or abandons the **Voltron deployment pattern** as the default must:
+  - be treated as a **major architectural shift**,  
+  - carry an explicit risk and trade-off analysis, and  
+  - be versioned accordingly.
 
 ### 2. Scope Protection
 
 - ArqonBus is **transport infrastructure**, not an application runtime.
-- Higher-level systems (e.g. ArqonBus Workbench, proto-intelligent agents, etc.) must live in separate repositories or modules built on top of the bus.
+- Higher-level systems (e.g. ArqonBus Workbench, proto-intelligent agents, etc.) must live in separate repositories or modules built on top of the bus, using ArqonBus as the Spine in the Voltron pattern.
 
 ### 3. Constitution Authority
 
@@ -1029,7 +1091,7 @@ Any feature, change, or optimization that compromises these principles is **not 
 
 ---
 
-**Version**: 1.2.0  
+**Version**: 2.0.0  
 **Ratified**: 2025-12-01  
-**Last Amended**: 2025-12-01  
+**Last Amended**: 2025-12-05  
 **Author**: Mike Young
