@@ -13,15 +13,16 @@ If a decision conflicts with this constitution, **the decision is wrong**.
 
 For the last two decades, real-time infrastructure was built for **Humans**—biological entities with 200ms reaction times, intermittent connectivity, and single-threaded focus.
 
-We are entering the era of **Agents**—silicon entities with microsecond reaction times, persistent connectivity, and swarm intelligence.
+
+We are entering the era of **Operators**—silicon or physical entities with microsecond reaction times, persistent connectivity, and swarm intelligence.
 
 ArqonBus is the infrastructure shift required to support this transition. It is a **Coordination Fabric** designed to treat:
 1.  **Humans** (Chat, Collaboration),
 2.  **Devices** (IoT, Sensors), and
-3.  **Intelligences** (AI Agents, Swarms)
+3.  **Operators** (AI Agents, Physical Rigs, NVM Nodes)
 ...as first-class citizens on a single, unified bus.
 
-Our vision is to provide the **Substrate** where the Agent Economy lives—a place where safe, high-velocity, and stateful coordination happens faster than the speed of human thought.
+Our vision is to provide the **Substrate** where the Agent Economy lives—a place where safe, high-velocity, and stateful coordination happens faster than the speed of human thought. We are **Substrate-Agnostic**, treating acoustic, optical, and silicon compute as peers.
 
 ## 2. The Scope
 
@@ -143,6 +144,15 @@ We reject hardcoded compliance logic. Safety requirements (PII scrubbing, Code I
 *   **Bounded Execution:** To prevent Denial of Service via inspection, all safety modules must have strict, non-negotiable limits on CPU usage (gas) and memory consumption.
 *   **The Air Gap:** Safety logic runs in a sandboxed environment. It must never have direct access to the host file system, network, or internal state of the Shield.
 
+### 9. Message-as-Program (The Capsule Principle)
+Messages are not just passive data envelopes. They may carry **Program Capsules** (Seeds + Rules) that enable Code-Mobile architectures.
+*   **Digital DNA:** The bus is optimized to transport the *Potential* (Seed), not just the *Result*.
+*   **Execution at the Edge:** Intelligent endpoints (Operators) unpack and execute these seeds using verified interpreters (NVM, Wasm, BowlNet).
+
+### 10. Delta-First Architecture (ITMD)
+Computation cost scales with **Change ($\Delta$)**, not total system size.
+*   **Diff over Snapshot:** Protocols must prefer incremental updates (Deltas) over full state dumps.
+*   **Causal Integrity:** Changes are propagated causally. If constraints allow, we process only the difference.
 ---
 
 # III. Code Quality & Engineering Standards
@@ -178,6 +188,7 @@ Errors are data, not exceptions. They must be handled explicitly.
 ### 6. Deterministic State & Protocol Correctness
 Distributed systems die when state transitions become ambiguous.
 *   **State Machine Contracts:** All critical state transitions (Presence, Room State, Circuit Breakers) must be implemented as explicit State Machines. Hidden mutations inside helper functions are forbidden.
+*   **Phonic ROM (Physical Determinism):** Physical operators must expose deterministic, replayable interfaces. We do not rely on transient physics; we rely on **Recorded Fingerprints** (Phonic ROM) to ensure identical outputs for identical inputs.
 *   **Protocol Evolution:** The `.proto` schema is the source of truth. Manual parsing of binary data is prohibited; all parsers must be code-generated.
 *   **Command Strictness:** Every Command/Event must have a single authoritative handler. Dynamic dispatch based on untyped maps is prohibited.
 
