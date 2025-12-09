@@ -112,8 +112,10 @@ To enable the transition to Multi-Agent Systems (MAS) without requiring a v2.0 r
 *   **Middleware Hook:** The Edge Gateway must implement a "Chain of Responsibility" pattern to allow the insertion of Wasm-based Safety Policies (The Overseer) later.
 *   **Physics Hook:** The architecture must reserve interfaces for **Phonic ROM** (BowlNet) integration, treating analogue transforms as native co-processing steps.
 *   **Pulse Hook:** The system must support **NVM Program Capsules** (Pulse Seeds) as a first-class message type, enabling the "Universal Decoder" pattern.
+*   **Pulse Certificates:** NVM Programs are passed by reference via **Pulse Certificates**, enabling the bus to orchestrate heavy analog compute without bandwidth saturation.
 *   **Superposition Hook:** Routing logic must allow for "late-binding" decisions (Schrödinger’s Packet), where message destination is determined by real-time load/affinity rather than static topics.
-*   **Teleportation Hook:** The bus must support atomic **State Transfer** jobs to move heavy execution contexts (Quantum Registers / NVM Snapshots) between nodes.
+---*   **Teleportation Hook:** The bus must support atomic **State Transfer** jobs to move heavy execution contexts (Quantum Registers / NVM Snapshots) between nodes.
+*   **SAM Interfaces:** Agent Operators should expose standard capability descriptors (In/Out/Store/Create/Control) to facilitate automated composition.
 
 ### 5. Semantic Versioning & Compatibility
 We adhere to strict Semantic Versioning regarding the **Protocol** and **Public API**.
@@ -168,19 +170,23 @@ Computation cost scales with **Change ($\Delta$)**, not total system size.
 Topology is declarative.
 *   **Pipelines are Circuits:** Complex flows (NVM -> BowlNet -> QML) are defined as **Circuits** (DAGs) in configuration, not hardcoded in service logic.
 *   **Decoupled Routing:** Operators remain oblivious to their upstream/downstream neighbors.
+*   **Semantic Kernels:** We prefer routing based on **Emergent Kernels** (Stable Attractors) over raw noise. Discovery operators are responsible for distilling kernels.
 
 ### 12. Bounded Emergence
 We consciously work only inside the **Engineerable Sub-Space**.
 *   **Tier 1 Only:** We serve architectures where we have control (Cycle length, Basin shaping).
 *   **Chaos Ban:** Highly chaotic or poorly characterized regimes are considered *out of scope* for production systems and live only in research sandboxes.
+*   **Regime Tuning:** Operators may be tuned to the **Edge of Chaos** (Criticality) for maximum adaptivity, provided sufficient **Damping/Collapse** mechanisms exist to prevent runaway.
+*   **Dual-Flow Dynamics:** Critical circuits must implement both **Generative** (Creation) and **Dissipative** (Pruning) pressures to prevent stagnation or explosion.
 
 ### 13. Temporal Sovereignty
-**Time-varying structure** (e.g., adaptive schedules, sequences of matrices) is a first-class control mechanism, equal to static topology.
+---**Time-varying structure** (e.g., adaptive schedules, sequences of matrices) is a first-class control mechanism, equal to static topology.
 *   **Dynamic Schedules:** We assume control can be restored through well-designed temporal programs, not just static wiring.
 
 ### 14. Mathematical Rigor (Algebraic Preference)
 *   **Solvers over Heuristics:** If a problem can be solved by a matrix operation or algebraic solver (e.g., GF(2)), do not use a neural net or heuristic.
 *   **Explicit Control:** Controllers must be explicit and observable. Hidden control loops are forbidden.
+*   **Structured Sampling:** Prefer **Prime-Structured Grids** (e.g., Prime-CF) over random sampling for parameter sweeps and discovery loops.
 
 ### 15. The Omega Tier (Risk Classification)
 Operators are classified by risk profile:
@@ -194,10 +200,20 @@ Operators are classified by risk profile:
 Complex emergent circuits follow the standard **Substrate → Observer → Controller → Architect** hierarchy.
 *   **Explicit Roles:** Operators must implicitly or explicitly fulfill one of these roles.
 *   **Downward Causation:** Higher-layer operators (Architects) can reconfigure lower layers (Substrates), provided the control messages are explicit and audited.
+*   **Topology as Control:** Architects may use **Dynamic Rewiring** (Topology Change) as a control actuator to shift system operating regimes.
+*   **Recursive Operators:** Operators may be Statefully Recursive. They must explicitly declare **Recursion Depth Limits** and **Halt Conditions**.
+---*   **Meta-Optimizers:** We explicitly recognize **Meta-Optimizers** (e.g., ERO) whose output is the *configuration* of other operators. They are subject to strict "Code-Generation" safety gates.
 
 ### 18. Probability Engines (NVM/QTR)
 The bus supports **Probability Shaping** engines where outputs are distributions, not scalars.
 *   **Superposition:** Routing and state can be "superposed" (probabilistic) until explicitly measured by a "Collapse" operator.
+*   **Hybrid Backends:** The bus supports **Quantum/NVM Backends** as first-class compute nodes. Jobs are routed based on `backend_type` capabilities (e.g., `qtr_sim`, `vqe`).
+
+### 19. Temporal Physics (TTC)
+---*   **Temporal Consensus:** For critical coordination, Time is a **BFT-validated ledger**, ensuring all operators agree on the sequence of events.
+*   **Differential Messaging:** The bus supports **Trajectory Shaping** protocols where signals are differential perturbations of a shared temporal fabric.
+*   **Phased Operation:** Circuits may explicitly declare phases (e.g., `['explore', 'consolidate']`). Control policies must adapt to the active phase.
+
 ---
 
 # III. Code Quality & Engineering Standards
@@ -277,6 +293,7 @@ We operate in a constrained physical reality. Infinite resources do not exist.
 ### 14. Mathematical Rigor (Algebraic Preference)
 *   **Solvers over Heuristics:** If a problem can be solved by a matrix operation or algebraic solver (e.g., GF(2)), do not use a neural net or heuristic.
 *   **Explicit Control:** Controllers must be explicit and observable. Hidden control loops are forbidden.
+*   **Structured Sampling:** Prefer **Prime-Structured Grids** (e.g., Prime-CF) over random sampling for parameter sweeps and discovery loops.
 
 ---
 
@@ -305,7 +322,9 @@ Coverage is about behavioral exhaustiveness, not raw percentages.
 *   **History & Persistence:** Must assert deterministic ordering, retention contract adherence, and replay semantics.
 *   **Envelope Validation:** Must include Valid, Invalid, and Adversarial payloads (Fuzzed bytes, Schema mismatches).
 *   **Telemetry (OFD):** Must verify metric cardinality, log structure (JSON), and Trace ID propagation.
+*   **Telemetry (OFD):** Must verify metric cardinality, log structure (JSON), and Trace ID propagation.
 *   **The Overseer:** Must simulate all policy actions (`ALLOW`/`REDACT`/`BLOCK`), resource limits, and multi-tenant policy interactions.
+*   **Battery Evaluation:** Complex Tier-Ω operators must be validated against a **Multi-Task Battery** to prove generality and stability before production.
 
 ### 3. Test Discipline Requirements
 *   **Unit Tests:** Must run in milliseconds with **Zero** external dependencies.
@@ -440,9 +459,10 @@ Performance is not a “nice to have”; it is a contract.
      rather than failing catastrophically.
 * **Per-Tenant Guardrails:** Resource usage (connections, subscriptions, history volume) must be bounded per tenant to prevent “noisy neighbor” failures.
 * **Latency Budgets:** Core paths (connect, publish, presence updates) must have documented latency budgets. Exceeding budgets is an SLO violation, not a suggestion.
+*   **Fractal Awareness:** Controllers must assume **Long-Range Correlations** (Fractal Time) in load and error metrics, rather than assuming white noise.
 
 ### 6. Observability & Audit
-
+---
 Operational correctness depends on the ability to observe and reconstruct events.
 
 * **End-to-End Tracing:** Requests flowing through Shield → Spine → Brain → Storage must be traceable via correlation IDs. Missing IDs in hot paths are considered bugs.
@@ -453,156 +473,6 @@ Operational correctness depends on the ability to observe and reconstruct events
 * **Security Audit Trails:** Authentication and authorization decisions must be logged (without secrets) with enough context to support forensics.
 * **No Silent Failures:** Any automatic recovery or fallback must emit telemetry that can be used to analyze frequency and impact.
 
----
-
-# VII. Governance & Amendment
-
-Governance defines how ArqonBus protects its mission and how this Constitution itself may change.
-
-### 1. Scope Protection
-
-ArqonBus is **Transport and Coordination Infrastructure**, not a general-purpose application runtime.
-
-* **Application Runtime Ban:** Proposals to run arbitrary application logic on the core bus (e.g., long-running workflows, generic compute runtimes inside the Shield/Brain) must be rejected. Application code belongs in external workers.
-* **Feature Creep Valve:** Features that do not directly serve the mission of “Coordination Fabric for Humans, Devices, and Intelligences” must be implemented as:
-
-  * External services, or
-  * Optional plugins, not core behavior.
-
-### 2. Complexity Budget
-
-Complexity is technical debt with compound interest.
-
-* **Justification of Complexity:** Adding a heavy dependency (new database, language runtime, broker, or orchestration system) requires a written justification and Architecture Review approval.
-* **One-Way Rule:** For any given concern (authentication, configuration, transport), there should be one obvious way. Competing mechanisms for the same purpose are prohibited unless explicitly justified as transitional.
-* **ADR Requirement:** Major architectural decisions must be recorded as Architecture Decision Records (ADRs) in the repo. “We forgot why we did this” is not acceptable.
-
-### 3. Decision Making
-
-* **Architecture Review Board (ARB):** A small set of core maintainers is responsible for enforcing this Constitution and approving major architectural changes.
-* **Tiebreaker:** In the presence of multiple viable designs, the ARB prefers:
-
-  * Simpler over more complex
-  * Observable over opaque
-  * Explicit over implicit
-  * Proven patterns over novelty
-* **Doctrine Hierarchy:**
-
-  1. The Constitution (this document)
-  2. Engineering Doctrine (e.g., SOTA Engineering Doctrine)
-  3. Policies & Playbooks (CI, Sentinel, Policy-as-Code rules, runbooks)
-  4. Implementation details
-
-  Lower layers must not contradict higher layers. When in doubt, the Constitution wins.
-
-### 4. Amendments
-
-This Constitution is living but intentionally hard to change.
-
-* **Ratification:** Amendments to this document require a unanimous vote by all core maintainers.
-* **Change Driver:** Amendments must be justified by:
-
-  * Production learnings (incidents, SLO data), or
-  * Demonstrable architectural constraints in new epochs (e.g., Multi-Agent Systems), not purely theoretical preferences.
-* **Traceability:** Every amendment must link to:
-
-  * An ADR
-  * Relevant incidents or metrics
-  * The discussion that led to the change
-
-### 5. Interpretation
-
-* **Constitution Over Convenience:** “It was easier this way” is never a valid reason for violating this document.
-* **Guardian Tools:** Sentinel, ACES, and Policy-as-Code are empowered to block changes that violate this Constitution. Their behavior should be tuned **toward** stricter conformity over time, not looser.
-* **Last Word:** If any ambiguity remains, the ARB interprets the Constitution, documented via ADR, and tooling is updated to reflect that interpretation.
-
----
-
-
-
-
-
-
-
-
-# VIII. Performance & Hot-Path Invariants
-
-ArqonBus is real-time infrastructure. Performance is not an optimization; it is a **correctness property**.
-The system must behave predictably under load, degradation, and failure.
-
-### 1. Boundedness as Law
-
-Unbounded anything is a denial-of-service vector.
-
-* **No Unbounded Queues:** All queues in hot paths (Shield, Spine, Brain) must be bounded. When limits are reached, the system must:
-
-  1. Apply backpressure,
-  2. Shed load, or
-  3. Fail fast with a clear error,
-     but must never silently buffer until OOM.
-* **Memory Caps:** Per-connection, per-tenant, and per-node memory consumption must have hard upper bounds. Exceeding a bound triggers shedding or disconnection, not uncontrolled growth.
-* **CPU Boundaries:** CPU-intensive tasks (compression, encryption, large JSON serialization, ML inference) must not run in the main reactor or scheduler loops. They must be offloaded to dedicated pools with quotas.
-
-### 2. Hot-Path Constraints
-
-The hot path is any operation that runs per-message, per-connection, or per-heartbeat.
-
-* **No Blocking in Hot Paths:** Synchronous disk I/O, synchronous network calls, and blocking locks are forbidden in hot paths.
-* **O(1) or Amortized O(1):** Per-message operations in the Shield and Spine must be O(1) or amortized O(1) with respect to number of tenants, rooms, or subscribers.
-* **Constant-Time Tenant Identification:** Tenant routing and authorization decisions must be made in constant time relative to total tenant count. Linear scans over tenants or large global maps in hot paths are forbidden.
-* **No Dynamic Allocation in Tight Loops:** Hot loops must avoid unnecessary heap allocations, string formatting, and dynamic dispatch. Where allocations are required, pooling or arena strategies must be used.
-
-### 3. Throughput & Latency Behavior
-
-Exact numerical SLOs are defined elsewhere; this section defines **behavioral invariants**.
-
-* **Deterministic Under Load:** Under load, the system must degrade in a controlled, monotonic manner. It must not exhibit oscillatory or chaotic behavior (e.g., thrashing, repeated recovery loops).
-* **Locality of Failure:** Overload in Tenant A must never cause global failure for Tenant B. Degradation must be tenant-local wherever mathematically possible.
-* **Latency Budgets:** Every core operation (connect, subscribe, publish, presence update) must have a defined latency budget. Code that consistently violates its budget is considered incorrect, even if it “works.”
-* **No Priority Inversion:** High-priority paths (e.g., heartbeats, control messages) must not be starved behind lower-priority work. Queueing and scheduling must reflect this.
-
-### 4. Capacity & Scaling Invariants
-
-* **Horizontal First:** When capacity is exceeded, the default solution is to scale horizontally using stateless Shield nodes and partitioned Spine/Brain/Storage roles, not to push vertical complexity into single nodes.
-* **Predictable Scaling:** Scaling characteristics (connections per node, messages per second per node) must be measured and documented. Surprises in scaling behavior are treated as architectural bugs.
-* **No “Special” Nodes:** There must be no single irreplaceable node. Roles may be specialized (e.g., leader), but any node must be replaceable through automation.
-
----
-
-# IX. Observability & Telemetry Contracts
-
-What cannot be observed cannot be governed. Observability is a **first-class protocol** of ArqonBus, not a bolt-on feature.
-
-### 1. Logs, Metrics, Traces as First-Class Citizens
-
-* **Structured Logs Only:** All logs must be structured (JSON or key/value) and must include correlation identifiers (`trace_id`, `span_id`, `tenant_id`, `node_id`) wherever applicable.
-* **Metrics Are Mandatory:** Any new externally visible behavior (API, command, state transition, safety decision) must emit metrics. Absence of metrics for operator-relevant behavior is a constitutional violation.
-* **Tracing is Mandatory for Hot Paths:** All hot paths (connect, routing, presence, safety) must be wrapped in spans, with propagation across Shield → Spine → Brain → Storage.
-
-### 2. Telemetry Contracts
-
-Telemetry itself is an interface and must be treated as such.
-
-* **Versioned Telemetry:** Metric names, labels, and log schemas that operators depend on must be versioned and evolved carefully. Breaking telemetry changes must be documented and rolled out like API changes.
-* **Cardinality Discipline:** Metrics must not use unbounded high-cardinality labels (e.g., user IDs, raw IPs, arbitrary strings). Cardinality explosions in metrics are considered operational bugs.
-* **Stability:** Once introduced, telemetry must remain stable enough to support dashboards, alerts, and SLO calculations. Renaming or removing must go through review.
-
-### 3. Security & Privacy in Telemetry
-
-* **No Secrets in Telemetry:** Logs, metrics, and traces must never contain secrets, tokens, passwords, or sensitive payloads. Redaction must be applied at the source.
-* **Minimal PII:** Personally identifying information must be minimized and, where present, must comply with privacy commitments (hashing, anonymization, or opt-in flagging).
-
-### 4. Operability Guarantees
-
-* **Debuggability:** For any production issue impacting tenants, the combination of logs, metrics, and traces must allow an on-call engineer (who is not the original author) to reconstruct the key events without guesswork.
-* **No Silent Recovery:** Automatic retries, fallbacks, or recoveries must emit telemetry with enough information to quantify frequency and cost.
-* **Alertability:** Observability data must support actionable alerts for:
-
-  * SLO violations
-  * Safety module failures
-  * Tenant isolation breaches (attempted or actual)
-  * Capacity and backpressure thresholds
-
 ### 7. Collapse Monitoring (Liveness)
 Emergent systems tend to "die" (collapse into fixed points).
 *   **Liveness Metrics:** Emergent operators must emit liveness metrics (e.g., Variance over Time, Entropy).
@@ -611,11 +481,15 @@ Emergent systems tend to "die" (collapse into fixed points).
 ### 8. Semantic Depth & Curiosity
 *   **Twist/Overlay Complexity:** We monitor "Semantic Depth" (how many interpretive layers or "twists" a message passes through). Circuits exceeding depth thresholds require governance review.
 *   **Curiosity Metrics:** Operators may emit "Interestingness" or "Novelty" scores. These are valid signals for routing/control (Exploration vs Exploitation).
-
+*   **Spectral Blueprints:** Operators must expose **Spectral Signatures** (Resonance profiles) to allow automated drift detection against their design blueprint.
+*   **Overlay Density:** We monitor **Relational Density** (count of overlapping dependencies/factors) as a proxy for structural fragility.
+*   **Overlap Topology:** We measure system coupling via **Geometric Overlap** (Prime Intersections). High-overlap zones are treated as high-contention critical sections.
+---
 ### 9. Artifact Provenance
 Configuration artifacts generated by **Discovery Operators** (Tier Ω) are treated as code.
 *   **Provenance Tagging:** Artifacts must be tagged with Source, Version, and Parent IDs before admission to production.
 *   **Review Gates:** Automated artifacts must pass the same policy gates as human-authored config.
+*   **Emergent Schemas:** We support **Emergent Schemas** where structured events (Particles/Kernels) are distilled from raw substrates by Discovery Operators.
 
 ---
 
