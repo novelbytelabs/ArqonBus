@@ -198,6 +198,59 @@ Paths are relative to the Emergenics repo root (e.g. `ash/...`).
 - `ash/13_Prime_Skeleton/MetaΩ-GeoClimate/MetaΩ-GeoClimate.ipynb` (structure-level)
 - `ash/13_Prime_Skeleton/Omega-Prime/omeag-prime_00.ipynb`
 - `ash/13_Prime_Skeleton/Omega-PrimeMegaAspirations/v00/00_meta_omega_aspirations.ipynb` (structure-level)
+
+---
+
+## 14. xMathIntelligence – Math-Based Computational Organism (`mike/emergenics-dev/xMathIntelligence`)
+
+- `mike/emergenics-dev/xMathIntelligence/README.md`
+- `mike/emergenics-dev/xMathIntelligence/PAPER.md`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_00.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_01.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_02.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_03.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_04.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_05.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_06.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_07.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_08.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_09.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_10.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_11.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_12.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/MathIntelligence_13.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/xMathIntelligence_14.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/xMathIntelligence_15.ipynb`
+- `mike/emergenics-dev/xMathIntelligence/xMathIntelligence_16.ipynb`
+
+Status: This series explores **prime/number-theoretic network automata** as a substrate for “math intelligence.” Early notebooks build prime-sum/prime-difference graphs and apply tanh + pheromone dynamics, repeatedly finding **uniform collapse** and dead zones despite adaptive/grid search over parameters. Later notebooks (14–16) migrate to a more formal relational-operator view: build kernels from ω(n), μ(n), GCD, prime-difference, kappa masks; normalize Hermitian operators; and scan activation/forcing/noise + dynamic mask weights to maximize sustained variance. The accompanying PAPER.md reports a positive result on a related system: a number-theoretic Network Automaton exhibiting life-like oscillations, pulsing, and organization at the edge of chaos—a “math-based computational organism” within the Computational Fabric framework. Design takeaway: these experiments both (a) reinforce **Computational Fabric** as a paradigm where topology+kernel define emergent dynamics, and (b) caution that many parameter regimes produce trivial collapse, so any Ω-tier “math-organism” operator on ArqonBus must be treated as an exploratory, diagnostic substrate with careful metric-driven governance.
+
+---
+
+## 15. Omega Theory – SAM & Universe Evolution (`mike/emergenics-dev/Omega_Theory`)
+
+- `mike/emergenics-dev/Omega_Theory/omega-theory.ipynb`
+
+Status: Implements the **Standard Agent Model (SAM)** from Omega Theory (five capabilities: Input, Output, Storage, Creation, Control) plus “intelligence gravity” forces (α Gravity and Ω Gravity) that push agents toward Alpha (zero capability) or Omega-like states. Builds single-agent and universe-level simulations where populations of agents evolve under global α/Ω field strengths, with transitions Finite→Alpha and Finite→“max-cap” finite. Also defines SAM-based observer types (Classical, Relativistic, Quantum) with detection-speed limits and simplified physical scenarios (motion prediction, Schrödinger-style thought experiments) whose outcomes depend on observer capabilities. Design takeaway: provides a unified capability model for agents and observers, and a field-based intuition for how populations drift—useful for thinking about operator metadata, observer roles, and governance pressure (friction vs amplification) in ArqonBus vNext.
+
+---
+
+## 16. SKC – Spectral Kernel Computing (`mike/SKC-SpectralKernelComputing`)
+
+- `mike/SKC-SpectralKernelComputing/SpectralKernelComputing/skc_04/SpectralKernelComputing_04.ipynb`
+- (additional SKC notebooks exist: period-finding, sparse reconstruction, adaptive sampling, NAS/HPO, final validation – not yet fully distilled here)
+
+Status: Foundations notebook defines **Spectral Kernel Computing (SKC)** as a way to build computational fabrics whose “laws” are the spectral properties of relational kernels. Fabrics are constructed from causal and Yukawa kernels on grids, with optional U(1) and SU(2) gauge symmetries; their emergent constants include an optimal causal propagation speed `c*`, spectral entropy/complexity, and an intrinsic nonlocality constant measured via CHSH-style probes. A 2+1D hybrid fabric exhibits a stable CHSH ≈ 1.84 (locally realistic but non-trivial), while a pure singlet reference yields CHSH = −2.828 (Tsirelson bound), validating the measurement protocol. Design takeaway: SKC provides a concrete **“reality engineering”** toolkit—by choosing kernels, symmetries, and geometries, you get fabrics with distinct, measurable constants. In ArqonBus vNext this motivates `spectral_kernel_fabric` substrate operators whose kernel/symmetry choices and measured constants are part of their metadata/telemetry, and which can be searched/tuned by architect/ERO-style meta-optimizers.
+
+---
+
+## 17. TTC – TimeTravelingCommunication (`mike/TTC-TimeTravelingCommunication`, AGI TimeTravel)
+
+- `mike/TTC-TimeTravelingCommunication/TTC-TimeTravelingCommunication_05b.ipynb`
+- `mike/TTC-TimeTravelingCommunication/TTC-TimeTravelingCommunication_05d.ipynb`
+- `Engineering/Novel_Systems_Engineering/Emergence_Engineering/Research/AGI_TimeTravel/TimeTravelingWormholes.ipynb` (TTC_Agent variants)
+
+Status: The TTC series builds a **TemporalFabric** abstraction (shared temporal state) and a family of differential messaging protocols on top of QTR-style substrates. 05b extends earlier idealized work into realistic, distributed settings: soft influence channels, noise and quantization, IPC-based `DistributedTemporalFabric` and `DistributedDifferentialAgent`s, and robustness/security probes (malicious forks, simple consistency checks). It characterizes regimes like Threshold Differential Messaging (Inf ≥ ~0.95 → BER=0 at ~21 msg/s, otherwise BER≈1) versus multi-bit protocols that trade off reliability and throughput. 05d adds a full security stack—key rotation and revocation, hybrid RSA+AES-GCM end-to-end encryption, a 2-of-3 BFT consensus fabric for quorum-signed temporal updates, and FEC around multi-bit messages—with benchmarks for overhead and BER gains. TimeTravelingWormholes notebooks define TTC_Agent variants that test convergence vs stochastic jitter in temporal fabrics. Design takeaway: TTC offers a concrete blueprint for **time-aware substrates and channels**: (a) `temporal_fabric` operators behind time-structured topics; (b) differential, regime-dependent messaging protocols (TDM vs multi-bit+FEC); and (c) temporal security/consensus patterns (key rotation, E2E, BFT) that ArqonBus vNext can adopt for time-structured coordination while staying within classical causality.
 - `ash/13_Prime_Skeleton/Omega-PrimeMegaAspirations/v00/full.pdb`
 - `ash/13_Prime_Skeleton/Omega-PrimeMegaAspirations/v00/target.pdb`
 - `ash/13_Prime_Skeleton/Omega-PrimeMegaAspirations/v00/template.pdb`
@@ -222,6 +275,26 @@ Paths are relative to the Emergenics repo root (e.g. `ash/...`).
 - `ash/8_General/RelationalAdjointOperator/RelationalAdjointOperator.ipynb`
 - `ash/8_General/ERO-study/ERO-study.ipynb`
 - `ash/8_General/ERO-study/feedback_run_single_system_dynamics.png` (plot referenced structurally)
+
+---
+
+## 16. ERO – Emergent Resonance Oracle (`mike/ERO-EmergentResonanceOracle`, SKC ERO)
+
+- `mike/ERO-EmergentResonanceOracle/v01_TheHybrid/` (results)
+- `mike/ERO-EmergentResonanceOracle/v02_TheAutonomousOracle/` (results)
+- `mike/ERO-EmergentResonanceOracle/v03_TheCreator/` (results)
+- `mike/ERO-EmergentResonanceOracle/v04_TheStrategist/` (results)
+- `mike/ERO-EmergentResonanceOracle/v05_TheTheorist/` (results)
+- `mike/ERO-EmergentResonanceOracle/v06_TheGauntlet/ERO_v6_TheGauntlet.ipynb`
+- `mike/ERO-EmergentResonanceOracle/v07_TheBattery/ERO_v7_TheBattery.ipynb`
+- `mike/ERO-EmergentResonanceOracle/v08_TheDecathlete/ERO_v8_TheDecathlete.ipynb`
+- `mike/ERO-EmergentResonanceOracle/v09_TheArchitect/ERO_v9_TheArchitect.ipynb`
+- `mike/ERO-EmergentResonanceOracle/v10_Accelerator/ERO_10.ipynb`
+- `mike/ERO-EmergentResonanceOracle/capstone01_GUTS/ERO-capstone01_GUTS.ipynb`
+- `mike/ERO-EmergentResonanceOracle/capstone03_AGI/ero_capstone03_AGI.ipynb`
+- `mike/SKC-SpectralKernelComputing/projects/The_Computational_Principle/ERO_v2.2_Autonomous_Optimizer.ipynb`
+
+Status: The ERO ladder evolves from a hybrid spectral/classical optimizer into an autonomous oracle, then into a creator/strategist/theorist, then a decathlete/architect evaluated on a battery of benchmark functions, and finally into capstones where ERO designs toy physical laws (GUTS) and participates in AGI Architect/Genesis experiments. ERO is best understood as an Ω-tier **meta-optimizer**: it builds and configures relational kernels and solver structures, chooses search strategies, and searches over universes of laws or solver designs. Design takeaway: in ArqonBus vNext, ERO corresponds to `meta_optimizer`/`ero_oracle` operators that sit at the Architect/Meta-Architect tier, designing solvers, fabrics, or universes, and should be evaluated via batteries and carefully governed before their configurations are applied to production operators.
 
 ---
 
@@ -282,6 +355,142 @@ Status: The EO1 Emergent Observer notebook and all associated human-facing summa
 
 ---
 
+## 19. Emergenics Dev – Topology is the Control Parameter (`mike/emergenics-dev/2_TopologyIStheControlParameter`, `mike/emergenics-dev/N2_ToplogyIsTheControlParameter`)
+
+### Notebooks & Docs
+
+- `mike/emergenics-dev/2_TopologyIStheControlParameter/2_TopologyIStheControlParameter.ipynb`
+- `mike/emergenics-dev/N2_ToplogyIsTheControlParameter/ToDo.md`
+
+Status: The main TICP notebook and its companion ToDo/narrative have been read at a structural/conceptual level. They demonstrate topology-driven phase transitions in network automata and frame “Topology IS the Control Parameter” as the organizing principle for computational fabrics; these insights extend and reinforce the system_fabric and omega_cognition views already captured in `docs/emergenics/system_fabric.md` and related docs.
+
+---
+
+## 20. Emergenics Dev – Computational Fabrics DEFINE the Edges of Chaos (`mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos`)
+
+### Notebooks & Docs
+
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N3_ComputationalFabricsDEFINEtheEdgesOfChaos.ipynb`
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/ToDo.md`
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/MLAI.md`
+
+Status: The Phase 2 notebook and its supporting docs have been read at a structural/conceptual level. They develop the “Intelligence IS the Edge of Chaos” (IIEoC) idea, showing how information metrics (entropy, perturbation response, attractor geometry) peak near criticality and arguing that true “intelligence” lives where computational fabrics sit marginally between order and chaos. This directly sharpens the system_fabric view of edge-of-chaos regimes and informs how ArqonBus might treat regime and fabric tuning as first-class concerns.
+
+---
+
+## 21. Emergenics Dev – Computational Fabrics Weave Themselves / Downward Causation (N4*) (`mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos`)
+
+### Notebooks & Docs
+
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N4_ComputationalFabricsWeaveThemselves_02.ipynb`
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N4_FalsificationAndIntervention.ipynb`
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N4_FalsifyMetaLaws.ipynb`
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N4_StructuralCausationPROVESStronEmergence.ipynb`
+
+Status: The N4 notebooks have been read at a structural/conceptual level. Together they implement macro-to-micro feedback (fabrics “weaving their own dynamics”), and run falsification and intervention tests that argue for genuine downward causation and strong emergence via structural adaptation (edge pruning, dynamic rewiring). These results extend the system_fabric story with explicit macro-level control loops and structural causation patterns.
+
+---
+
+## 22. Emergenics Dev – Computational Fabrics FORGE Their Own Dynamics / Falsify Structural Causation (N5*) (`mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos`)
+
+### Notebooks
+
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N5_ComputationalFabricsFORGETheirOwnDynamics_02.ipynb`
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N5_FalsifyStructuralCausation.ipynb`
+
+Status: The N5 notebooks have been read at a structural/conclusion level. `N5_ComputationalFabricsFORGETheirOwnDynamics_02` extends feedback/universality to new topologies (e.g., BA, lattices), shows robustness and partial structure–effectiveness correlations, but misses a critical null-model validation in this run. `N5_FalsifyStructuralCausation` falsifies “simple structural adaptation yields homeostasis” while confirming a narrower but clear form of downward structural causation: the emergent global state dictates the final stable topology of the substrate, even if it cannot fully control its dynamic trajectory. These refine our understanding of where structural feedback helps (final structure) and where it does not (full dynamic homeostasis).
+
+---
+
+## 23. Emergenics Dev – Prime Physics Fabrics (N8*, N9*) (`mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos`)
+
+### Notebooks & Conclusions
+
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N8_PrimePhysics.ipynb`
+- `mike/emergenics-dev/N3_ComputationalFabricsDEFINEtheEdgesOfChaos/N9_PrimePhysics_Scaled.ipynb`
+
+Status: N8 introduces the Ω-Prime “Prime Physics” fabric but is resource-limited locally; N9_Scaled provides a scaled-down local run (inconclusive due to OOM) and a Colab run with a definitive summary. Final conclusion (from the N9_PrimePhysics_Scaled summary cell): a prime-modulated local interaction rule yields a computational fabric with a sharp phase transition and a peak in Lempel–Ziv complexity exactly at criticality, i.e., a **prime-based fabric sitting at the edge of chaos**. This validates prime-modulated fabrics as fertile, robust substrates for emergent behavior and sets the stage for reintroducing downward-causation controllers on top of this new physics.
+
+---
+
+## 24. Emergenics Dev – N5_ComputationalFabricsFORGETTheirOwnDynamics / eN4-NA_FeedbackLayersFORGEDynamics (Notebook A/B) (`mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics`)
+
+### Notebooks
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NA_FeedbackLayersFORGEDynamics/eN4-NA_FeedbackLayersFORGEDynamics_00.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NA_FeedbackLayersFORGEDynamics/eN4-NA_FeedbackLayersFORGEDynamics_01.ipynb`
+
+Status: The eN4-NA notebooks (Notebook A/B) have been read at the conclusion level. They implement nested and multi-level feedback layers on top of the fabric and show: (1) **hierarchical control**—managing multiple objectives or scales concurrently; (2) **adaptive goal-setting**—using one metric (e.g., entropy) to set targets for another (variance); and (3) increased dynamic richness relative to single feedback loops. They strengthen the downward-causation story by demonstrating layered control structures, but still require parameter tuning and further tests on diverse topologies. Their key patterns are reflected in the vNext multi-layer control hierarchy and structural-adaptation governance.
+
+---
+
+## 25. Emergenics Dev – N5_ComputationalFabricsFORGETTheirOwnDynamics / eN4-NB_ComputationalFabricsWITHSTANDPerturbations (Notebook B) (`mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics`)
+
+### Notebooks
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NB_ComputationalFabricsWITHSTANDPerturbations/eN4-NB_ComputationalFabricsWITHSTANDPerturbations_00.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NB_ComputationalFabricsWITHSTANDPerturbations/eN4-NB_ComputationalFabricsWITHSTANDPerturbations_01.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NB_ComputationalFabricsWITHSTANDPerturbations/eN4-NB_ComputationalFabricsWITHSTANDPerturbations_02.ipynb`
+
+Status: The eN4-NB notebooks (Notebook B variants) have been read at the conclusion level. They stress-test the macro-to-micro feedback loop under noise and targeted shocks, and (where available) attempt clamping/replay analysis. Conclusions: the feedback mechanism is **robust to moderate noise**, exhibits **resilience to shocks** (actively restoring towards the target), and demonstrates the **necessity of a closed loop**—pre-baked parameter schedules are insufficient; real-time coupling between global metrics and local parameters is required for homeostasis. This further supports viewing fabrics-plus-feedback as active, adaptive systems rather than static rule sets.
+
+---
+
+## 26. Emergenics Dev – N5_ComputationalFabricsFORGETTheirOwnDynamics / eN4-ND_TopologyFramesUniversality (Notebook D) (`mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics`)
+
+### Notebooks
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-ND_TopologyFramesUniversality/eN4-ND_TopologyFramesUniversality.ipynb`
+
+Status: The eN4-ND notebook has been read at the conclusion level. Final “Conclusions & Implications” cell: **macro-to-micro feedback is universal**—it works across diverse network topologies and global metrics—but the *effectiveness* and detailed behavior of homeostasis are framed by topology. Some fabrics are more controllable than others, and the choice of metric and control law strongly influences accuracy, stability, and transients. Design takeaway: when building self-regulating computational fabrics (or ArqonBus circuits), topology, metric, and controller must be co-designed; structure is an active participant, not a neutral substrate.
+
+---
+
+## 27. Emergenics Dev – N5_ComputationalFabricsFORGETTheirOwnDynamics / eN4-NE_FeedbackLearnsToForgeItself (Notebook E) (`mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics`)
+
+### Notebooks
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NE_FeedbackLearnsToForgeItself/eN4-NE_FeedbackLearnsToForgeItself.ipynb`
+
+Status: The eN4-NE notebook has been read at the conclusion level. Its “Conclusions & Implications” cell shows that **Genetic Algorithms can successfully evolve PID controller parameters** for these fabrics: GA-tuned controllers match or outperform a representative hand-tuned PID on steady-state error, partially closing the loop on “feedback learns to forge itself”. Limitations: only PID gains were evolved (not the control-law structure or target metric), and fitness was evaluated on single models/graphs. Design takeaway: automated controller tuning (GA, RL, GNN controllers) is effective and should be treated as a first-class possibility—especially at higher tiers—but remains fabric- and metric-dependent and must be governed and validated across conditions.
+
+---
+
+## 28. Emergenics Dev – N5_ComputationalFabricsFORGETTheirOwnDynamics / eN4-NX1_ComputationalFabricBecomesDesigner (Capstone – Fabric as Architect) (`mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics`)
+
+### Notebooks
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NX1_ComputationalFabricBecomesDesigner/eN4-NX1_ComputationalFabricBecomesDesigner_00.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NX1_ComputationalFabricBecomesDesigner/eN4-NX1_ComputationalFabricBecomesDesigner_01.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NX1_ComputationalFabricBecomesDesigner/eN4-NX1_ComputationalFabricBecomesDesigner_02.ipynb`
+
+Status: The eN4-NX1 capstone notebooks have been read at the conclusion level (v02 synthesis). A co-evolutionary GA jointly searches **controller parameters (PID gains)** and **fabric topology parameters (WS k, p)** against an SBM-based evaluation task. Results: the GA converges to a **specialized pair**—a sparse, regular WS topology (e.g., k = 8, p ≈ 0.003) plus a compatible PID controller—that achieves high fitness on the task. This is a concrete step toward “Fabric as Architect”: the system discovers an *integrated design* where rules and structure are mutually adapted. Full evidence for “fabric as architect” depends on the benchmark comparison (evolved pair vs baselines across contexts), but the pattern is clear: fabrics can be **designed by search** around specific tasks, not just hand-chosen, and topology+controller should be treated as a single, co-designed object.
+
+---
+
+## 29. Emergenics Dev – N5_ComputationalFabricsFORGETTheirOwnDynamics / eN4-NX2_CompuationalFabricsFORGEReality (Multiverse Fabrics) (`mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics`)
+
+### Notebooks
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NX2_CompuationalFabricsFORGEReality/eNV-NX2_CompuationalFabricsFORGEReality_00.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NX2_CompuationalFabricsFORGEReality/eNV-NX2_CompuationalFabricsFORGEReality_01.ipynb`
+
+Status: The eN4-NX2 notebooks have been read at the conclusion level (including the “Computational Fabrics FORGE Reality” cell). They extend the capstone by instantiating a **multiverse of computational universes**, each with different NA rule meta-parameters (“physics laws”), and evaluating native vs transplanted agents. Key findings: (1) **environmental determinism**—a universe’s meta-parameters dictate how hospitable it is for a given agent/controller; (2) **context-specific adaptation**—fixed agents can perform well in some universes and poorly in others; and (3) **meta-laws emerge**—statistically significant relationships between meta-parameters (e.g., activation_decay_rate) and agent fitness define which “physics” yield forgeable realities for that agent class. Design takeaway: fabrics’ laws are themselves design targets; ArqonBus meta-architects may want to search over fabric meta-parameters, not only topology, when designing substrates for specific operator types.
+
+---
+
+## 30. Emergenics Dev – N5_ComputationalFabricsFORGETTheirOwnDynamics / eN4-NX3_ComputationalFabricASCosmos (Meta-Law & Cosmos View) (`mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics`)
+
+### Notebooks
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NX3_ComputationalFabricASCosmos/eN4-NX3_ComputationalFabricASCosmos_00.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NX3_ComputationalFabricASCosmos/eN4-NX3_ComputationalFabricASCosmos_01.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/eN4-NX3_ComputationalFabricASCosmos/eN4-NX3_ComputationalFabricASCosmos_02.ipynb`
+
+Status: The eN4-NX3 notebooks have been read at the conclusion level (Notebook G synthesis). They formalize a **meta-law synthesis engine** that sweeps meta-parameters to generate many universe “physics,” instantiates each universe, and evaluates native and transplanted agents. Conclusions reinforce that **computational fabrics forge reality**: physics laws actively shape which kinds of adaptation and complexity are possible, and native vs transplanted success differ. The notebook also sketches next steps: GA over universe meta-parameters (evolving physics), co-evolution of agents and universe laws, and adding emergent observers (LLMs) that describe and question their universe. Design takeaway: this is the conceptual ceiling of the Architect tier for ArqonBus—meta-operators that search over families of fabrics and laws, potentially assisted by higher-level observers, rather than only over individual circuits.
+
+---
+
 ## 17. Memory (`ash/17_memory`)
 
 ### Research Notebooks (competitive memory)
@@ -329,6 +538,23 @@ Status: NVM docs, tasks, core NVM notebook, main quantum notebooks, and key demo
 
 ---
 
+## 19. Recursive Relational Emergence (RRE) (`mike/emergenics-dev/RecursiveRelationalEmergence`)
+
+### Docs
+
+- `mike/emergenics-dev/RecursiveRelationalEmergence/512_cracked.md`
+- `mike/emergenics-dev/RecursiveRelationalEmergence/phases.md`
+
+### Notebooks
+
+- `mike/emergenics-dev/RecursiveRelationalEmergence/RRE_00_00_00/RRE_00_00_00_v00_PRD.ipynb`
+- `mike/emergenics-dev/RecursiveRelationalEmergence/RRE_01_Zeta_Tension_Operator/RRE_01_Zeta_Tension_Operator.ipynb`
+- `mike/emergenics-dev/RecursiveRelationalEmergence/RRE_02_Universal_Operator_Dynamics/RRE_02_Universal_Operator_Dynamics.ipynb`
+
+Status: RRE provides a general pattern for how structure and “laws” emerge from relational dynamics (URF → generative kernels → overlays → recursion → emergent structures → stabilisation → laws/constants). `512_cracked.md` documents a successful 512‑bit semiprime factorisation via biquadratic fields and ideal norms (an example of lifting a problem into a richer relational space where factors emerge), and `phases.md` lays out a multi‑phase roadmap for formalising RRE and building a RelationalSystemSimulator. `RRE_00_00_00_v00_PRD.ipynb` implements the minimal Bit‑Flip URF (BF‑URF) with a 1D bit tape, random flip rule, and particle tracking, showing spontaneous emergence of trackable “particles” from an undifferentiated field. `RRE_01_Zeta_Tension_Operator` builds a self-adjoint relational operator on the critical line of the Riemann Zeta function and shows that tension minima exactly match known zeros up to t=200. `RRE_02_Universal_Operator_Dynamics` explores a prime-modulated universal operator and tests a tentative “Relational Emergence Law” via spectral/tension metrics, revealing useful distinctions but also grid-sensitivity. All of these are summarised in `docs/emergenics/rre.md` and inform how we think about relational-operator substrates, spectral diagnostics, and emergent-entity schemas in ArqonBus vNext.
+
+---
+
 ## 9. Other Emergenics Sources (from earlier passes)
 
 These were mined earlier (outside the ash tree) and are already summarized in other docs:
@@ -366,6 +592,32 @@ These were mined earlier (outside the ash tree) and are already summarized in ot
 
 - `docs/omega-infinity/...` (Omega Cognition / Omega-Prime / Omega-Infinity; see `docs/emergenics/omega_cognition_summary.md`).  
 - Additional project-level docs under `docs/foundations/ctoe/`, `ash/_Compilation/distillation/master_distillation.md`, etc.
+
+---
+
+## 10. CAIS Series – Emergent Observers & Transfer (`mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration`)
+
+### CAIS-nEO1 – Emergent Observers v1
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/CAIS-nEO1-EmergentObserversv1/CAIS-nEO1-EmergentObserversv1.md`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/CAIS-nEO1-EmergentObserversv1/CAIS-nEO1-EmergentObserversv1_00.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/CAIS-nEO1-EmergentObserversv1/CAIS-nEO1-EmergentObserversv1_01.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/CAIS-nEO1-EmergentObserversv1/CAIS-nEO1-EmergentObserversv1_02.ipynb`
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/CAIS-nEO1-EmergentObserversv1/CAIS-nEO1-EmergentObserversv1_03.ipynb`
+
+Status: EO1 defines a concrete **emergent observer pattern**: log rich simulation traces (metric & parameter histories, anomalies) to JSONL, then invoke an LLM-based observer to summarize behavior, flag risks, and propose parameter tweaks, with a small closed loop where some suggestions are re-run. Design takeaway: this is an explicit template for ArqonBus **observer/modeler operators** that sit above substrate simulations, consume histories, and emit structured summaries and configuration suggestions.
+
+### CAIS-nSRF1 – Self-Reflexive Fitness v1
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/CAIS-nSRF1-SelfReflexiveFitnessv1/CAIS-nSRF1-SelfReflexiveFitnessv1.md`
+
+Status: SRF1 specifies **self-reflexive fitness** for universes: treat agent SSE outcomes as votes (preference scores) over universe meta-parameters, and run a GA over universe meta-params alone (no agent genome) using those preferences as fitness. This yields evolution logs and meta-parameter drift plots. Design takeaway: provides a blueprint for ArqonBus **universe/fabric evolution operators** where fitness is defined by the performance of agents/operators running on that fabric, i.e., substrates judged and shaped by their inhabitants.
+
+### CAIS-nT1 – Cross-Universe Transfer Benchmark Matrix
+
+- `mike/emergenics-dev/N5_ComputationalFabricsFORGETTheirOwnDynamics/exploration/CAIS-nT1-Cross-UniverseTransferBenchmarkMatrix/CAIS-nT1-Cross-UniverseTransferBenchmarkMatrix.md`
+
+Status: T1 defines a **cross-universe transfer benchmark**: build an all-pairs task list of (src_universe, tgt_universe), run agents with native PID from src in tgt, and assemble a transfer matrix of normalized SSE. It adds generalist/specialist scores, PCA/UMAP embeddings colored by transferability, and JSON compute-cards per run. Design takeaway: directly informs ArqonBus **transfer evaluation circuits**—matrix-style benchmarks for how well operators/controllers transfer across different fabrics/laws, and a compute-card logging pattern for each run.
 
 ---
 

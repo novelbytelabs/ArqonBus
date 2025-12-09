@@ -15,21 +15,36 @@ Sources sampled (Emergenics repo):
 
 ## 1. What we just read (this chunk)
 
-- **PPP_Resonant_Process_Prediction/distill.md**  
-  - Subsystem A: Uses a Rule-30-style cellular automaton (CA) with logistic regression to predict bit evolution:
-    - Binary initial row from PRNG outputs vs mean.
-    - Rule 30 update \(b^{(t+1)}_i = b^{(t)}_{i-1} \oplus (b^{(t)}_i \lor b^{(t)}_{i+1})\).
-    - Logistic model on neighborhoods to predict target column bits.
-  - Subsystem B: **Twist-field forecast of CA regime**:
-    - Map each cell to radius \(r_i = R \cdot b_i\).
-    - Build twist vectors \(\text{twist}_{i,k} = \cos(r_i \ln p_k) / p_k^s\) across primes \(p_k\).
-    - Use average pairwise cosine similarity of twist vectors (mean_sim) to classify CA behavior (stable / oscillatory / chaotic), compared against a ground-truth regime from CA variance (mean_var).  
-  - Subsystem C: **Entropy-driven RSA factor via twist resonance**:
-    - Encode CA trace into bitstring E, convert to integer X(E), scale to radius R(E).
-    - Build twist_E, project via PCA, compare to reference prime twist, choose E* minimizing distance, then:
-      - \(p_{\text{final}} = \text{nextprime}(X(E^*))\),
-      - \(q_{\text{final}} = \text{nextprime}(X(\text{reverse}(E^*)))\),
-      - \(n = p_{\text{final}} q_{\text{final}}\).
+- **PPP_Resonant_Process_Prediction (distill + Prime_Programme_Prediction.ipynb)**  
+  - **Subsystem A – Rule 30 as resonance probe**
+    - Start from unseeded PRNG output: 128 floats → binarize at 0.5 into a row \(\mathbf b^{(0)} \in \{0,1\}^{128}\).
+    - Evolve with Rule 30 (periodic boundary) to get rows \(\mathbf b^{(t)}\).
+    - Train a simple logistic regression to predict the center cell \(b^{(t)}_{64}\) from the full row \(\mathbf b^{(t)}\).
+    - Observation: the linear model achieves **100% accuracy** across all \(t\), i.e. once Rule 30 has “resonated” the seed, the supposedly random center cell becomes linearly predictable.
+    - Prime vs composite index analysis:
+      - Split indices into primes \(P\) and composites \(C\), track mean bit values \(\mu_P(t), \mu_C(t)\).
+      - Find large, persistent gaps \(\Delta(t) = \mu_P(t) - \mu_C(t)\) (≈ −0.28 in examples), showing that prime-indexed cells systematically diverge from composite ones.
+    - Conclusion: Rule 30 acts as a **resonator** that amplifies hidden arithmetic structure in the PRNG seed; randomness ≠ irreducibility.
+  - **Subsystem B – Twist-field forecast of CA regime**
+    - Take the same 128-bit seed, embed each bit as a radius \(r_i\) (e.g. 0 or 10).
+    - For a fixed list of primes \(p_k\) and exponent \(s\), build twist vectors:
+      \[
+        \text{twist}_{i,k} = \frac{\cos(r_i \ln p_k)}{p_k^s}
+      \]
+      to get a \(128 \times K\) twist matrix.
+    - Compute cosine-similarity between all twist vectors and take the mean similarity (mean_sim) as a scalar **resonance score**.
+    - Define a simple classifier on mean_sim (e.g. thresholds for “stable / oscillatory / chaotic”).
+    - Ground truth: independently simulate Rule 30 for 32 steps, compute per-row std deviation, average over time to get mean_var, and threshold that into the same three regimes.
+    - Result in the PPP notebook: across 100 seeds, all are “chaotic → chaotic” (predict and truth), i.e. the twist-field classifier matches the regime labels on this sample with **0 errors**.
+    - Key insight: the prime-twist field serves as a **“fate reader”**; you can predict the dynamic regime without running the CA, by looking only at the seed’s resonance in prime harmonics.
+  - **Subsystem C – Program as structural web / reading instead of running**
+    - Extends the twist-field idea from CA seeds to general programs:
+      - Treat a program as a **structural web** (graph of operations/variables/flows).
+      - Map each element into a twist vector via the prime-based transform to get a high-dimensional “twist signature” of the whole program.
+      - Conceptual picture: as logical time advances, this signature traces a **trajectory in twist-space** and settles into an attractor corresponding to the program’s outcome.
+    - Philosophical conclusion:
+      - The **irreducible shape** of a program carries its execution.
+      - In principle, you don’t have to simulate every instruction; you can “read” aspects of its destiny from its prime-resonant field.
 
 - **Twist_Field/twist_field_core.py**  
   - Defines a **Twist(n)** function:
@@ -98,25 +113,20 @@ Sources sampled (Emergenics repo):
     - Operator selection.
     - Detection of unusual or adversarial patterns (off-manifold twist signatures).
 
-### 2.2 Regime prediction from twist geometry
+### 2.2 Regime prediction and “read instead of run”
 
-- PPP’s Subsystem B shows:
-  - You can predict **dynamic regimes (stable/oscillatory/chaotic)** from twist-similarity statistics of initial conditions, without simulating long trajectories.
+- PPP’s Subsystem B & notebook experiments show:
+  - You can predict **dynamic regimes (stable/oscillatory/chaotic)** from twist-similarity statistics of seeds, without simulating long trajectories.
+  - The prime-twist field acts as a **“fate reader”**: resonance precedes operation; in the experiments, every sampled seed that looked chaotic in twist-space was indeed chaotic under Rule 30.
+  - The accompanying narrative generalizes this to **programs as structural webs** whose irreducible twist-shape encodes aspects of their eventual behavior (“read instead of run”).
 - For ArqonBus:
-  - Suggests **regime-predictor operators** that:
-    - Take circuit configuration / initial traffic patterns.
+  - Suggests **prime-twist regime-predictor operators** that:
+    - Take circuit configuration, initial traffic patterns, or program capsules.
     - Build twist-like embeddings over primes or dimensions.
-    - Estimate whether a configuration is likely to be stable, oscillatory (bursty), or chaotic under load.
-  - These predictors can gate deployments or trigger mitigations before full-scale rollout.
-
-### 2.3 Entropy → twist → RSA-like construction
-
-- PPP’s Subsystem C:
-  - Uses CA entropy (bit traces) to generate candidate patterns E, maps them through twist + PCA to match a reference, and then lifts them to primes via nextprime() and bit-reversal.
-- For ArqonBus:
-  - While the RSA aspect is specialized, the pattern “**entropy pattern → twist embedding → spectral matching → configuration selection**” is broadly useful:
-    - Selecting operator configurations that best match desired spectral properties.
-    - Tuning safety or routing parameters via spectral matching rather than brute-force search.
+    - Estimate whether a configuration is likely to be stable, oscillatory (bursty), or chaotic under load, before full-scale rollout.
+  - These predictors can:
+    - Gate deployments or trigger mitigations.
+    - Inform which substrates (e.g., fragile math-organism vs robust CF) a job is allowed to touch.
 
 ### 2.4 Overlap descriptors and composite geometry
 

@@ -3,10 +3,11 @@
 This note distills `ash/4_SpectralComputation` and surfaces patterns useful for ArqonBus vNext.
 
 Sources sampled (Emergenics repo):
-- `SpectralComputing/spectral_computing_(3).py`
-- `SpectralComputing/spectral_computing_00.ipynb` (structure)
-- `Prime-CollapseOperator/*.ipynb` (titles and themes)
-- `ash-app/ash-app.ipynb` (integration context)
+- `ash/4_SpectralComputation/SpectralComputing/spectral_computing_(3).py`
+- `ash/4_SpectralComputation/SpectralComputing/spectral_computing_00.ipynb` (structure)
+- `ash/4_SpectralComputation/Prime-CollapseOperator/*.ipynb` (titles and themes)
+- `ash/4_SpectralComputation/ash-app/ash-app.ipynb` (integration context)
+- `mike/SKC-SpectralKernelComputing/SpectralKernelComputing/skc_04/SpectralKernelComputing_04.ipynb` (Foundations of SKC)
 
 ---
 
@@ -43,6 +44,20 @@ Sources sampled (Emergenics repo):
 
 - **ash-app/ash-app.ipynb**  
   - Appears to be an application shell integrating spectral/prime-collapse functionality into a user-facing or orchestrated environment.
+
+- **SKC – Foundations of Spectral Kernel Computing (`SpectralKernelComputing_04.ipynb`)**
+  - Defines **Spectral Kernel Computing (SKC)** as a framework for constructing computational fabrics whose “physics” is given by the spectral properties of relational kernels:
+    - Baseline fabrics from causal and Yukawa kernels on grids.
+    - Hybrid fabrics with additional **U(1)** and **SU(2)** gauge symmetries.
+  - Measures emergent physical constants of each fabric:
+    - An optimal causal propagation speed `c*` (e.g., `c* = 1.0` in 1+1D) found by maximizing a dominant eigenvalue.
+    - Spectral entropy / informational complexity.
+    - An intrinsic nonlocality constant via CHSH-style probes:
+      - U(1) hybrid: CHSH ≈ −1.31.
+      - SU(2) hybrid: CHSH ≈ −1.41.
+      - 2+1D hybrid with full angular sweep: CHSH ≈ 1.84 (locally realistic, but non-trivial).
+    - Calibration against a pure singlet fabric where CHSH = −2.828 (Tsirelson bound).
+  - Interprets each SKC fabric as having its own **intrinsic laws** (causality, nonlocality constants, complexity) derived from its kernel and symmetry, not hard-coded into the simulator.
 
 ---
 
@@ -85,6 +100,7 @@ Sources sampled (Emergenics repo):
   - Reinforces treating **spectral/embedding signatures** (from twist, semantic, or other transforms) as:
     - First-class features in operator selection and governance.
     - Tools to detect drift or misalignment (if an operator’s live spectrum diverges from its expected blueprint).
+   - Suggests that **ERO-style meta-optimizers** can operate on these spectral signatures directly, acting as “spectral theorists” over fabrics and solvers when realized as `operator_type: "meta_optimizer" | "ero_oracle"`.
 
 ### 2.4 Emergent computation as a deployment mode
 
@@ -94,6 +110,22 @@ Sources sampled (Emergenics repo):
   - Fits the vNext picture where some Ω-tier operators:
     - Implement emergent, field-based solvers for difficult subproblems (routing optimization, resource allocation).
     - Are governed via strict boundaries: sandboxed, observed, and used as advisory engines rather than unquestioned authorities.
+
+### 2.5 SKC: “Reality engineering” via spectral kernels
+
+- SKC extends the spectral story by:
+  - Treating relational kernels (causal, Yukawa, gauge-decorated) as **fabric laws** whose spectra determine emergent constants (`c*`, nonlocality, complexity).
+  - Showing that changing symmetry (U(1), SU(2)) or dimensionality (1+1D vs 2+1D) yields different, measurable nonlocality constants—even when all fabrics are locally realistic.
+  - Demonstrating a calibrated measurement protocol (against the singlet Tsirelson bound) so these constants are meaningful, not artifacts.
+- For ArqonBus:
+  - Suggests a class of **SKC substrate operators**:
+    - `operator_type: "spectral_kernel_fabric"` that:
+      - Encapsulate a kernel + symmetry + geometry choice.
+      - Expose measured constants (`c*`, CHSH-like nonlocality, spectral entropy) as telemetry and metadata.
+  - Reinforces the idea of **reality engineering**:
+    - Architect/meta-optimizer operators (often ERO-style) can search over kernel/symmetry/topology choices to design fabrics with desired constants (e.g., “more causal”, “less nonlocal”, “richer complexity”).
+  - Provides concrete observables for governance:
+    - Circuits that rely on exotic SKC fabrics can be labeled and constrained based on their measured constants (e.g., only certain tenants allowed on highly nonlocal fabrics).
 
 ---
 

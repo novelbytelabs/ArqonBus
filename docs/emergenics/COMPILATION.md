@@ -71,6 +71,8 @@ Emergenics adds a much richer perspective:
 - **Omega Cognition** patterns (Actor–Modeler, Architect–Physicist, curiosity).
 - **Structural intelligence** (fold/twist/prime spaces, meaning kernels).
 - **Quantum‑style routing ideas** (Schrödinger’s packet, pseudo‑entangled state sync).
+- **Meta-optimization and discovery** via **ERO (Emergent Resonance Oracle)**:
+  - Ω-tier `meta_optimizer` / `ero_oracle` operators that search over solver, fabric, and math-organism/number-fabric design spaces and feed circuits with new candidate laws, kernels, and configurations.
 
 The vNext ArqonBus is therefore:
 
@@ -223,7 +225,7 @@ In Emergenics/vNext, we add richer **operator roles**:
 - `algebraic_substrate` – algebraic/spectral fabrics over number fields.
 - `controller` – feedback and mode control for substrates or other operators.
 - `observer/modeler` – internal oracles that model other operators.
-- `architect/discovery` – meta‑operators that design new rules, substrates, configs.
+- `architect/discovery` – meta‑operators that design new rules, substrates, configs (often realized as ERO-style `meta_optimizer` / `ero_oracle` operators).
 - `multi_agent` – operators that encapsulate internal multi‑agent systems.
 
 The constitution/spec don’t yet hard‑enforce these roles, but `arqonbus_vnext.md` anticipates them as metadata.
@@ -627,4 +629,3 @@ A quick, informal glossary of key terms as used in this ecosystem:
 ---
 
 If you’d like, the next step can be a **worked example document** (e.g., “ArqonBus by Example”) that walks through specific, concrete JSON/protobuf snippets and circuit definitions for one or two end‑to‑end workflows (such as “Helios attention + NVM pulses + BowlNet classification”), using this compilation as the conceptual backdrop.
-
