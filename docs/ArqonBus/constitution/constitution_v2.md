@@ -220,6 +220,13 @@ The system manages **Realities** (Bundles of Substrate + Laws + Agents) as first
 *   **Reality Objects:** A Reality is a managed container for an emergent ecosystem. It must be explicitly defined and governed.
 *   **Lifecycle States:** Hosted realities must track their lifecycle state (`Draft` → `Running` → `Promoted`), with strict transition gates.
 
+### 21. Strong Emergence Patterns (FRR/Omega)
+*   **Criticality as Control:** Operators may explicitly tune control parameters (e.g., coupling $k_c$) to keep substrates at the **Edge of Chaos**, maximizing computational capacity.
+*   **Wave Interference:** Relational fabrics may exhibit interference. Observers must be capable of measuring **Coherence** and **Decoherence** as first-class metrics.
+*   **Homeostatic Override:** Feedback Controllers must have the authority to **Override** substrate dynamics (e.g., force State Reset) when error thresholds are breached.
+*   **Internal Models:** Operators should implement the **Actor-Modeler** pattern, maintaining an internal predictive model of their peers to generate self-supervised error signals (solving the Internal Oracle problem).
+*   **Curiosity Metrics:** "Surprise" (Model Prediction Error) is a valid optimization target for Discovery Operators, driving the exploration of novel regimes.
+
 ---
 
 # III. Code Quality & Engineering Standards

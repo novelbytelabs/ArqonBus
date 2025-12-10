@@ -4,6 +4,7 @@ This plan defines how we will organize the ArqonBus vNext documentation to align
 
 ## 1. The Core Philosophy
 We follow the **Spec-Kit Workflow**:
+
 1.  **Specify (The What):** Define the product requirements and boundaries FIRST.
 2.  **Plan (The How):** Define the technical implementation details SECOND.
 3.  **Execute (The Tasks):** Break down the plan into checklists LAST.
