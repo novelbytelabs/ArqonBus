@@ -5,7 +5,7 @@ repo_name: arqonbus
 dev_addr: 127.0.0.1:8001
 
 theme:
-  name: 'material'
+  name: "material"
   logo: assets/logo.svg
   favicon: assets/favicon.ico
   palette:
@@ -15,7 +15,7 @@ theme:
   features:
     - navigation.sections
     - navigation.expand
-#    - toc.integrate
+    #    - toc.integrate
     - search.suggest
     - search.highlight
     - content.tabs.link
@@ -27,78 +27,84 @@ theme:
     - content.action.view
 
 nav:
-  - Home: 'index.md'
+  - Home: "index.md"
+  - ArqonBus vNext (SDD):
+      - vNext Documentation Plan: "ArqonBus/vnext_plan.md"
+      - Constitution v2: "ArqonBus/constitution/constitution_v2.md"
+      - Master Spec (The What): "ArqonBus/spec/00_master_spec.md"
+      - Master Plan (The How): "ArqonBus/plan/00_master_plan.md"
+      - Legacy Spec v1: "ArqonBus/spec/01_legacy_spec.md"
   - Getting Started:
-    - Quick Start Guide: 'quickstart.md'
-    - Tutorial: 'tutorial.md'
-    - WebSocket & CASIL Walkthrough: 'guides/test_websocket_and_casil.md'
+      - Quick Start Guide: "quickstart.md"
+      - Tutorial: "tutorial.md"
+      - WebSocket & CASIL Walkthrough: "guides/test_websocket_and_casil.md"
   - Setup Guide:
-    - MkDocs Setup: 'mkdocs_setup.md'
+      - MkDocs Setup: "mkdocs_setup.md"
   - Configuration:
-    - Configuration Guide: 'configuration.md'
-    - Telemetry Reference: 'telemetry.md'
+      - Configuration Guide: "ArqonBus/plan/configuration.md"
+      - Telemetry Reference: "ArqonBus/spec/telemetry.md"
   - Operations:
-    - Operations Runbook: 'runbook.md'
+      - Operations Runbook: "ArqonBus/checklist/runbook.md"
   - Developer Guide:
-    - Developers Guide: 'developers_guide.md'
-    - API Reference: 'api.md'
+      - Developers Guide: "developers_guide.md"
+      - API Reference: "ArqonBus/spec/api.md"
   - CASIL (Content-Aware Safety & Inspection Layer):
-    - Overview: 'casil/index.md'
-    - Getting Started: 'casil/getting-started.md'
-    - Configuration Guide: 'casil/configuration.md'
-    - Redaction & Safety: 'casil/redaction.md'
-    - Monitoring & Telemetry: 'casil/monitoring.md'
-    - Best Practices: 'casil/best-practices.md'
-    - API Reference: 'casil/api-reference.md'
+      - Overview: "casil/index.md"
+      - Getting Started: "casil/getting-started.md"
+      - Configuration Guide: "casil/configuration.md"
+      - Redaction & Safety: "casil/redaction.md"
+      - Monitoring & Telemetry: "casil/monitoring.md"
+      - Best Practices: "casil/best-practices.md"
+      - API Reference: "casil/api-reference.md"
   - Architecture:
-    - Design & Architecture: 'architecture.md'
-    - Project Scope: 'arqonbus_v1_scope.md'
-  - Specifications:
-    - Constitution: 'specs/constitution.md'
-    - Core Message Bus:
-      - Specification: 'specs/001-core-message-bus/spec.md'
-      - Implementation Plan: 'specs/001-core-message-bus/plan.md'
-      - Data Model: 'specs/001-core-message-bus/data-model.md'
-      - Quickstart: 'specs/001-core-message-bus/quickstart.md'
-      - Tasks: 'specs/001-core-message-bus/tasks.md'
-      - Requirements Checklist: 'specs/001-core-message-bus/checklists/requirements.md'
-      - HTTP Endpoints Contract: 'specs/001-core-message-bus/contracts/http-endpoints.md'
-      - WebSocket Protocol Contract: 'specs/001-core-message-bus/contracts/websocket-protocol.md'
-    - Content-Aware Safety Inspection (CASIL):
-      - Implementation Plan: 'specs/002-content-aware-safety-inspection/plan.md'
-      - Quickstart: 'specs/002-content-aware-safety-inspection/quickstart.md'
-      - Specification: 'specs/002-content-aware-safety-inspection/spec.md'
-      - Tasks: 'specs/002-content-aware-safety-inspection/tasks.md'
-      - CASIL Contract: 'specs/002-content-aware-safety-inspection/contracts/casil.md'
+      - Design & Architecture: "ArqonBus/plan/architecture.md"
+      - Project Scope: "arqonbus_v1_scope.md"
+  - Specifications (Legacy v1):
+      - Constitution: "specs/constitution.md"
+      - Core Message Bus:
+          - Specification: "specs/001-core-message-bus/spec.md"
+          - Implementation Plan: "specs/001-core-message-bus/plan.md"
+          - Data Model: "specs/001-core-message-bus/data-model.md"
+          - Quickstart: "specs/001-core-message-bus/quickstart.md"
+          - Tasks: "specs/001-core-message-bus/tasks.md"
+          - Requirements Checklist: "specs/001-core-message-bus/checklists/requirements.md"
+          - HTTP Endpoints Contract: "specs/001-core-message-bus/contracts/http-endpoints.md"
+          - WebSocket Protocol Contract: "specs/001-core-message-bus/contracts/websocket-protocol.md"
+      - Content-Aware Safety Inspection (CASIL):
+          - Implementation Plan: "specs/002-content-aware-safety-inspection/plan.md"
+          - Quickstart: "specs/002-content-aware-safety-inspection/quickstart.md"
+          - Specification: "specs/002-content-aware-safety-inspection/spec.md"
+          - Tasks: "specs/002-content-aware-safety-inspection/tasks.md"
+          - CASIL Contract: "specs/002-content-aware-safety-inspection/contracts/casil.md"
   - Projects:
-    - Platform Overview:
-      - ArqonTech Vision: 'projects/arqontech.md'
-      - ArqonTech Ecosystem 2.1: 'projects/arqon_ecosystem.md'
-      - Problems & Promise: 'projects/problems_promise.md'
-      - Who Arqon is For: 'projects/who_for.md'
-    - Core Concepts: 'projects/concepts/index.md'
-    - Platform Architecture:
-      - ArqonMesh: 'projects/arqonmesh.md'
-    - Developers Guide:
-      - Overview: 'projects/guides/dev/overview.md'
-    - Operations Guide:
-      - Overview: 'projects/guides/ops/overview.md'
-    - Packaged Business Capabilities:
-      - Overview: 'projects/pb'
-    - Delta Framework:
-      - Delta Control Levers: 'projects/levers.md'
-      - Delta Fabric: 'projects/fabric.md'
-      - Deltas Example: 'projects/deltas_example.md'
-      - Deltas: 'projects/deltas.md'
-    - Research Projects:
-      - Network Automaton: 'projects/network_automaton.md'
-      - Grid: 'projects/grid.md'
-      - Moonshots: 'projects/moonshots.md'
-      - Proto-Intelligence Initial: 'projects/proto-intelligence-initial.md'
-      - Six Steps: 'projects/six_steps.md'
+      - Platform Overview:
+          - ArqonTech Vision: "projects/arqontech.md"
+          - ArqonTech Ecosystem 2.1: "projects/arqon_ecosystem.md"
+          - Problems & Promise: "projects/problems_promise.md"
+          - Who Arqon is For: "projects/who_for.md"
+      - Core Concepts: "projects/concepts/index.md"
+      - Platform Architecture:
+          - ArqonMesh: "projects/arqonmesh.md"
+      - Developers Guide:
+          - Overview: "projects/guides/dev/overview.md"
+      - Operations Guide:
+          - Overview: "projects/guides/ops/overview.md"
+      - Packaged Business Capabilities:
+          - Overview: "projects/pb"
+      - Delta Framework:
+          - Delta Control Levers: "projects/levers.md"
+          - Delta Fabric: "projects/fabric.md"
+          - Deltas Example: "projects/deltas_example.md"
+          - Deltas: "projects/deltas.md"
+      - Research Projects:
+          - Network Automaton: "projects/network_automaton.md"
+          - Grid: "projects/grid.md"
+          - Moonshots: "projects/moonshots.md"
+          - Proto-Intelligence Initial: "projects/proto-intelligence-initial.md"
+          - Six Steps: "projects/six_steps.md"
   - Project Info:
-    - Ecosystem: 'arqon_ecosystem.md'
-    - Completion Report: 'completion_report.md'
+      - Ecosystem: "arqon_ecosystem.md"
+      - Completion Report: "completion_report.md"
 
 markdown_extensions:
   - attr_list
@@ -128,7 +134,7 @@ extra_css:
   - stylesheets/extra.css
 
 # This tells mkdocs where your documentation source files are
-docs_dir: 'docs'
+docs_dir: "docs"
 
 # This allows GitHub Actions to deploy the site to the gh-pages branch
 edit_uri: edit/main/docs/
@@ -140,7 +146,7 @@ plugins:
 
 # Extra configuration
 extra:
-  version: '1.0.0'
+  version: "1.0.0"
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/novelbytelabs/arqonbus
@@ -164,4 +170,4 @@ extra:
             Thanks for your feedback! Help us improve this page by
             <a href="https://github.com/novelbytelabs/arqonbus/issues/new/?title=[Feedback]+{title}+-+{url}" target="_blank" rel="noopener">telling us what you found helpful or what could be improved</a>.
 
-copyright: 'Copyright &copy; 2025 NovelByte Labs - All rights reserved.'
+copyright: "Copyright &copy; 2025 NovelByte Labs - All rights reserved."
