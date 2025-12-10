@@ -1,4 +1,4 @@
-# ArqonBus v2.0 Product Specification
+# ArqonBus v1.1 Product Specification
 
 **Version:** 2.0.0  
 **Status:** Draft  

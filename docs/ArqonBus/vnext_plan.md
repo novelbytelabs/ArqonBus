@@ -55,3 +55,26 @@ We will migrate the research notes from `docs/emergenics/` into `docs/ArqonBus/c
 1.  **Migrate:** Move files to `docs/ArqonBus/context/category/`.
 2.  **Synthesize:** Create `spec/00_master_spec.md` referencing `context/vision`.
 3.  **Detail:** Create `spec/02_operators.md` referencing `context/substrates`.
+
+## 6. Specification Hierarchy (The Tree)
+
+To "include everything" without creating an unreadable monolith, we will use a **Federated Specification** structure. The Master Spec acts as the Root Node, legally binding the system to the detailed constraints in the `context/` files.
+
+### The Files
+*   **`spec/00_master_spec.md` (The Product)**
+    *   Defines the Top-Level Vision (Universal Substrate).
+    *   **Includes:** `context/vision/arqonbus_vnext.md`
+*   **`spec/01_core_spine.md` (The Bus)**
+    *   Defines the Kernel (Transport, Identity, Time, CASIL).
+    *   **Includes:** `context/vision/ttc_vnext_vision.md`
+*   **`spec/02_tier_omega.md` (The Operators)**
+    *   Defines the "Substrate Support" requirements (Must host NVM, Primes, etc.).
+    *   **Includes:** `context/substrates/*`
+*   **`spec/03_reality_factory.md` (The Lifecycle)**
+    *   Defines the "Factory" requirements (Promotion Gates, Observatories).
+    *   **Includes:** `context/engineering/*`
+*   **`spec/04_agents.md` (The Inhabitants)**
+    *   Defines the "SAM Interface" and Agent capabilities.
+    *   **Includes:** `context/agents/*`
+
+**Rule:** The Spec files define the **Requirements** ("System MUST support X"). The Context files define the **X** ("X is a Prime-Resonant Field...").
