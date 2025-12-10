@@ -25,13 +25,11 @@ ArqonBus is the infrastructure shift required to support this transition. It is 
 
 1. **Humans** (Chat, Collaboration),
 2. **Devices** (IoT, Sensors), and
-3. **Operators** (AI Agents, Physical Rigs, NVM Nodes)
+3. **Operators** (AI Agents, Physical Rigs, Computational Entities)
 
 …as first-class citizens on a single, unified bus.
 
-Our vision is to provide the **Substrate** where the Agent Economy lives—a place where safe, high-velocity, and stateful coordination happens faster than the speed of human thought. We are **Substrate-Agnostic**, treating acoustic, optical, and silicon compute as peers.
-
-While universal, the ArqonBus architecture is proven against the extreme rigor of the **QuantumHyperEngine (QHE)** workload family (Helios, NVM, BowlNet).
+Our vision is to provide the **Substrate** where the Agent Economy lives—a place where safe, high-velocity, and stateful coordination happens faster than the speed of human thought. We are **Substrate-Agnostic**, treating diverse compute substrates as peers.
 
 ## 2. The Scope
 
@@ -60,14 +58,14 @@ ArqonBus is **not an Application Runtime**.
 We define our evolution in three distinct epochs. Engineering decisions must align with the current epoch while reserving capacity for the next.
 
 * **Epoch 1: The Foundation (Infrastructure).**
-  * *Focus:* Unrivaled WebSocket performance, Multi-tenancy, and Developer Experience.
-  * *Goal:* Be the best "Bus for Humans."
+    * *Focus:* Unrivaled WebSocket performance, Multi-tenancy, and Developer Experience.
+    * *Goal:* Be the best "Bus for Humans."
 * **Epoch 2: The Platform (Programmability).**
-  * *Focus:* Wasm Edge Hooks, Traffic Mirroring, and Schema Governance.
-  * *Goal:* Be the most developer-friendly real-time platform.
+      * *Focus:* Wasm Edge Hooks, Traffic Mirroring, and Schema Governance.
+      * *Goal:* Be the most developer-friendly real-time platform.
 * **Epoch 3: The Singularity (Intelligence).**
-  * *Focus:* Semantic Routing, Agent Identity, and Swarm Consensus.
-  * *Goal:* Be the Operating System for Multi-Agent Systems.
+     * *Focus:* Semantic Routing, Agent Identity, and Swarm Consensus.
+     * *Goal:* Be the Operating System for Multi-Agent Systems.
 
 ---
 
