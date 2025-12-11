@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "crates/arqonhpo-core",
+    "crates/arqonhpo-operator",
+    "crates/arqonhpo-py",
+]
+resolver = "2"
