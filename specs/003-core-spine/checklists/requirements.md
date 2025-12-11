@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2025-12-11
-**Feature**: [01_core_spine.md](../spec/01_core_spine.md)
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 
