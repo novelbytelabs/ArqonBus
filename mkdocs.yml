@@ -30,6 +30,11 @@ nav:
   - Home: "index.md"
   - ArqonBus vNext (SDD):
       - vNext Documentation Plan: "ArqonBus/vnext_plan.md"
+      - Smart Circuit Lifecycle: "ArqonBus/context/vision/smart_circuit_lifecycle.md"
+      - Substrates (Research):
+          - Time Traveling Communication (TTC): "ArqonBus/context/substrates/ttc.md"
+          - RPZL (Search Protocol): "ArqonBus/context/substrates/rpzl.md"
+          - Prime Twist Models: "ArqonBus/context/substrates/prime_twist_models.md"
       - Constitution v2: "ArqonBus/constitution/constitution_v2.md"
       - Master Spec (The What): "ArqonBus/spec/00_master_spec.md"
       - Master Plan (The How): "ArqonBus/plan/00_master_plan.md"
