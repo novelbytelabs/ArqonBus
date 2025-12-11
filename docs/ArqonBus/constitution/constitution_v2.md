@@ -758,8 +758,8 @@ Each category must define:
 
 * **Tenant-Scoped Data:** All tenant data must be addressable by `TenantID` and isolated logically and physically where required. Queries or operations that span tenants are forbidden unless explicitly allowed at a governance level (e.g., global ops-only diagnostics).
 * **Right to Vanish:** When a tenant is deleted or requests erasure (where applicable), their data must be deleted or cryptographically shredded across:
-  * Primary databases
-  * Search indexes
+  * Primary storage
+  * Secondary indexes
   * Caches
   * Logs and backups (subject to regulatory allowances and obligations)
 * **Access Controls:** Internal access to tenant data (for support or diagnostics) must be:
@@ -849,4 +849,3 @@ To prevent interpretation drift (especially for Spec Kit agents), we define core
 ---
 
 **Verified as Constitution v2.1 (Spec Kit–Aligned)**
-
