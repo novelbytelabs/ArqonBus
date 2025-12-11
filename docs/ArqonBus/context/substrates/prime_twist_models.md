@@ -16,15 +16,15 @@ Sources sampled (Emergenics repo):
 ## 1. What we just read (this chunk)
 
 - **PPP_Resonant_Process_Prediction (distill + Prime_Programme_Prediction.ipynb)**  
-  - **Subsystem A – Rule 30 as resonance probe**
-    - Start from unseeded PRNG output: 128 floats → binarize at 0.5 into a row \(\mathbf b^{(0)} \in \{0,1\}^{128}\).
-    - Evolve with Rule 30 (periodic boundary) to get rows \(\mathbf b^{(t)}\).
-    - Train a simple logistic regression to predict the center cell \(b^{(t)}_{64}\) from the full row \(\mathbf b^{(t)}\).
-    - Observation: the linear model achieves **100% accuracy** across all \(t\), i.e. once Rule 30 has “resonated” the seed, the supposedly random center cell becomes linearly predictable.
-    - Prime vs composite index analysis:
-      - Split indices into primes \(P\) and composites \(C\), track mean bit values \(\mu_P(t), \mu_C(t)\).
-      - Find large, persistent gaps \(\Delta(t) = \mu_P(t) - \mu_C(t)\) (≈ −0.28 in examples), showing that prime-indexed cells systematically diverge from composite ones.
-    - Conclusion: Rule 30 acts as a **resonator** that amplifies hidden arithmetic structure in the PRNG seed; randomness ≠ irreducibility.
+     - **Subsystem A – Rule 30 as resonance probe**
+         - Start from unseeded PRNG output: 128 floats → binarize at 0.5 into a row \(\mathbf b^{(0)} \in \{0,1\}^{128}\).
+         - Evolve with Rule 30 (periodic boundary) to get rows \(\mathbf b^{(t)}\).
+         - Train a simple logistic regression to predict the center cell \(b^{(t)}_{64}\) from the full row \(\mathbf b^{(t)}\).
+         - Observation: the linear model achieves **100% accuracy** across all \(t\), i.e. once Rule 30 has “resonated” the seed, the supposedly random center cell becomes linearly predictable.
+     - Prime vs composite index analysis:
+         - Split indices into primes \(P\) and composites \(C\), track mean bit values \(\mu_P(t), \mu_C(t)\).
+         - Find large, persistent gaps \(\Delta(t) = \mu_P(t) - \mu_C(t)\) (≈ −0.28 in examples), showing that prime-indexed cells systematically diverge from composite ones.
+     - Conclusion: Rule 30 acts as a **resonator** that amplifies hidden arithmetic structure in the PRNG seed; randomness ≠ irreducibility.
   - **Subsystem B – Twist-field forecast of CA regime**
     - Take the same 128-bit seed, embed each bit as a radius \(r_i\) (e.g. 0 or 10).
     - For a fixed list of primes \(p_k\) and exponent \(s\), build twist vectors:
@@ -38,13 +38,14 @@ Sources sampled (Emergenics repo):
     - Result in the PPP notebook: across 100 seeds, all are “chaotic → chaotic” (predict and truth), i.e. the twist-field classifier matches the regime labels on this sample with **0 errors**.
     - Key insight: the prime-twist field serves as a **“fate reader”**; you can predict the dynamic regime without running the CA, by looking only at the seed’s resonance in prime harmonics.
   - **Subsystem C – Program as structural web / reading instead of running**
-    - Extends the twist-field idea from CA seeds to general programs:
-      - Treat a program as a **structural web** (graph of operations/variables/flows).
-      - Map each element into a twist vector via the prime-based transform to get a high-dimensional “twist signature” of the whole program.
-      - Conceptual picture: as logical time advances, this signature traces a **trajectory in twist-space** and settles into an attractor corresponding to the program’s outcome.
-    - Philosophical conclusion:
-      - The **irreducible shape** of a program carries its execution.
-      - In principle, you don’t have to simulate every instruction; you can “read” aspects of its destiny from its prime-resonant field.
+       - Extends the twist-field idea from CA seeds to general programs:
+  
+          - Treat a program as a **structural web** (graph of operations/variables/flows).
+          - Map each element into a twist vector via the prime-based transform to get a high-dimensional “twist signature” of the whole program.
+          - Conceptual picture: as logical time advances, this signature traces a **trajectory in twist-space** and settles into an attractor corresponding to the program’s outcome.
+      - Philosophical conclusion:
+          - The **irreducible shape** of a program carries its execution.
+          - In principle, you don’t have to simulate every instruction; you can “read” aspects of its destiny from its prime-resonant field.
 
 - **Twist_Field/twist_field_core.py**  
   - Defines a **Twist(n)** function:
