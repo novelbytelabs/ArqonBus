@@ -47,6 +47,7 @@ nav:
   - Getting Started:
       - Quick Start Guide: "quickstart.md"
       - Tutorial: "tutorial.md"
+      - Epoch 2 Quickstart: "ArqonBus/tutorials/epoch2_quickstart.md"
       - WebSocket & CASIL Walkthrough: "guides/test_websocket_and_casil.md"
   - Setup Guide:
       - MkDocs Setup: "mkdocs_setup.md"
