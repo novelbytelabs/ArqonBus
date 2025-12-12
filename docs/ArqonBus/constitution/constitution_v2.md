@@ -10,7 +10,7 @@ Sync Impact Report:
 
 **Version**: 2.2.0  
 **Ratification Date**: 2025-12-11  
-**Last Amended**: 2025-12-12  
+**Last Amended**: 2025-12-11  
 
 This document defines the **non-negotiable principles** that govern how ArqonBus is designed, evolved, and maintained.
 
@@ -1256,4 +1256,4 @@ Rule: If it is not true, it is not done.
 
 **Version**: 2.2.0  
 **Ratified**: 2025-12-11  
-**Last Amended**: 2025-12-12
+**Last Amended**: 2025-12-11
