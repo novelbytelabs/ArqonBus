@@ -6,7 +6,14 @@ use crate::router::nats_bridge::NatsBridge;
 use crate::handlers::socket::ws_handler;
 
 mod handlers;
-mod router;
+mod policy;
+use crate::policy::engine::PolicyEngine;
+
+#[derive(Clone)]
+pub struct AppState {
+    nats: NatsBridge,
+    policy: PolicyEngine,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,10 +26,15 @@ async fn main() -> anyhow::Result<()> {
     let nats_bridge = NatsBridge::connect(&nats_url).await?;
     info!("Connected to NATS Spine at {}", nats_url);
 
-    // 3. Build Router
+    // 3. Init Policy Engine
+    let policy_engine = PolicyEngine::new()?;
+    info!("Wasm Policy Engine initialized");
+
+    // 4. Build Router
+    let state = AppState { nats: nats_bridge, policy: policy_engine };
     let app = Router::new()
         .route("/ws", get(ws_handler))
-        .with_state(Arc::new(nats_bridge));
+        .with_state(state);
 
     // 4. Bind Server
     let addr = SocketAddr::from(([0, 0, 0, 0], 4000));

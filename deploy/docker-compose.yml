@@ -6,7 +6,10 @@ services:
     ports:
       - "4222:4222" # Client
       - "8222:8222" # Monitoring
-    command: "-js" # Enable JetStream
+    command: "-c /etc/nats/nats.conf"
+    volumes:
+      - ./nats/nats.conf:/etc/nats/nats.conf
+      - nats_data:/data
 
   valkey:
     image: valkey/valkey:latest
@@ -32,3 +35,6 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - jaeger
+
+volumes:
+  nats_data:

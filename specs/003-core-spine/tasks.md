@@ -24,37 +24,37 @@
 ## Phase 2: The Core (Shield & Spine)
 *The Nervous System. Establishing connectivity.*
 
-- [/] **Implement The Shield Reactor (Rust)**
-    - [ ] Scaffold `crates/shield` (Axum/Tokio)
-    - [ ] Implement `ConnectionActor` (WebSocket State Machine)
-    - [ ] Implement Zero-Copy NATS Bridge (`async-nats`)
-    - [ ] **Verification**: `wscat` connection sends message to NATS subject `in.t.T1.r.R1`.
-- [ ] **Implement NATS Topology**
-    - [ ] Configure `deploy/nats/nats.conf` with strict Subject Mapping
-    - [ ] Define JetStream Streams for `sys.*` (Audit Logs)
-    - [ ] **Verification**: `nats pub` to forbidden subject is rejected.
+- [x] **Implement The Shield Reactor (Rust)**
+    - [x] Scaffold `crates/shield` (Axum/Tokio)
+    - [x] Implement `ConnectionActor` (WebSocket State Machine)
+    - [x] Implement Zero-Copy NATS Bridge (`async-nats`)
+    - [x] **Verification**: `wscat` connection sends message to NATS subject `in.t.T1.r.R1`.
+- [x] **Implement NATS Topology**
+    - [x] Configure `deploy/nats/nats.conf` with strict Subject Mapping
+    - [x] Define JetStream Streams for `sys.*` (Audit Logs)
+    - [x] **Verification**: `nats pub` to forbidden subject is rejected.
 
 ## Phase 3: The Brain (Elixir State)
 *The Control Plane. Tracking "Who is where".*
 
-- [ ] **Implement Brain Topology**
-    - [ ] Configure `libcluster` for Mesh Discovery
-    - [ ] Implement `Brain.Application` Supervision Tree
-    - [ ] **Verification**: Start 2 Brain nodes, verify they form a cluster.
-- [ ] **Implement Presence Engine**
-    - [ ] Add `Brain.Overlay.Presence` (Phoenix.Tracker)
-    - [ ] Implement NATS Consumer (`in.t.*`) -> Presence Update
-    - [ ] **Verification**: Connect Client A -> Shield -> NATS -> Brain -> Client B sees "A Joined".
-- [ ] **Implement Room Manager**
-    - [ ] Create `Brain.Context.Room` GenServer
-    - [ ] Implement `DynamicSupervisor` for Room spawning
-    - [ ] **Verification**: Sending to `room_1` spawns a process for `room_1`.
+- [x] **Implement Brain Topology**
+    - [x] Configure `libcluster` for Mesh Discovery
+    - [x] Implement `Brain.Application` Supervision Tree
+    - [x] **Verification**: Start 2 Brain nodes, verify they form a cluster.
+- [x] **Implement Presence Engine**
+    - [x] Add `Brain.Overlay.Presence` (Phoenix.Tracker)
+    - [x] Implement NATS Consumer (`in.t.*`) -> Presence Update
+    - [x] **Verification**: Connect Client A -> Shield -> NATS -> Brain -> Client B sees "A Joined".
+- [x] **Implement Room Manager**
+    - [x] Create `Brain.Context.Room` GenServer
+    - [x] Implement `DynamicSupervisor` for Room spawning
+    - [x] **Verification**: Sending to `room_1` spawns a process for `room_1`.
 
 ## Phase 4: The Overseer (Safety & Observability)
 *The Governance Layer.*
 
-- [ ] **Implement Wasm Host (Rust)**
-    - [ ] Add `wasmtime` to `crates/shield`
+- [/] **Implement Wasm Host (Rust)**
+    - [x] Add `wasmtime` to `crates/shield`
     - [ ] Implement `PolicyEngine` (Fail-Closed Execution)
     - [ ] **Verification**: Load a "Ban All" wasm module; verify all connections drop.
 - [ ] **Implement Telemetry Contracts**
