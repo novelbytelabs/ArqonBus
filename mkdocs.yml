@@ -42,6 +42,7 @@ nav:
       - Constitution v2: "ArqonBus/constitution/constitution_v2.md"
       - Master Spec (The What): "ArqonBus/spec/00_master_spec.md"
       - Master Plan (The How): "ArqonBus/plan/00_master_plan.md"
+      - Epoch 1 Product Overview: "ArqonBus/product/epoch1_overview.md"
       - Legacy Spec v1: "ArqonBus/spec/01_legacy_spec.md"
   - Getting Started:
       - Quick Start Guide: "quickstart.md"

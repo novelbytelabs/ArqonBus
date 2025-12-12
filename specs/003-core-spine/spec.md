@@ -69,6 +69,47 @@ As a User, I want to know who else is in the room so that I can see my team's av
 
 ---
 
+### User Story 5 - Developer Experience (Priority: P2)
+
+As a Developer, I want to control the stack via a unified CLI (`arq dev`, `arq status`) so that I don't have to memorize docker-compose commands or API paths.
+
+**Acceptance Scenarios**:
+
+1. **Given** I am in the repo, **When** I run `arq dev up`, **Then** the Docker stack (NATS, Brain, Shield, Jaeger, Grafana) spins up.
+2. **Given** the stack is running, **When** I run `arq status`, **Then** I see the health of all services and the current connection count.
+3. **Given** I need a test token, **When** I run `arq auth gen --role user`, **Then** I get a valid JWT.
+
+---
+
+### User Story 6 - Operational Visibility (Priority: P2)
+
+As an Operator, I want immediate visibility into the "Core Spine" metrics (Throughput, Latency, Error Rate) via standard dashboards, so I can debug issues without digging into raw logs.
+
+**Acceptance Scenarios**:
+
+1. **Given** the stack is running, **When** I open Grafana (localhost:3000), **Then** I see a pre-loaded "ArqonBus Overview" dashboard.
+2. **Given** a message flow, **When** I check Jaeger, **Then** I see a distributed trace spanning Shield -> Spine -> Brain.
+
+As a Developer, I want to install the client SDK via `pip install arqon-sdk` and run it on Windows, Linux, and Mac, so that I can integrate it into my apps easily.
+
+**Why this priority**: Adoption depends on DX. The "Complete Package" promise.
+
+**Acceptance Scenarios**:
+
+1. **Given** a clean Python env on Windows, **When** I run `pip install arqon-sdk`, **Then** it installs successfully.
+2. **Given** the SDK is installed, **When** I run the `arqon.connect()` example, **Then** it connects to the local Docker stack.
+
+---
+
+### User Story 6 - Automated Delivery (Priority: P2)
+
+As a Maintainer, I want every git push to trigger a matrix build (Linux/Mac/Windows) and publish artifacts, so that releases are automatic.
+
+**Acceptance Scenarios**:
+
+1. **Given** a push to `main`, **When** CI runs, **Then** it builds Rust (Shield) and Elixir (Brain) docker images and pushes to GHCR.
+2. **Given** a new tag, **When** CI runs, **Then** it publishes the Python SDK to PyPI.
+
 ### Edge Cases
 
 - **Connection Storms**: What happens when 10,000 users reconnect simultaneously? (Should throttle/backpressure, not crash).
@@ -87,12 +128,19 @@ As a User, I want to know who else is in the room so that I can see my team's av
 - **FR-006**: The system MUST support **Wasm Middleware** chains in the Shield for payload inspection.
 - **FR-007**: Messages MUST include `X-Twist-ID` and `X-Timestamp` headers in the envelope to support future TTC integration.
 - **FR-008**: The system MUST enforce **Tenant Isolation** on every NATS publish/subscribe operation.
+- **FR-009**: The project MUST provide immediate **Docker Compose** stacks for local dev (`docker compose up`).
+- **FR-010**: The project MUST provide a **Python SDK** published to PyPI that wrappers the protocol.
+- **FR-011**: The CI/CD pipeline MUST support **Matrix Builds** (Linux-x64, MacOS-ARM64, Windows-x64) for CLI tools.
+- **FR-012**: The system MUST emit **OpenTelemetry** traces and metrics from both Rust and Elixir components.
+- **FR-013**: The `arq` CLI tool MUST be provided as a single static binary for managing the lifecycle.
+- **FR-014**: All Configuration MUST be defined via a strict **TOML Schema** with validation on startup (no loose env vars).
 
 ### Key Entities
 
 - **Envelope**: The outer Protobuf wrapper containing Headers and Payload.
 - **Session**: A stateful connection mapped to a `UserID` and `TenantID`.
 - **Room**: A simplified topic/channel abstraction for grouping Sessions.
+- **Manifest**: The `config.toml` definition of the running Node.
 
 ## Success Criteria *(mandatory)*
 

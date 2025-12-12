@@ -1,17 +1,14 @@
 <!--
 Sync Impact Report:
 
-- Version: old -> 2.1.0
-- Added Sections: Vision, Scope, Principles (Architectural Invariance, Statelessness, Protocol Sovereignty, Future-Proofing Hooks, Semantic Versioning, Tenant Isolation, Security by Design, Programmable Safety, Message-as-Program, Delta-First, Circuit-First), Tier Ω Scope, Code Quality, Testing Strategy, Lifecycle, Operational Excellence, Data Governance, Internal Contracts.
-- Modified: Complete rewrite based on v2.1 input.
-- Templates requiring updates:
-  - .specify/templates/plan-template.md (Warning: Ensure alignment)
-  - .specify/templates/spec-template.md (Warning: Ensure alignment)
+- Version: 2.1.0 -> 2.2.0
+- Added: V.4 Security Substrate (Day 1); XIII. Reference Implementation Stack; extended Glossary.
+- Notes: Check .specify templates for any hardcoded version references.
 -->
 
 # ArqonBus Constitution
 
-**Version**: 2.1.0  
+**Version**: 2.2.0  
 **Ratification Date**: 2025-12-11  
 **Last Amended**: 2025-12-11  
 
@@ -185,6 +182,7 @@ Security is a baseline constraint, not a feature.
 * **Zero Trust:** The Gateway does not trust the Client. The Brain does not trust the Gateway. Every boundary requires validation.
 * **Fail Closed:** If a security module (like the Wasm Overseer) fails, times out, or crashes, the traffic is **Blocked**. It is never "allowed by default."
 * **Secure Defaults:** The system must refuse to start if configured with default passwords or insecure binding addresses (e.g., `0.0.0.0` without TLS).
+* **Central Authority:** In production, secrets, keys, and certificates must be issued and governed by an authorized security substrate (Vault-class secrets manager + certificate automation + GitOps). Ad-hoc trust roots, unmanaged secrets, or manually provisioned certificates are forbidden in production environments.
 
 ### 8. Programmable Safety (The Overseer)
 
@@ -496,7 +494,26 @@ Manual releases are strictly forbidden. The CI/CD pipeline is the **only** path 
 * **Dependency Locking:** No floating versions. `Cargo.lock` and `mix.lock` must be committed. Dependencies must be pinned and audited automatically; high-severity vulnerabilities block the release.
 * **Provenance:** The origin of each artifact (commit, branch, CI run) must be traceable from production back to source.
 
-### 4. Semantic Versioning & Compatibility
+### 4. Security Substrate (Day 1)
+
+ArqonBus is operated with an enterprise-grade security substrate from day one. Security is not an afterthought; it is part of the factory.
+
+* **Central Secrets Authority:** All secrets (API keys, DB credentials, tokens, encryption keys) must be managed by a hardened, centralized secrets system (Vault or a functionally equivalent Vault-like service). Long-lived static secrets in configuration files, container images, or CI variables are prohibited.
+* **Automated Certificate Management:** All TLS certificates (external and internal) must be issued, rotated, and revoked by an automated certificate management system (e.g., `cert-manager` backed by an internal or external CA). Manual certificate provisioning in production is forbidden.
+* **GitOps as the Only Truth:** Infrastructure, configuration, and policy are applied to environments exclusively via Git-backed workflows (GitOps). The desired state of Shield, Spine, Brain, Storage, Overseer, and Observability must live in version control and be reconciled into clusters by automated controllers. Direct, ad-hoc mutation of production resources (e.g., `kubectl edit`, in-cluster UI toggles) is considered an incident.
+* **Secrets as References, Not Payloads:** Application and platform configuration checked into Git may only contain **references** to secrets (paths, identities, roles), never secret values. The secret manager is the only authorized source of secret material at runtime.
+* **Auditable Changes Only:** Every security-relevant change (secrets, certificates, auth policies, network policies, safety modules) must be traceable to:
+  * A Git commit,
+  * An approved CI/CD run, and
+  * A human or automated identity.  
+  Out-of-band changes are treated as security incidents and must be investigated and eliminated.
+* **Rotation by Design:** The security substrate must support routine rotation of:
+  * Secrets and credentials,
+  * Certificates and keys,
+  * Signing keys used for artifacts and tokens,  
+  without requiring downtime or special-case code paths. Architectures that assume “static forever” secrets or certs are constitutionally invalid.
+
+### 5. Semantic Versioning & Compatibility
 
 We adhere strictly to Semantic Versioning (SemVer 2.0.0) for both **Protocol** and **Public API**, consistent with Section II.5.
 
@@ -507,7 +524,7 @@ We adhere strictly to Semantic Versioning (SemVer 2.0.0) for both **Protocol** a
 * **Deprecation Policy:** No field, command, or feature may be removed in a Major version without being marked `deprecated` in at least one previous Minor version.
 * **Rolling Upgrade Guarantee:** The system must support at least **N-1** compatibility. A `v1.2` Gateway must be able to communicate with a `v1.1` Brain during a rolling deployment, and vice versa where documented.
 
-### 5. Deployment Safety Nets
+### 6. Deployment Safety Nets
 
 Deployments must be **boring, reversible, and observable.**
 
@@ -734,7 +751,7 @@ Telemetry itself is an interface and must be treated as such.
 ### 4. Operability Guarantees
 
 * **Debuggability:** For any production issue impacting tenants, the combination of logs, metrics, and traces must allow an on-call engineer (who is not the original author) to reconstruct the key events without guesswork.
-* **No Silent Recovery:** Automatic recovery or fallback must emit telemetry that can be used to analyze frequency and impact.
+* **No Silent Recovery:** Automatic retries, fallbacks, or recoveries must emit telemetry with enough information to quantify frequency and cost.
 * **Alertability:** Observability data must support actionable alerts for:
   * SLO violations
   * Safety module failures
@@ -852,6 +869,7 @@ To prevent interpretation drift (especially for Spec Kit agents), we define core
 | **Spine** | The internal message bus (e.g., NATS/Rust) providing transport and decoupling. All internal traffic traverses the Spine. |
 | **Brain** | The control plane (Elixir) responsible for complex state, presence, authorization, and system self-healing. |
 | **Storage** | The set of services providing durable configuration and hot counters (e.g., Postgres + Valkey) under strict state locality rules. |
+| **Overseer** | The programmable Safety layer at the Shield, implemented via Wasm modules that enforce tenant-specific policies under fail-closed constraints. |
 | **Capsule** | A message containing a "Seed" (Code/Intent) + "Rules" for execution (Message-as-Program). |
 | **Reality** | A governed namespace or container that bundles Substrate + Laws + Agents, particularly for Tier Ω emergent workloads. |
 | **Tier 1** | Production-critical operators and circuits. Subject to **all** Core Principles (II.1–11, VIII–X) with strict safety and performance guarantees. |
@@ -860,9 +878,67 @@ To prevent interpretation drift (especially for Spec Kit agents), we define core
 | **Voltron Pattern** | The strict 4-layer architectural hierarchy: Shield → Spine → Brain → Storage. No bypasses allowed. |
 | **Universe** | The collection of all Realities and Tenants operating on ArqonBus under this Constitution. |
 | **Drift** | Divergence of system behavior or schema from its baseline over time; controlled via SLOs, observability, and Tier Ω governance. |
+| **ACES** | The automated CI pipeline enforcing constitutional gates (coverage, architecture, safety, observability, complexity) as hard rules. |
+| **Sentinel** | The semantic review bot responsible for detecting missing specs, architectural violations, and observability gaps before merge. |
+| **Vault-Class Secrets Manager** | A hardened, centralized secrets system (e.g., Vault or equivalent) providing encryption, access control, audit trails, and short-lived credentials for services and operators. |
+| **GitOps** | An operational model where the desired state of environments (manifests, policies, configs) lives in Git and is reconciled into clusters by automated controllers. Git is the only source of truth. |
+| **cert-manager** | An automated certificate management system (or equivalent) that issues, renews, and revokes TLS certificates for ArqonBus components. |
+| **Service Mesh (Linkerd)** | A mesh layer (reference: Linkerd) providing mTLS, identity, and per-connection telemetry between services, consistent with Tenant Isolation and Security by Design. |
 
 ---
 
-**Version**: 2.1.0
-**Ratified**: 2025-12-11
+# XIII. Reference Implementation Stack (Non-Normative)
+
+This section is **informative, not constitutional**. It defines a **reference stack** for implementing ArqonBus in production.  
+Teams may choose functionally equivalent alternatives, but **must preserve the guarantees** defined in Sections II–XI.
+
+### 1. Network & Transport
+
+* **Service Mesh:** Linkerd (mTLS, identity, per-tenant telemetry).
+* **Message Bus:** NATS (Spine) with strict subject prefixes for `TenantID`.
+* **Edge:** Rust-based Shield with WebSocket/TCP/QUIC termination and Wasm safety hooks.
+
+### 2. Observability & Telemetry
+
+* **Tracing:** OpenTelemetry SDKs + Jaeger as the primary tracing backend.
+* **Metrics:** Prometheus for metrics collection; Grafana for dashboards and SLO views.
+* **Logs (ELK):** Filebeat → Elasticsearch → Kibana for structured log aggregation, search, and visualization.
+* **Correlation:** `trace_id`, `tenant_id`, and `node_id` propagated end-to-end and present in logs/metrics/traces.
+
+### 3. Policy, Safety & Governance
+
+* **Policy-as-Code:** OPA (Open Policy Agent) + Conftest for CI policy checks.
+* **Kubernetes Policy:** Kyverno or Gatekeeper for in-cluster policy enforcement.
+* **Safety Runtime:** Embedded Wasm engine in Shield (The Overseer) for tenant-specific safety modules.
+* **ACES / Sentinel:** CI bots enforcing coverage, contracts, and constitutional rules.
+
+### 4. Storage & State
+
+* **Durable State:** Postgres for configuration, topology, and history metadata.
+* **Hot State:** Valkey for hot counters, presence, and transient coordination state.
+* **History:** Stream and time-travel history stored with explicit retention policies, backed by Postgres or compatible stream storage.
+
+### 5. Security & Secrets
+
+* **Secrets:** Vault (or Vault-like) as the central secrets authority.
+* **Certificates:** cert-manager for issuing and rotating TLS certs (internal + external).
+* **GitOps:** Argo CD or Flux as the GitOps controller; GitHub Actions or GitLab CI as CI runners.
+* **Artifact Security:** cosign for image/binary signing; Syft + Grype + Trivy for SBOM generation and vulnerability scanning.
+
+### 6. Load, Chaos & Resilience Testing
+
+* **Load Testing:** k6 for protocol-level and scenario-based performance tests.
+* **Chaos Engineering:** Chaos Mesh (or equivalent) for injected failures (network partitions, node loss, latency).
+* **Resilience CI:** Regular chaos and load scenarios wired into CI/CD and pre-production environments.
+
+### 7. Error Tracking & Forensics
+
+* **Error Localization:** OpenTelemetry + Jaeger traces as the primary source of truth for error flows.
+* **Rate Monitoring:** Prometheus error-rate metrics (per-tenant, per-endpoint, per-operator).
+* **Context:** ELK stack as the canonical store for log context around incidents. No separate error SaaS (e.g., Sentry) is required if OTel + Jaeger + Prometheus + ELK are correctly wired.
+
+---
+
+**Version**: 2.2.0  
+**Ratified**: 2025-12-11  
 **Last Amended**: 2025-12-11
