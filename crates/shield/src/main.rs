@@ -1,14 +1,17 @@
 mod handlers;
 mod router;
 mod policy;
+mod middleware;
 
 use axum::{routing::get, Router};
+use axum::middleware::{self, from_fn_with_state};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::info;
 use crate::router::nats_bridge::NatsBridge;
 use crate::handlers::socket::ws_handler;
 use crate::policy::engine::PolicyEngine;
+use crate::middleware::wasm::wasm_middleware;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -31,10 +34,11 @@ async fn main() -> anyhow::Result<()> {
     let policy_engine = PolicyEngine::new()?;
     info!("Wasm Policy Engine initialized");
 
-    // 4. Build Router
+    // 4. Build Router with Wasm middleware
     let state = AppState { nats: nats_bridge, policy: policy_engine };
     let app = Router::new()
         .route("/ws", get(ws_handler))
+        .layer(from_fn_with_state(state.clone(), wasm_middleware))
         .with_state(state);
 
     // 4. Bind Server
