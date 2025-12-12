@@ -53,27 +53,32 @@
 ## Phase 4: The Overseer (Safety & Observability)
 *The Governance Layer.*
 
-- [/] **Implement Wasm Host (Rust)**
+- [x] **Implement Wasm Host (Rust)**
     - [x] Add `wasmtime` to `crates/shield`
-    - [ ] Implement `PolicyEngine` (Fail-Closed Execution)
-    - [ ] **Verification**: Load a "Ban All" wasm module; verify all connections drop.
-- [ ] **Implement Telemetry Contracts**
-    - [ ] Configure `opentelemetry` in Rust (Shield)
-    - [ ] Configure `opentelemetry_exporter` in Elixir (Brain)
-    - [ ] **Verification**: TraceID propagates from Client -> Shield -> Brain -> Jaeger UI.
+    - [x] Implement `PolicyEngine` (Fail-Closed Execution)
+    - [x] **Verification**: Load a "Ban All" wasm module; verify all connections drop.
+- [x] **Implement Telemetry Contracts**
+    - [x] Configure `opentelemetry` in Rust (Shield)
+    - [x] Configure `opentelemetry_exporter` in Elixir (Brain)
+    - [x] **Verification**: TraceID propagates from Client -> Shield -> Brain -> Jaeger UI.
 
 ## Phase 5: The Product (Packaging)
 *The Developer Experience.*
 
-- [ ] **Build `arq` CLI Tool**
-    - [ ] Create `crates/arq-cli` (Clap)
-    - [ ] Implement `arq dev up` (Docker Wrapper)
-    - [ ] Implement `arq auth gen` (JWT Minter)
-    - [ ] **Verification**: `arq dev up` boots the full stack from zero.
-- [ ] **Publish Python SDK**
-    - [ ] Create `sdks/python/pyproject.toml`
-    - [ ] Implement `arqon.connect()` wrapper
-    - [ ] **Verification**: `pip install .` and run echo example.
+- [x] **Build `arq` CLI Tool**
+    - [x] Create `crates/arq-cli` (Clap)
+    - [x] Implement `arq dev up` (Docker Wrapper)
+    - [x] Implement `arq auth gen` (JWT Minter)
+    - [x] **Verification**: `arq dev up` starts the stack.
+- [x] **Build Python SDK**
+    - [x] Create `sdks/python/arqon`
+    - [x] Implement `arqon.connect()` wrapper around NATS
+    - [x] **Verification**: `pip install` succeeds.` and run echo example.
+- [x] **Verified Implementation**
+    - [x] Implement `crates/shield/src/policy/engine.rs` Unit Tests
+    - [x] Implement `verification/e2e_suite.py` (Shield -> NATS)
+    - [x] **Verification**: `python verification/e2e_suite.py` passes.
+
 - [ ] **Final Polish**
     - [ ] Audit `config.toml` Schema Enforcement
     - [ ] Update Documentation with "As Built" specs

@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "shield",
-    "proto",
-    "voltron-core",
-    "arq-cli"
+    "crates/shield",
+    "crates/proto",
+    "crates/voltron-core",
+    "crates/arq-cli"
 ]
 
 [workspace.package]
