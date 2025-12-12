@@ -1,12 +1,13 @@
+mod handlers;
+mod router;
+mod policy;
+
 use axum::{routing::get, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::info;
 use crate::router::nats_bridge::NatsBridge;
 use crate::handlers::socket::ws_handler;
-
-mod handlers;
-mod policy;
 use crate::policy::engine::PolicyEngine;
 
 #[derive(Clone)]
