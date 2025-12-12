@@ -1,0 +1,60 @@
+name: Rust CI
+
+on:
+  push:
+    branches: ["main", "003-core-spine"]
+    paths:
+      - "crates/**"
+      - ".github/workflows/ci-rust.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "crates/**"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        toolchain: [stable]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: clippy, rustfmt
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Cargo Grid
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+        working-directory: crates
+
+      - name: Lint with Clippy
+        run: cargo clippy --all-features -- -D warnings
+        working-directory: crates
+
+      - name: Run Tests
+        run: cargo test --all-features
+        working-directory: crates

@@ -1,3 +1,35 @@
-fn main() {
-    println!("Hello, world!");
+use axum::{routing::get, Router};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tracing::info;
+use crate::router::nats_bridge::NatsBridge;
+use crate::handlers::socket::ws_handler;
+
+mod handlers;
+mod router;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // 1. Init Telemetry
+    tracing_subscriber::fmt::init();
+    info!("Shield Reactor booting...");
+
+    // 2. Connect to NATS
+    let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".to_string());
+    let nats_bridge = NatsBridge::connect(&nats_url).await?;
+    info!("Connected to NATS Spine at {}", nats_url);
+
+    // 3. Build Router
+    let app = Router::new()
+        .route("/ws", get(ws_handler))
+        .with_state(Arc::new(nats_bridge));
+
+    // 4. Bind Server
+    let addr = SocketAddr::from(([0, 0, 0, 0], 4000));
+    info!("Shield listening on {}", addr);
+    
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
+
+    Ok(())
 }

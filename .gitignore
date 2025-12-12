@@ -13,6 +13,7 @@ simulation_results/
 string_data/
 benchmark_outputs/
 node_modules/
+crates/
 
 *.json
 *.jsonl

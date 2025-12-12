@@ -6,17 +6,17 @@
 ## Phase 1: The Factory (CI/CD & Polyglot Scaffolding)
 *The Foundation Phase. Nothing exists until the Factory can build it.*
 
-- [/] **Initialize Polyglot Workspace**
+- [x] **Initialize Polyglot Workspace**
     - [ ] Create `crates/Cargo.toml` (Workspace Root)
     - [ ] Create `lib/brain/mix.exs` (Elixir App)
     - [ ] Create `deploy/docker-compose.yml` (NATS, Valkey, Jaeger, Grafana)
     - [ ] **Verification**: `docker compose up` starts all infra services.
-- [ ] **Setup GitHub Actions (The Assembly Line)**
+- [x] **Setup GitHub Actions (The Assembly Line)**
     - [ ] Create `.github/workflows/ci-rust.yml` (Matrix: Lin/Win/Mac)
     - [ ] Create `.github/workflows/ci-elixir.yml` (OTP 26)
     - [ ] Create `.github/workflows/docker-publish.yml` (GHCR Multi-Arch)
     - [ ] **Verification**: Push to branch triggers green CI matrix.
-- [ ] **Define Protocol Contracts**
+- [x] **Define Protocol Contracts**
     - [ ] Create `crates/proto/src/envelope.proto` (The V1 Schema)
     - [ ] Add `prost-build` to `crates/proto/build.rs`
     - [ ] **Verification**: `cargo build -p proto` generates Rust structs.
@@ -24,7 +24,7 @@
 ## Phase 2: The Core (Shield & Spine)
 *The Nervous System. Establishing connectivity.*
 
-- [ ] **Implement The Shield Reactor (Rust)**
+- [/] **Implement The Shield Reactor (Rust)**
     - [ ] Scaffold `crates/shield` (Axum/Tokio)
     - [ ] Implement `ConnectionActor` (WebSocket State Machine)
     - [ ] Implement Zero-Copy NATS Bridge (`async-nats`)

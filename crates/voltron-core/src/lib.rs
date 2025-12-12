@@ -1,14 +1,20 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub mod config {
+    use serde::Deserialize;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    #[derive(Debug, Deserialize, Clone)]
+    pub struct ServerConfig {
+        pub host: String,
+        pub port: u16,
+    }
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    #[derive(Debug, Deserialize, Clone)]
+    pub struct NatsConfig {
+        pub url: String,
+    }
+
+    #[derive(Debug, Deserialize, Clone)]
+    pub struct AppConfig {
+        pub server: ServerConfig,
+        pub nats: NatsConfig,
     }
 }

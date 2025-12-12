@@ -1,8 +1,23 @@
 [package]
 name = "shield"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
+version = "0.1.0"
+edition = "2021"
 
 [dependencies]
+tokio = { version = "1.35", features = ["full"] }
+axum = { version = "0.7", features = ["ws"] }
+async-nats = "0.33"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bytes = "1.5"
+anyhow = "1.0"
+thiserror = "1.0"
+headers = "0.4"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+
+# Internal
+proto = { path = "../proto" }
+voltron-core = { path = "../voltron-core" }
