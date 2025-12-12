@@ -4,7 +4,8 @@ members = [
     "crates/shield",
     "crates/proto",
     "crates/voltron-core",
-    "crates/arq-cli"
+    "crates/arq-cli",
+    "crates/operators"
 ]
 
 [workspace.package]

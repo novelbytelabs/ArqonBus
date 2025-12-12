@@ -11,6 +11,39 @@ If a decision conflicts with this constitution, **the decision is wrong**.
 
 ---
 
+# 0. The Integrity Imperative (Meta-Constitution)
+
+**"Amateurs practice until they get it right. Professionals practice until they can’t get it wrong."**
+
+This section overrides all others. It defines the difference between "Coding" and "Systems Engineering." Violations of this section are not bugs; they are ethical failures.
+
+## 0.1 The "Definition of Done" (The 4-Pillar Standard)
+A task is **NEVER** "Done" until all four pillars are standing:
+1.  **Implementation**: The code exists, compiles, and handles edge cases (not just the happy path).
+2.  **Verification**: Automated tests prove it works under *realistic* conditions (see 0.2).
+3.  **Documentation**: The architecture, usage, and operational caveats are documented in `docs/` or `README.md`. Code without Docs is "Undone".
+4.  **Evidence**: The engineer has provided distinct proof of function (Logs, Screenshots, Profiles).
+
+**Rule**: Checking a box without satisfying all 4 pillars is a lie.
+
+## 0.2 Data Integrity & The Ban on "Lazy Synthetics"
+Testing on trivial, biased, or synthetic data (`foo`, `bar`, `user_1`) is a constitution violation.
+*   **Realism Mandate**: Tests must use data that mirrors production complexity (e.g., valid UUIDs, realistic JSON payloads, adversarial inputs, large blobs).
+*   **Fuzzing Mandate**: Inputs must be fuzzed or varied. Hardcoded "Golden Paths" hide race conditions and parsing errors.
+*   **No "Happy Path" Testing**: Tests must assert behavior under Failure (Network partition, Auth failure, Malformed data).
+
+## 0.3 The "Placeholder" Prohibition
+*   **Zero Stubs**: Writing `todo!()` or `pass` in a function body and marking the Feature as "Complete" is fraud.
+*   **Zero Magic Defaults**: Configuration must never default to `localhost` or insecure settings without an explicit "Dev Mode" warning.
+*   **Zero "Later"**: Requirements (e.g., Listen on Port 80) must be implemented *now*, not deferred to a "hardening phase" that never comes.
+
+## 0.4 The Professional Standard
+*   **Warnings are Errors**: Code with compiler warnings or linter errors is not mergable.
+*   **Error Handling**: "Swallowing" errors (`_ => ()`) is forbidden. Every error must be logged, handled, or bubbled.
+*   **Complexity Justification**: Complexity without explanation is rejected. If it's hard to read, it's wrong.
+
+---
+
 # I. Vision and Scope
 
 ## 1. The Vision
