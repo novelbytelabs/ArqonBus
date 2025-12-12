@@ -19,6 +19,13 @@ headers = "0.4"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 flate2 = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+jsonwebtoken = "9.0"
+base64 = "0.22"
+chrono = "0.4"
+metrics = "0.21"
+metrics-exporter-prometheus = "0.12"
+prost-reflect = "0.12"
 
 # Internal
 proto = { path = "../proto" }
