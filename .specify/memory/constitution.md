@@ -23,6 +23,207 @@ If a decision conflicts with this constitution, **the decision is wrong**.
 
 ---
 
+# ULTIMATE INTEGRITY COVENANT
+
+This constitution is a **hard constraint** on all engineering work. It exists to prevent the failure modes that destroy real systems:
+
+- “Happy path” engineering that collapses under real inputs
+- Pseudocode / placeholders / stubs presented as completion
+- Tests that “check boxes” but don’t model production reality
+- Fake evidence (invented logs, benchmarks, screenshots, coverage, results)
+- Unnamed technical debt that silently becomes permanent
+- Silent failure handling and silent security degradation
+- Undocumented complexity and unreadable “clever” code
+- Non-reproducible builds, non-deterministic behavior, and flaky verification
+- Work products that are narrative-only, vague, or unverifiable
+
+If a decision conflicts with this covenant, **the decision is wrong**.
+
+---
+
+### A. The Only Acceptable Meaning of “DONE” (The 8-Pillar Standard)
+
+A change is **NOT DONE** until all eight pillars are true:
+
+1. Implementation  
+   - Real code exists (not pseudocode). It compiles, runs, and handles edge cases.  
+   - Invalid states are rejected; invariants are enforced.  
+   - Failure behavior is explicit: timeouts, retries, backpressure, cancellation, and partial failures are defined.
+
+2. Verification  
+   - Automated tests cover normal + failure + adversarial + concurrency/ordering behavior.  
+   - Tests model production complexity, not toy inputs.  
+   - Where appropriate: property-based tests, fuzzing, chaos/fault injection, and regression tests exist.
+
+3. Documentation  
+   - In-repo docs explain: architecture, usage, invariants, data contracts, and “what can go wrong.”  
+   - Operational caveats are explicit: limits, failure modes, rollback strategy, and safety constraints.  
+   - Every public behavior change updates docs and/or changelog.
+
+4. Evidence  
+   - Reproducible proof exists (CI artifacts, logs, traces, coverage reports, benchmarks).  
+   - Evidence is not implied; it is attached or linkable to a specific commit/run.  
+   - If there is no evidence, the claim is false.
+
+5. Traceability  
+   - Each requirement / acceptance criterion maps to:
+     - code locations,
+     - test locations,
+     - documentation locations,
+     - evidence artifacts.
+   - No orphan requirements. No orphan code. No untested requirements.
+
+6. Operational Readiness  
+   - Safe defaults, explicit configuration validation, and clear failure signals exist.  
+   - Observability exists: structured logs + metrics + tracing (or an equivalent breadcrumb system).  
+   - Rollout/rollback exists where relevant; migrations are reversible or explicitly irreversible.
+
+7. Security & Safety Readiness  
+   - Threat assumptions are stated. Privilege boundaries are validated.  
+   - Secrets are not logged; sensitive data is redacted.  
+   - Fail-closed behavior is defined for safety/security modules (no silent “allow”).
+
+8. Task Completeness  
+   - Work is decomposed into a concrete task list (not vague bullets).  
+   - Each task includes acceptance criteria, a test hook, and an evidence hook.  
+   - If a task is not done, the work is not done.
+
+Rule: Declaring “done” without satisfying every pillar is deception.
+
+---
+
+### B. The Anti-Half-Ass Rules (Merge-Blocking by Definition)
+
+#### B1. No Pseudocode-as-Deliverable
+- Pseudocode may exist only as clearly labeled design notes.  
+- Pseudocode cannot be the “solution,” cannot substitute for tests, and cannot be used to claim completion.
+
+#### B2. No Placeholders / No Stubs / No “Later”
+Forbidden in production paths:
+- `TODO`, `FIXME`, `pass`, `todo!()`, empty handlers, commented-out behavior, “mock later,” “hardening later,” “edge cases later.”
+If incomplete behavior must exist temporarily, it must:
+- be feature-flagged OFF by default,
+- be isolated so it cannot affect production behavior,
+- have a `TD-###` record with TTL (see Debt Policy).
+
+#### B3. No Fake Data, No Toy Inputs, No Lazy Synthetics
+- Tests and examples must use production-like complexity: realistic IDs, nested payloads, boundary sizes, malformed variants, weird unicode/whitespace, and adversarial inputs.
+- Ban list (unless the test is explicitly about these literals): `foo`, `bar`, `user_1`, `test123`, “hello world.”
+
+#### B4. No Happy Path Testing
+For any externally coupled feature (network, storage, auth, scheduler, filesystem, dependencies), tests must cover:
+- timeouts, retries, partial failures, malformed responses, permission failures, cancellation, overload/backpressure, and out-of-order/duplicate events where relevant.
+
+#### B5. No Silent Failures
+- Swallowing errors is forbidden. Every error must be handled, logged with context, or propagated.
+- “Fallback to success” behavior without explicit documentation and tests is forbidden.
+
+#### B6. Warnings Are Errors
+- Compiler, linter, formatter, typechecker warnings block merge. “It builds on my machine” is irrelevant.
+
+#### B7. No Unbounded Risk
+- Unbounded queues, unbounded memory growth, unbounded metric cardinality, unbounded retries, and unbounded timeouts are forbidden.
+- If something can grow, it must have a cap. If it can retry, it must have a budget. If it can wait, it must have a timeout.
+
+---
+
+### C. Technical Debt Policy (Zero Debt Unless Named + Owned + Expiring)
+
+Technical debt is **forbidden by default**. If debt must exist, it must be explicit, bounded, and temporary.
+
+Debt is valid only if it is recorded as `TD-###` and includes:
+- owner,
+- scope and blast radius,
+- why it exists,
+- the exact exit criteria (“debt is removed when…”),
+- remediation plan,
+- hard TTL date,
+- tests guarding the boundary so the debt cannot silently expand.
+
+Rules:
+- Debt without TTL is invalid.
+- Debt past TTL blocks merge/release.
+- “We’ll fix later” is not a plan.
+- “Temporary” code paths must have an explicit sunset mechanism.
+
+---
+
+### D. SDD + TDD Contract (Professional Standard)
+
+#### D1. Specification-Driven Design Requirements (for non-trivial changes)
+A valid spec includes:
+- intent and non-goals,
+- acceptance criteria (falsifiable),
+- invariants (must-always-be-true),
+- failure modes and expected behavior under each,
+- compatibility rules (protocol/API/schema expectations),
+- performance envelope and resource bounds (when relevant),
+- security/privacy assumptions and constraints,
+- operational concerns (observability, rollout/rollback, migration notes).
+
+If the spec is ambiguous, the first task is to remove ambiguity by producing falsifiable criteria.
+
+#### D2. Test-Driven Development Requirements
+- Tests define behavior before/with implementation (TDD by default).
+- Refactors require existing tests protecting behavior.
+- Every bug fix includes a regression test that fails pre-fix and passes post-fix.
+- Flaky tests are critical bugs; they must be fixed, not ignored.
+
+---
+
+### E. Verification Constitution (Realism + Adversarial + Failure-First)
+
+Required test categories (as applicable):
+- unit tests for pure logic (fast, no external deps),
+- integration tests for boundaries and real dependency interactions,
+- property-based tests for parsers/validators/protocol/config boundaries,
+- fuzz tests for user-controlled input surfaces,
+- concurrency/ordering tests for races, duplicates, replays, idempotency,
+- chaos/fault injection for externally coupled behaviors,
+- performance regression checks for hot paths or stated latency budgets.
+
+Verification must explicitly test:
+- malformed inputs,
+- partial reads/writes,
+- timeout handling,
+- retry policy and idempotency guarantees,
+- auth failures and permission boundaries,
+- overload/backpressure behavior,
+- deterministic ordering assumptions (or explicit non-guarantees).
+
+---
+
+### F. The Claim Ledger (Mandatory Honesty)
+
+Any claim like “works,” “done,” “fixed,” “secure,” “fast,” “compatible,” “production-ready” must be labeled:
+
+- Observed: executed + evidence attached
+- Derived: reasoned + assumptions listed + risks stated
+- Unverified: not tested + the exact minimal experiment provided
+
+Presenting Derived/Unverified claims as Observed is lying.
+
+---
+
+### G. Minimum Acceptable Deliverable (Non-Negotiable Output Shape)
+
+Any non-trivial work product must include all of:
+- a concrete task list with acceptance criteria per task,
+- a file-level plan (what files change/add/remove),
+- implementation code,
+- tests (including failure/adversarial coverage where relevant),
+- documentation updates,
+- an Evidence Pack (defined in the footer).
+
+If any part is incomplete, it must be explicitly labeled Unverified and paired with the shortest experiment that would verify it.
+
+### H. Default Principles
+
+If a situation, decision, or design choice is not explicitly covered by this Constitution, the default principle is to:
+- **Adopt the most stringent, resilient, and transparent posture.**
+- **Enforce the primacy of operational integrity, unambiguous intent, and disciplined scaling.**
+- **Treat unresolved ambiguity as a Constitutional void, demanding immediate and formal amendment.**
+
 # I. Vision and Scope
 
 ## 1. The Vision
@@ -936,6 +1137,120 @@ Teams may choose functionally equivalent alternatives, but **must preserve the g
 * **Error Localization:** OpenTelemetry + Jaeger traces as the primary source of truth for error flows.
 * **Rate Monitoring:** Prometheus error-rate metrics (per-tenant, per-endpoint, per-operator).
 * **Context:** ELK stack as the canonical store for log context around incidents. No separate error SaaS (e.g., Sentry) is required if OTel + Jaeger + Prometheus + ELK are correctly wired.
+
+---
+
+# XIV. ULTIMATE INTEGRITY ATTESTATION & EVIDENCE PACK
+
+This section is the **merge/ship gate**. It exists so “done” is not a feeling—it is a reproducible fact.
+
+---
+
+### 1) Merge/Ship Attestation (Required)
+
+By merging or shipping, the author(s) and reviewer(s) attest:
+
+- No placeholders exist in production paths (no TODOs, stubs, pseudocode-as-work, “later hardening”).
+- No fake evidence is presented (no invented logs, benchmarks, screenshots, coverage, or results).
+- No happy-path-only verification exists for critical behaviors.
+- No silent failure handling exists; errors are handled/logged/propagated with context.
+- Warnings were treated as errors (clean lint/typecheck/compile).
+- Any technical debt is recorded as `TD-###` with owner + TTL + exit criteria and is bounded by tests.
+- All claims are labeled Observed/Derived/Unverified, and Observed claims have attached evidence.
+
+If you cannot honestly attest to every item above, you must not merge/ship.
+
+---
+
+### 2) Evidence Pack (Attach or Link; Required)
+
+A change is invalid without a reproducible Evidence Pack. The Evidence Pack must be tied to a specific commit and must be reproducible by another engineer.
+
+#### 2.1 Build Proof
+- CI run or local output showing:
+  - clean build,
+  - clean lint/typecheck/format,
+  - warnings treated as errors.
+
+#### 2.2 Test Proof
+- Results for:
+  - unit tests,
+  - integration tests (where applicable),
+  - property/fuzz tests (where required by input boundaries),
+  - concurrency/ordering tests (where applicable).
+- A short note listing what is not covered and why (explicitly, not implicitly).
+
+#### 2.3 Failure Matrix Proof (Where the bad paths live)
+For each externally coupled feature, list:
+- failure scenarios tested (timeouts, retries, malformed responses, auth failures, overload/backpressure, partial failures),
+- test file(s) and test names (or equivalent pointers).
+
+#### 2.4 Traceability Proof (Truth Table)
+Provide a “truth table” mapping:
+- requirement / acceptance criteria → implementation location(s) → test location(s) → documentation location(s) → evidence artifact(s).
+
+Rule: If a requirement has no test, it is untested. If a test has no requirement, it is suspicious.
+
+#### 2.5 Runtime Proof (When Applicable)
+- example run logs demonstrating:
+  - normal behavior,
+  - at least one failure mode behaving correctly.
+- proof that observability works:
+  - correlation IDs exist,
+  - metrics/traces exist (or equivalent breadcrumbs).
+
+#### 2.6 Performance / Resource Proof (When Relevant)
+- baseline numbers + method + environment,
+- a regression guard (benchmark test, threshold check, or documented budget),
+- proof of bounded behavior (caps, backpressure, shedding policy).
+
+#### 2.7 Reproduction Commands
+- one-command verification (examples):
+  - `make test`, `just test`, `npm test`, `cargo test`, etc.
+- environment notes:
+  - pinned toolchains/dependencies,
+  - any required services (compose, containers),
+  - seed control for deterministic tests.
+
+---
+
+### 3) Debt Register Enforcement (TD-###)
+
+If any `TD-###` exists in the change:
+- TTL date and owner are mandatory.
+- The debt boundary must be protected by tests so it cannot silently expand.
+- The exit criteria must be concrete (“remove X path,” “delete Y flag,” “replace Z dependency,” etc.).
+- Debt past TTL is a release/merge blocker.
+
+---
+
+### 4) Professional Review Checklist (Hard Questions Only)
+
+Review must answer “yes” with evidence:
+
+- Does this handle failure modes explicitly (not “assumed”)?
+- Are tests realistic, adversarial, and non-trivial (no lazy synthetics)?
+- Are there concurrency/ordering hazards, and are they tested or explicitly ruled out?
+- Is behavior observable in production (logs/metrics/traces/breadcrumbs)?
+- Are resource bounds explicit (timeouts, caps, retry budgets, queue bounds)?
+- Is the code readable under pressure (3 AM outage standard)?
+- Is documentation updated to match behavior and constraints?
+- Can another engineer reproduce the Evidence Pack from scratch?
+
+If any answer is “no,” the change is not complete.
+
+---
+
+### 5) Claim Ledger Summary (Required When Stating Status)
+
+If a deliverable claims completion or correctness, it must include:
+
+- Observed claims: link evidence
+- Derived claims: list assumptions + risks + how to verify
+- Unverified claims: list the minimal experiment to verify
+
+Rule: If it cannot be reproduced from the Evidence Pack, it is not true.  
+Rule: If it is not true, it is not done.
 
 ---
 
