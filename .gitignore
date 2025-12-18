@@ -14,6 +14,10 @@ string_data/
 benchmark_outputs/
 node_modules/
 
+# Rust / Cargo build artifacts
+target/
+**/target/
+
 *.json
 *.jsonl
 *.json.gz

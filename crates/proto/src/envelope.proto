@@ -1,0 +1,43 @@
+syntax = "proto3";
+package arqon.v1;
+
+message Envelope {
+  // Routing Headers (Unencrypted, Mutable by Router)
+  string trace_id = 1;      // W3C Trace Context
+  string tenant_id = 2;     // Extracted from JWT
+  string room_id = 3;       // Target Room
+  int64 timestamp = 4;      // Wall clock (ms)
+  string twist_id = 5;      // Time Travel ID (FR-007)
+  map<string, string> headers = 6; // Extension Headers
+
+
+  // Security Headers (Signed/Immutable)
+  bytes signature = 10;     // Ed25519 signature of payload
+
+  // The Payload (Opaque to Router)
+  oneof payload {
+    Command cmd = 20;
+    Event event = 21;
+    SystemSignal signal = 22; // Control plane (Disconnect, Ban)
+  }
+}
+
+message Command {
+    string type = 1;
+    bytes data = 2;
+}
+
+message Event {
+    string type = 1;
+    bytes data = 2;
+}
+
+message SystemSignal {
+    enum SignalType {
+        UNKNOWN = 0;
+        DISCONNECT = 1;
+        BAN = 2;
+    }
+    SignalType type = 1;
+    string reason = 2;
+}
