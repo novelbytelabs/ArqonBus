@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package arqon;
+
+// The core unit of truth
+message Triplet {
+    string subject = 1;
+    string predicate = 2; // e.g., "IS_EQUIVALENT_TO", "IS_NOT_EQUIVALENT_TO"
+    string object = 3;
+    float confidence = 4;
+}
+
+// Result of a truth verification
+enum HolonomyVerdict {
+    CONSISTENT = 0;
+    CONTRADICTION = 1;
+    NULL_HYPOTHESIS = 2;
+    TYPE_ERROR = 3;
+}
+
+// A single assertion or query
+message Assertion {
+    string text = 1;
+    repeated Triplet triplets = 2;
+}
+
+message ConsultationRequest {
+    string text = 1;
+}
+
+message ConsultationResponse {
+    HolonomyVerdict verdict = 1;
+    repeated Triplet involved_triplets = 2;
+    string explanation = 3;
+}
+
+// The entire state of the truth graph
+message TruthGraph {
+    message Node {
+        string id = 1;
+        string name = 2;
+        string type = 3;
+    }
+    message Edge {
+        string source = 1;
+        string target = 2;
+        int32 parity = 3; // 0 for equivalent, 1 for opposite
+    }
+    repeated Node nodes = 1;
+    repeated Edge edges = 2;
+    int32 version = 3;
+}
+
+// Ingestion of a file or directory
+message IngestionRequest {
+    string path = 1;
+    repeated string include_patterns = 2;
+    repeated string exclude_patterns = 3;
+}
+
+message IngestionStatus {
+    string current_file = 1;
+    int32 processed_files = 2;
+    int32 total_files = 3;
+    int32 fact_count = 4;
+    bool completed = 5;
+}

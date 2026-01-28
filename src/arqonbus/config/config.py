@@ -131,6 +131,9 @@ class ArqonBusConfig:
     security: SecurityConfig = field(default_factory=SecurityConfig)
     casil: CASILConfig = field(default_factory=CASILConfig)
     
+    # Feature Flags
+    holonomy_enabled: bool = False
+    
     # Environment-specific overrides
     environment: str = "development"
     debug: bool = False
@@ -204,6 +207,9 @@ class ArqonBusConfig:
         config.casil.metadata.to_logs = os.getenv("ARQONBUS_CASIL_METADATA_TO_LOGS", str(config.casil.metadata.to_logs)).lower() == "true"
         config.casil.metadata.to_telemetry = os.getenv("ARQONBUS_CASIL_METADATA_TO_TELEMETRY", str(config.casil.metadata.to_telemetry)).lower() == "true"
         config.casil.metadata.to_envelope = os.getenv("ARQONBUS_CASIL_METADATA_TO_ENVELOPE", str(config.casil.metadata.to_envelope)).lower() == "true"
+        
+        # Feature Flags
+        config.holonomy_enabled = os.getenv("ARQONBUS_HOLONOMY_ENABLED", "false").lower() == "true"
         
         # Global configuration
         config.environment = os.getenv("ARQONBUS_ENVIRONMENT", config.environment)

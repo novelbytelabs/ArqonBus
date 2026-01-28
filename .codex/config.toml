@@ -1,2 +1,14 @@
-model = "gpt-5.1-codex-max"
-model_reasoning_effort = "high"
+model = "gpt-5.2-codex"
+model_reasoning_effort = "medium"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonHPO"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonReflex"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonAnchor"]
+trust_level = "trusted"
+
+[notice.model_migrations]
+"gpt-5.2" = "gpt-5.2-codex"
