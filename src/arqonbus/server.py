@@ -96,9 +96,35 @@ def check_verdict(req: VerdictRequest):
 
 @app.post("/ingest")
 async def start_ingestion(request: IngestRequest, background_tasks: BackgroundTasks):
-    """Start recursive ingestion from a path."""
+    """Start recursive ingestion from a path in the background."""
+    # We use background_tasks to prevent blocking the FastAPI event loop
     background_tasks.add_task(scanner.scan_path, request.path, request.includes)
     return {"status": "INGESTION_STARTED", "path": request.path}
+
+@app.get("/ingest/browse")
+async def browse_files(path: str = "/"):
+    """Browse server-side directories for ingestion."""
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Path not found")
+    
+    try:
+        items = []
+        for item in os.listdir(path):
+            full_path = os.path.join(path, item)
+            is_dir = os.path.isdir(full_path)
+            items.append({
+                "name": item,
+                "path": full_path,
+                "type": "directory" if is_dir else "file",
+                "size": os.path.getsize(full_path) if not is_dir else 0
+            })
+        return {
+            "current_path": os.path.abspath(path),
+            "parent_path": os.path.dirname(os.path.abspath(path)),
+            "items": sorted(items, key=lambda x: (x["type"] != "directory", x["name"].lower()))
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/ingest/status")
 async def get_ingestion_status():
@@ -126,6 +152,18 @@ async def verify_claim(u: str, v: str):
         "status": "SUCCESS",
         "resolution": resolution
     }
+
+@app.post("/reset")
+async def reset_graph():
+    """
+    Hard Reset: Wipes all graph datastructures, registry, and persisted state.
+    """
+    engine.reset()
+    scanner.processed_files = 0
+    scanner.total_files = 0
+    scanner.facts_found = 0
+    scanner.completed = False
+    return {"status": "RESET_COMPLETE", "message": "The slate is clean."}
 
 if __name__ == "__main__":
     import uvicorn

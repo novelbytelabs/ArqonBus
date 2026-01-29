@@ -18,7 +18,10 @@ class ScannerEngine:
         self.processed_files = 0
         self.facts_found = 0
         self.current_file = ""
-        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.root_path = ""
+        self.includes = []
+        import threading
+        self.lock = threading.Lock()
 
     def scan_path(self, root_path: str, includes: List[str] = None):
         """Recursively scan a path and ingest truth."""

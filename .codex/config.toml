@@ -10,5 +10,11 @@ trust_level = "trusted"
 [projects."/home/irbsurfer/Projects/arqon/ArqonAnchor"]
 trust_level = "trusted"
 
+[projects."/home/irbsurfer/Projects/arqon/ArqonStudio"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon"]
+trust_level = "trusted"
+
 [notice.model_migrations]
 "gpt-5.2" = "gpt-5.2-codex"

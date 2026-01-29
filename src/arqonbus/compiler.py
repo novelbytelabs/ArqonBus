@@ -60,11 +60,11 @@ Output the corrected JSON.
 
 class RLMCompiler:
     def __init__(self, model: str = None, base_url: str = None, api_key: str = None):
-        # Configuration Priority: Arg > Env > Local Ollama Default
-        self.model = model or os.getenv("ARQON_LLM_MODEL") or "qwen2.5-coder:14b"
+        # Configuration Priority: Arg > Env > Local Chutes Default
+        self.model = model or os.getenv("ARQON_LLM_MODEL") or "MiniMaxAI/MiniMax-M2.1-TEE"
         
-        base_url = base_url or os.getenv("ARQON_LLM_BASE_URL") or "http://localhost:11434/v1"
-        api_key = api_key or os.getenv("ARQON_LLM_API_KEY") or "ollama"
+        base_url = base_url or os.getenv("ARQON_LLM_BASE_URL") or "https://llm.chutes.ai/v1"
+        api_key = api_key or os.getenv("ARQON_LLM_API_KEY") or os.getenv("CHUTES_API_KEY") or "ollama"
         
         logger.info(f"RLM Compiler Initialized: Model={self.model}, Base={base_url}")
         
@@ -215,7 +215,8 @@ class RLMCompiler:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.0,
+                temperature=0.1,
+                max_tokens=4096,
                 response_format={"type": "json_object"}
             )
             return completion.choices[0].message.content

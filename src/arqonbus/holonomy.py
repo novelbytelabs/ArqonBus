@@ -234,6 +234,20 @@ class TruthEngine:
         if not self.kernel:
             return (u, 0)
         return self.kernel.find(u)
+    
+    def reset(self):
+        """Hard reset the engine state."""
+        logger.warning("HARD RESET TRIGGERED: Clearing all topological state.")
+        self.entity_registry = {}
+        self.id_to_name = {}
+        self.next_entity_id = 1
+        self.assertions = []
+        self.kernel = arqon_sentinel.ParityDSU(DEFAULT_WORLD_SIZE)
+        if os.path.exists(self.state_path):
+            os.remove(self.state_path)
+            logger.info("Deleted persisted state file.")
+        logger.info("Engine state reset to 0.")
+        return True
 
     def resolve_entities_from_text(self, text: str) -> Dict[str, list[str]]:
         """
