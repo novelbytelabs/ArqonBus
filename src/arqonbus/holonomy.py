@@ -10,7 +10,7 @@ Architecture:
 import logging
 import json
 import os
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 from enum import Enum
 import arqon_sentinel
 from dataclasses import dataclass
@@ -36,13 +36,13 @@ class Triplet:
 class TruthEngine:
     _instance = None
 
-    def __new__(cls):
+    def __new__(cls) -> "TruthEngine":
         if cls._instance is None:
             cls._instance = super(TruthEngine, cls).__new__(cls)
             cls._instance.initialize()
         return cls._instance
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Initialize the Rust Kernel."""
         try:
             logger.info("Initializing Topological Truth Engine...")
@@ -57,13 +57,13 @@ class TruthEngine:
             self.assertions: List[Tuple[int, int, int]] = [] # Track all assertions for replay/persistence
             
             # The Rust Kernel (ParityDSU)
-            self.kernel = arqon_sentinel.ParityDSU(DEFAULT_WORLD_SIZE) # Initialize with default size
+            self.kernel: Optional[arqon_sentinel.ParityDSU] = arqon_sentinel.ParityDSU(DEFAULT_WORLD_SIZE) # Initialize with default size
             
             # Try to load Python state and replay assertions
             self._load_state()
 
             # The Ingest Gate (Regex/Heuristic) - Optional/Legacy
-            self.gate = arqon_sentinel.CriticGate(0.1, 1)
+            self.gate: Optional[arqon_sentinel.CriticGate] = arqon_sentinel.CriticGate(0.1, 1)
             
             logger.info("✅ Topological Truth Engine Online (Rust Native).")
         except Exception as e:
@@ -71,7 +71,7 @@ class TruthEngine:
             self.kernel = None
             self.gate = None
 
-    def _save_state(self):
+    def _save_state(self) -> bool:
         """Save the Python-side state (entities, assertions) to a JSON file."""
         if not self.kernel:
             logger.warning("Kernel not initialized, cannot save state.")
@@ -90,7 +90,7 @@ class TruthEngine:
             logger.error(f"❌ Failed to save Python state: {e}")
             return False
 
-    def _load_state(self):
+    def _load_state(self) -> None:
         """Load the Python-side state from a JSON file and replay assertions into the kernel."""
         if not os.path.exists(self.state_path):
             logger.info(f"No Python state file found at {self.state_path}. Starting fresh.")
@@ -105,10 +105,11 @@ class TruthEngine:
                 self.assertions = data.get("assertions", [])
                 
                 # Replay assertions into the DSU kernel
-                for u_id, v_id, parity in self.assertions:
-                    # Use the kernel's union method for replay, as it handles redundancy
-                    self.kernel.union(u_id, v_id, parity) 
-                logger.info(f"Loaded {len(self.assertions)} assertions from {self.state_path} and replayed into kernel.")
+                if self.kernel:
+                    for u_id, v_id, parity in self.assertions:
+                        # Use the kernel's union method for replay, as it handles redundancy
+                        self.kernel.union(u_id, v_id, parity) 
+                    logger.info(f"Loaded {len(self.assertions)} assertions from {self.state_path} and replayed into kernel.")
         except Exception as e:
             logger.error(f"❌ Failed to load Python state from {self.state_path}: {e}")
             # If loading fails, reset to a fresh state to avoid corrupted data
@@ -165,7 +166,7 @@ class TruthEngine:
             logger.error(f"Kernel Error during add_edge: {e}")
             return HolonomyVerdict.ERROR
 
-    def get_graph(self) -> Dict:
+    def get_graph(self) -> Dict[str, List[Dict[str, Any]]]:
         """Export graph for visualization."""
         nodes = [
             {"id": str(eid), "name": name, "val": 1} 
@@ -182,7 +183,7 @@ class TruthEngine:
         ]
         return {"nodes": nodes, "links": links}
 
-    def save_state(self, path: str = "truth_snapshot.json"):
+    def save_state(self, path: str = "truth_snapshot.json") -> bool:
         """Save the current Truth Topology to disk."""
         if self.kernel:
             try:
@@ -215,7 +216,10 @@ class TruthEngine:
             # Atomic Check-and-Insert
             # Rust `union` returns False if it contradicts known facts.
             # Returns True if it's new (integrated) or redundant (already true).
-            success = self.kernel.union(u, v, parity)
+            if self.kernel:
+                success = self.kernel.union(u, v, parity)
+            else:
+                return HolonomyVerdict.ERROR
             
             if success:
                 return HolonomyVerdict.CONSISTENT
@@ -235,7 +239,7 @@ class TruthEngine:
             return (u, 0)
         return self.kernel.find(u)
     
-    def reset(self):
+    def reset(self) -> bool:
         """Hard reset the engine state."""
         logger.warning("HARD RESET TRIGGERED: Clearing all topological state.")
         self.entity_registry = {}
@@ -271,7 +275,7 @@ class TruthEngine:
         rogues = []
         # Candidates: Any word starting with Capital, excluding common filler.
         stop_words = {"is", "are", "the", "and", "part", "of", "in", "by", "if", "asked", "question"}
-        potential_rogues = re.findall(rf"\b[A-Z][a-z]+\b", text)
+        potential_rogues = re.findall(r"\b[A-Z][a-z]+\b", text)
         
         for p in potential_rogues:
             p_lower = p.lower()

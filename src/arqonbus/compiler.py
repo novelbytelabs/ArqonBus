@@ -59,7 +59,7 @@ Output the corrected JSON.
 # --- COMPILER ---
 
 class RLMCompiler:
-    def __init__(self, model: str = None, base_url: str = None, api_key: str = None):
+    def __init__(self, model: str | None = None, base_url: str | None = None, api_key: str | None = None):
         # Configuration Priority: Arg > Env > Local Chutes Default
         self.model = model or os.getenv("ARQON_LLM_MODEL") or "MiniMaxAI/MiniMax-M2.1-TEE"
         
@@ -176,7 +176,7 @@ class RLMCompiler:
         target_v = entities[0] # Usually the longest/group term
         others = entities[1:]
         
-        all_results = []
+        all_results: list[dict[str, Any]] = []
         for u in others:
             res = engine.query_relationship(u, target_v)
             all_results.append({"u": u, "v": target_v, "res": res})
@@ -219,7 +219,8 @@ class RLMCompiler:
                 max_tokens=4096,
                 response_format={"type": "json_object"}
             )
-            return completion.choices[0].message.content
+            content = completion.choices[0].message.content
+            return content if content is not None else "{}"
         except Exception as e:
             logger.error(f"LLM Call Failed: {e}")
             return "{}"
@@ -228,6 +229,7 @@ class RLMCompiler:
         return json.loads(text)
 
 # Global Instance (Lazy/Safe)
+compiler: RLMCompiler | None = None
 try:
     compiler = RLMCompiler()
 except Exception:
