@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Set
 import uuid
 import time
+import os
 
 try:
     import websockets
@@ -161,6 +162,9 @@ class TelemetryServer:
             # Handle client messages (this may block waiting for messages)
             async for message in websocket:
                 try:
+                    if isinstance(message, (bytes, bytearray)):
+                        await self._handle_binary_message(websocket, bytes(message))
+                        continue
                     data = json.loads(message)
                     await self._handle_client_message(websocket, data)
                 except json.JSONDecodeError:
@@ -205,6 +209,10 @@ class TelemetryServer:
             logger.info(f"Telemetry client unsubscribed from events: {events}")
         else:
             logger.warning(f"Unknown telemetry message type: {message_type}")
+
+    async def _handle_binary_message(self, websocket, payload: bytes) -> None:
+        """Handle binary telemetry envelope and broadcast to other clients."""
+        await self.broadcast_envelope_bytes(payload, exclude=websocket)
     
     async def broadcast_event(self, event: Dict[str, Any]) -> str:
         """Broadcast telemetry event to connected clients.
@@ -247,10 +255,34 @@ class TelemetryServer:
         
         if self._telemetry_clients:
             return "broadcast_success"
+
         # Special-case legacy tests expecting success for client lifecycle events
         if event.get("event_type") == "client_connected":
             return "broadcast_success"
         return "buffered"
+
+    async def broadcast_envelope_bytes(self, envelope_bytes: bytes, exclude=None) -> str:
+        """Broadcast binary telemetry envelope to connected clients."""
+        async with self._client_lock:
+            clients = list(self._telemetry_clients)
+        if not clients:
+            return "no_clients"
+
+        had_error = False
+        sent_count = 0
+        for client in clients:
+            if exclude is not None and client is exclude:
+                continue
+            try:
+                await client.send(envelope_bytes)
+                sent_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to broadcast binary telemetry: {e}")
+                had_error = True
+
+        if had_error and sent_count == 0:
+            return "client_error"
+        return "broadcast_success"
     
     async def _flush_batch(self):
         """Flush buffered events to connected clients."""
@@ -411,3 +443,25 @@ class TelemetryServer:
             "metadata": metadata or {}
         }
         await self.broadcast_event(event)
+
+
+async def run_telemetry_server() -> None:
+    config = {
+        "telemetry_enabled": True,
+        "telemetry_host": os.environ.get("ARQONBUS_TELEMETRY_HOST", "localhost"),
+        "telemetry_port": int(os.environ.get("ARQONBUS_TELEMETRY_PORT", "8081")),
+        "telemetry_rooms": [os.environ.get("ARQONBUS_TELEMETRY_ROOM", "arqonbus.telemetry")],
+    }
+    server = TelemetryServer(config)
+    started = await server.start()
+    if not started:
+        return
+    try:
+        await asyncio.Event().wait()
+    except KeyboardInterrupt:
+        pass
+    await server.stop()
+
+
+if __name__ == "__main__":
+    asyncio.run(run_telemetry_server())

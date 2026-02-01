@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package arqon.ago.v1;
+
+import "google/protobuf/any.proto";
+
+message IdentityEnvelope {
+  fixed64 identity_hash = 1;
+  bytes signature = 2;
+  uint64 sequence_id = 3;
+  google.protobuf.Any payload = 4;
+}
+
+enum GatePhase {
+  GATE_PHASE_UNSPECIFIED = 0;
+  GATE_PHASE_START = 1;
+  GATE_PHASE_PROGRESS = 2;
+  GATE_PHASE_END = 3;
+  GATE_PHASE_ADAPT = 4;
+}
+
+enum GateStatus {
+  GATE_STATUS_UNSPECIFIED = 0;
+  GATE_STATUS_PROCESSING = 1;
+  GATE_STATUS_SIGNED = 2;
+  GATE_STATUS_ABSTAIN = 3;
+  GATE_STATUS_SKIPPED = 4;
+  GATE_STATUS_ERROR = 5;
+}
+
+message GateEvent {
+  string gate_id = 1; // "A".."D"
+  GatePhase phase = 2;
+  float coefficient = 3; // HPO gain (if applicable)
+  GateStatus status = 4;
+  float progress = 5; // 0..100
+  uint64 duration_ms = 6;
+  string reason = 7;
+  string request_id = 8;
+}
+
+message RetrievalEvent {
+  repeated string evidence_hashes = 1;
+  float max_score = 2;
+  uint32 latency_us = 3;
+  bool cached = 4;
+  string request_id = 5;
+}
+
+enum EntailmentVerdict {
+  ENTAILMENT_VERDICT_UNSPECIFIED = 0;
+  ENTAILMENT_PASS = 1;
+  ENTAILMENT_FAIL = 2;
+}
+
+message EntailmentEvent {
+  string claim_id = 1;
+  EntailmentVerdict verdict = 2;
+  float score = 3;
+  string contradiction_with_id = 4;
+  string request_id = 5;
+}
+
+message IdentityEvent {
+  fixed64 constitution_hash = 1;
+  fixed64 ledger_hash = 2;
+  fixed64 ctc_trace_id = 3;
+  string request_id = 4;
+}
+
+message MetabolicEvent {
+  string system_id = 1;
+  float stress_index = 2;
+  float reward_signal = 3;
+  map<string, float> parameters = 4;
+  string request_id = 5;
+}
+
+enum AlertSeverity {
+  ALERT_SEVERITY_UNSPECIFIED = 0;
+  ALERT_SEVERE = 1;
+  ALERT_WARN = 2;
+  ALERT_INFO = 3;
+}
+
+message AlertEvent {
+  AlertSeverity severity = 1;
+  string category = 2;
+  string message = 3;
+  repeated string related_ids = 4;
+  string request_id = 5;
+}
+
+message LoopEvent {
+  string from_system = 1;
+  string to_system = 2;
+  string payload_type = 3;
+  repeated string evidence_hashes = 4;
+  uint32 latency_us = 5;
+  fixed64 request_id = 6;
+}
+
+message QueryRequest {
+  string request_id = 1;
+  string query = 2;
+}
+
+message Evidence {
+  string citation = 1;
+  string source = 2;
+  string loc = 3;
+  float score = 4;
+  string text = 5;
+}
+
+message QueryResponse {
+  string request_id = 1;
+  string status = 2; // "SIGNED", "ABSTAIN", "ERROR"
+  string response = 3;
+  repeated string citations = 4;
+  repeated Evidence evidence = 5;
+  uint64 duration_ms = 6;
+  uint32 docs = 7;
+  uint32 chunks = 8;
+  uint64 last_ingest_ts = 9;
+  string model = 10;
+  float coverage = 11; // percent of sentences with citations (0..100)
+}
