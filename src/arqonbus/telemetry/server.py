@@ -76,7 +76,7 @@ class TelemetryServer:
         }
         
         # WebSocket connection management
-        self._max_connections = config.get("max_telemetry_connections", 100)
+        self._max_connections = config.get("max_telemetry_connections", 500)
         self._connection_timeout = config.get("connection_timeout", 30)
         # For test compatibility, assume running once constructed
         self.is_running = True
@@ -126,7 +126,7 @@ class TelemetryServer:
             self.is_running = False
             logger.info("Telemetry server stopped")
     
-    async def _handle_client_connection(self, websocket, path):
+    async def _handle_client_connection(self, websocket, path=None):
         """Handle new WebSocket client connection.
         
         Args:
