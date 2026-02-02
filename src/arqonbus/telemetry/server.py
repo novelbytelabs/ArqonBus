@@ -100,7 +100,8 @@ class TelemetryServer:
             self.server = await websockets.serve(
                 self._handle_client_connection,
                 self.host,
-                self.port
+                self.port,
+                origins=None  # Disable Origin check for development
             )
             
             self.is_running = True
