@@ -146,7 +146,7 @@ from arqonbus.config.config import ArqonBusConfig
 # Load configuration
 config = ArqonBusConfig.from_environment()
 
-# Create server
+# Create server (stable public entry point)
 server = ArqonBusServer(config)
 
 # Start server
