@@ -2,12 +2,79 @@
 import sys
 import os
 import logging
+import asyncio
 from typing import List, Optional
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Body, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+
+# ArqonBus runtime components
+from arqonbus.transport.websocket_bus import WebSocketBus
+from arqonbus.routing.router import RoutingCoordinator
+from arqonbus.storage.interface import MessageStorage, StorageRegistry
+
+class ArqonBusServer:
+    """Orchestrator for ArqonBus components (WebSocket, Routing, Storage)."""
+    def __init__(self, config_override: Optional[dict] = None):
+        from arqonbus.config.config import load_config
+        self.config = load_config()
+        if config_override:
+            if "server" in config_override and "port" in config_override["server"]:
+                self.config.server.port = config_override["server"]["port"]
+            if "websocket" in config_override and "port" in config_override["websocket"]:
+                self.config.websocket.port = config_override["websocket"]["port"]
+
+        self.routing_coordinator = None
+        self.ws_bus = None
+        self.storage = None
+        self.running = False
+
+    async def start(self):
+        self.routing_coordinator = RoutingCoordinator()
+        await self.routing_coordinator.initialize()
+
+        storage_backend = await StorageRegistry.create_backend(
+            self.config.storage.backend,
+            max_size=self.config.storage.max_history_size
+        )
+        self.storage = MessageStorage(storage_backend)
+        self.ws_bus = WebSocketBus(self.routing_coordinator.client_registry)
+        await self.ws_bus.start_server()
+        self.running = True
+
+    async def stop(self):
+        if self.ws_bus:
+            await self.ws_bus.stop_server()
+        if self.storage:
+            await self.storage.close()
+        if self.routing_coordinator:
+            await self.routing_coordinator.shutdown()
+        self.running = False
+
+    def is_running(self):
+        return self.running
+
+    @property
+    def telemetry_emitter(self):
+        # Shim for legacy tests
+        return self
+
+    def get_stats(self):
+        """Synchronous shim for tests that expect server.telemetry_emitter.get_stats()."""
+        if not self.ws_bus:
+            return {"stats": {"events_emitted": 0, "total_connections": 0}}
+        stats = self.ws_bus._stats
+        return {
+            "stats": {
+                "events_emitted": stats.get("events_emitted", stats.get("messages_processed", 0)),
+                "total_connections": stats.get("total_connections", 0),
+                "active_connections": stats.get("active_connections", 0),
+                "errors": stats.get("errors", 0),
+            }
+        }
 
 # Ensure src is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")

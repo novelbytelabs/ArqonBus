@@ -54,6 +54,7 @@ class WebSocketBus:
             "total_connections": 0,
             "active_connections": 0,
             "messages_processed": 0,
+            "events_emitted": 0,
             "errors": 0,
             "started_at": None,
             "last_activity": None
@@ -149,6 +150,8 @@ class WebSocketBus:
                 sender="arqonbus"
             )
             await websocket.send(welcome_msg.to_json())
+            # Track connection event for telemetry-style stats
+            self._stats["events_emitted"] += 1
             
             # Handle incoming messages
             async for message_str in websocket:
@@ -195,6 +198,11 @@ class WebSocketBus:
             await self.client_registry.update_client_activity(client_id)
             self._stats["last_activity"] = asyncio.get_event_loop().time()
 
+            # Count messages as soon as they're accepted for processing
+            self._stats["messages_processed"] += 1
+            if envelope.type == "command":
+                self._stats["events_emitted"] += 1
+
             # CASIL inspection (post-validation, pre-routing)
             if envelope.type in ("message", "command"):
                 context = {"client_id": client_id, "room": envelope.room, "channel": envelope.channel}
@@ -219,8 +227,6 @@ class WebSocketBus:
                 await handler(envelope, client_id)
             else:
                 logger.warning(f"Unknown message type: {envelope.type}")
-            
-            self._stats["messages_processed"] += 1
 
             # Minimal ack responses for legacy tests
             if envelope.type == "message":
@@ -290,7 +296,7 @@ class WebSocketBus:
         # TODO: Implement command processing (Phase 4)
         # For now, send a simple response
         response = Envelope(
-            type="response",
+            type="message",
             request_id=envelope.id,
             status="pending",
             payload={"message": "Command processing not yet implemented"},

@@ -87,6 +87,14 @@ class Envelope:
         if "timestamp" in data:
             data["timestamp"] = datetime.fromisoformat(data["timestamp"])
 
+        # Legacy command shape: command details nested under payload
+        if data.get("type") == "command" and "command" not in data:
+            payload = data.get("payload") or {}
+            if "command" in payload:
+                data["command"] = payload.get("command")
+            if "args" not in data and "parameters" in payload:
+                data["args"] = payload.get("parameters") or {}
+
         # Map legacy fields
         if "from_client" in data and "sender" not in data:
             data["sender"] = data.get("from_client")
