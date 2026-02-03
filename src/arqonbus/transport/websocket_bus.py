@@ -1,9 +1,8 @@
 """WebSocket server for ArqonBus real-time messaging."""
 import asyncio
 import logging
-from typing import Dict, Optional, Set, Callable
-import websockets
-from websockets.server import serve, WebSocketServerProtocol
+from typing import Dict, Optional, Set, Callable, Any
+from websockets import serve
 from websockets.exceptions import ConnectionClosed
 
 from ..protocol.envelope import Envelope
@@ -125,7 +124,7 @@ class WebSocketBus:
         
         logger.info("ArqonBus WebSocket server stopped")
     
-    async def _handle_connection(self, websocket: WebSocketServerProtocol, path: str):
+    async def _handle_connection(self, websocket: Any):
         """Handle new WebSocket connection.
         
         Args:
@@ -167,7 +166,7 @@ class WebSocketBus:
             if client_id:
                 await self._disconnect_client(client_id)
     
-    async def _handle_message_from_client(self, client_id: str, websocket: WebSocketServerProtocol, message_str: str):
+    async def _handle_message_from_client(self, client_id: str, websocket: Any, message_str: str):
         """Handle incoming message from client.
         
         Args:
