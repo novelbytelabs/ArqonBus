@@ -1,22 +1,40 @@
-model = "gpt-5.2-codex"
+model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
 
-[projects."/home/irbsurfer/Projects/arqon/ArqonHPO"]
-trust_level = "trusted"
-
-[projects."/home/irbsurfer/Projects/arqon/ArqonReflex"]
+[projects."/home/irbsurfer/Projects/arqon"]
 trust_level = "trusted"
 
 [projects."/home/irbsurfer/Projects/arqon/ArqonAnchor"]
 trust_level = "trusted"
 
-[projects."/home/irbsurfer/Projects/arqon/ArqonStudio"]
+[projects."/home/irbsurfer/Projects/arqon/Arqon"]
 trust_level = "trusted"
 
-[projects."/home/irbsurfer/Projects/arqon"]
+[projects."/home/irbsurfer/Projects/arqon/ArqonConstitutiveEngine"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonContinuum"]
 trust_level = "trusted"
 
 [projects."/home/irbsurfer/Projects/arqon/ArqonCore"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonCortex"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonHPO"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonMCP"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonReflex"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonSentinel"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonStudio"]
 trust_level = "trusted"
 
 [notice.model_migrations]
