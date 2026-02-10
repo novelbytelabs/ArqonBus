@@ -1,5 +1,5 @@
-model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
+model = "gpt-5.2-codex"
+model_reasoning_effort = "medium"
 
 [projects."/home/irbsurfer/Projects/arqon"]
 trust_level = "trusted"
@@ -39,3 +39,4 @@ trust_level = "trusted"
 
 [notice.model_migrations]
 "gpt-5.2" = "gpt-5.2-codex"
+"gpt-5.2-codex" = "gpt-5.3-codex"
