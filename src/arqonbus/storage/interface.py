@@ -1,6 +1,6 @@
 """Storage backend interface for ArqonBus."""
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Iterator
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass
 
@@ -117,6 +117,27 @@ class StorageBackend(ABC):
     async def close(self):
         """Close storage connection and cleanup resources."""
         pass
+
+    # Extended Consumer Group API (optional for some backends)
+    async def ensure_group(self, stream: str, group: str):
+        """Extended: Ensure a consumer group exists for a stream."""
+        raise NotImplementedError("Consumer groups not supported by this backend")
+
+    async def read_group(self, stream: str, group: str, consumer: str, count: int = 1, block_ms: int = 5000) -> List[Any]:
+        """Extended: Read messages from a consumer group."""
+        raise NotImplementedError("Consumer groups not supported by this backend")
+
+    async def ack(self, stream: str, group: str, *message_ids: str):
+        """Extended: Acknowledge messages in a consumer group."""
+        raise NotImplementedError("Consumer groups not supported by this backend")
+
+    async def pending(self, stream: str, group: str) -> List[Any]:
+        """Extended: Get pending messages in a consumer group."""
+        raise NotImplementedError("Consumer groups not supported by this backend")
+
+    async def claim(self, stream: str, group: str, consumer: str, min_idle_ms: int, *message_ids: str) -> List[Any]:
+        """Extended: Claim stale messages in a consumer group."""
+        raise NotImplementedError("Consumer groups not supported by this backend")
 
 
 class MessageStorage:
@@ -327,10 +348,40 @@ class MessageStorage:
             True if healthy, False otherwise
         """
         return await self.backend.health_check()
+
+    async def health_check(self) -> bool:
+        """Check if storage backend is healthy (alias)."""
+        return await self.backend.health_check()
+
+    async def connect(self):
+        """Connect storage backend if supported."""
+        if hasattr(self.backend, "connect"):
+            await self.backend.connect()
     
     async def close(self):
         """Close storage connection."""
         await self.backend.close()
+
+    # Consumer Group methods
+    async def ensure_group(self, stream: str, group: str):
+        """Ensure a consumer group exists."""
+        return await self.backend.ensure_group(stream, group)
+
+    async def read_group(self, stream: str, group: str, consumer: str, count: int = 1, block_ms: int = 5000):
+        """Read from a consumer group."""
+        return await self.backend.read_group(stream, group, consumer, count, block_ms)
+
+    async def ack(self, stream: str, group: str, *message_ids: str):
+        """Acknowledge messages."""
+        return await self.backend.ack(stream, group, *message_ids)
+
+    async def pending(self, stream: str, group: str):
+        """Get pending messages."""
+        return await self.backend.pending(stream, group)
+
+    async def claim(self, stream: str, group: str, consumer: str, min_idle_ms: int, *message_ids: str):
+        """Claim stale messages."""
+        return await self.backend.claim(stream, group, consumer, min_idle_ms, *message_ids)
 
 
 # Storage registry for different backends

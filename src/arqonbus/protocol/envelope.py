@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from .ids import generate_message_id
 
 
 @dataclass
@@ -13,7 +14,7 @@ class Envelope:
     """
     
     # Required fields - all messages must have these
-    id: str = field(default_factory=lambda: f"arq_{int(datetime.now().timestamp() * 1000000)}")
+    id: str = field(default_factory=generate_message_id)
     timestamp: datetime = field(default_factory=datetime.utcnow)
     type: str = ""  # message, command, response, error, telemetry
     version: str = "1.0"

@@ -27,14 +27,19 @@ class WebSocketBus:
     - Connection lifecycle management
     """
     
-    def __init__(self, client_registry: ClientRegistry):
+    def __init__(self, client_registry: ClientRegistry, routing_coordinator: Optional[Any] = None, storage: Optional[Any] = None, config: Optional[Any] = None):
         """Initialize WebSocket bus.
         
         Args:
             client_registry: Client registry for managing connections
+            routing_coordinator: Optional routing coordinator for operator management
+            storage: Optional MessageStorage backend
+            config: Optional configuration object
         """
         self.client_registry = client_registry
-        self.config = get_config()
+        self.routing_coordinator = routing_coordinator
+        self.storage = storage
+        self.config = config or get_config()
         self.server = None
         self.running = False
         self._server_task = None
@@ -45,8 +50,12 @@ class WebSocketBus:
             "message": self._handle_message,
             "command": self._handle_command,
             "response": self._handle_response,
-            "telemetry": self._handle_telemetry
+            "telemetry": self._handle_telemetry,
+            "operator.join": self._handle_operator_join
         }
+        
+        # Task delivery loops {client_id: asyncio.Task}
+        self._operator_tasks: Dict[str, asyncio.Task] = {}
         
         # Statistics
         self._stats = {
@@ -71,7 +80,7 @@ class WebSocketBus:
             return
         
         host = host or self.config.server.host
-        port = port or self.config.server.port
+        port = port or self.config.websocket.port
         
         logger.info(f"Starting ArqonBus WebSocket server on {host}:{port}")
         
@@ -90,6 +99,19 @@ class WebSocketBus:
                 reuse_port=True,
                 reuse_address=True
             )
+            
+            # Connect storage backend
+            if self.storage:
+                if hasattr(self.storage, "connect"):
+                    await self.storage.connect()
+
+                # Verify storage connection
+                if not await self.storage.health_check():
+                    logger.error("Storage health check failed. Server will not start.")
+                    await self.stop_server()
+                    raise RuntimeError("Storage health check failed")
+            else:
+                 logger.warning("Starting WebSocket server without storage backend.")
             
             self.running = True
             self._stats["started_at"] = asyncio.get_event_loop().time()
@@ -154,6 +176,7 @@ class WebSocketBus:
             
             # Handle incoming messages
             async for message_str in websocket:
+
                 await self._handle_message_from_client(client_id, websocket, message_str)
                 
         except ConnectionClosed:
@@ -292,20 +315,48 @@ class WebSocketBus:
             envelope: Command envelope
             client_id: Client who sent the command
         """
-        # TODO: Implement command processing (Phase 4)
-        # For now, send a simple response
+        if envelope.command == "truth.verify":
+            # Bridge to distributed task queue (Phase 2 completion)
+            if self.routing_coordinator and self.routing_coordinator.operator_registry:
+                storage = self.routing_coordinator.operator_registry.storage
+                if storage:
+                    # Enqueue to the truth group stream
+                    # Enqueue to the truth group stream or channel
+                    group = getattr(self.config.casil, "truth_worker_group", "truth_workers")
+                    stream = f"arqonbus:group:{group}"
+                    
+                    # Store data from args or payload
+                    job_data = envelope.args or envelope.payload
+                    
+                    # We use the generic storage.backend.redis_client if possible, 
+                    # or just use MessageStorage.store_message with a custom stream name
+                    # But store_message uses room/channel. We want a custom stream.
+                    if hasattr(storage.backend, "redis_client") and storage.backend.redis_client:
+                        # Serialize envelope to dict for stream
+                        # Actually we just want the payload/args for the worker
+                        await storage.backend.redis_client.xadd(stream, job_data, maxlen=10000)
+                        logger.info(f"Routed command {envelope.command} from {client_id} to stream {stream}")
+                        
+                        # Send ACK to client
+                        ack = Envelope(
+                            type="response",
+                            request_id=envelope.id,
+                            status="success",
+                            payload={"message": "Task enqueued"},
+                            sender="arqonbus"
+                        )
+                        await self.send_to_client(client_id, ack)
+                        return
+
+        # Fallback/Default implementation
         response = Envelope(
             type="message",
             request_id=envelope.id,
             status="pending",
-            payload={"message": "Command processing not yet implemented"},
+            payload={"message": f"Command {envelope.command} processing not fully implemented"},
             sender="arqonbus"
         )
-        
-        # Get client info to send response
-        client_info = await self.client_registry.get_client(client_id)
-        if client_info and client_info.websocket.open:
-            await client_info.websocket.send(response.to_json())
+        await self.send_to_client(client_id, response)
     
     async def _handle_response(self, envelope: Envelope, client_id: str):
         """Handle response messages.
@@ -326,7 +377,71 @@ class WebSocketBus:
         """
         # TODO: Implement telemetry processing (Phase 5)
         logger.debug(f"Received telemetry from {client_id}")
-    
+
+    async def _handle_operator_join(self, envelope: Envelope, client_id: str):
+        """Handle operator registration for a work group."""
+        if not self.routing_coordinator or not self.routing_coordinator.operator_registry:
+            logger.error("Operator registry not available")
+            return
+
+        group = envelope.payload.get("group")
+        if not group:
+            logger.warning(f"Operator {client_id} tried to join without group")
+            return
+        
+
+        await self.routing_coordinator.operator_registry.register_operator(client_id, group)
+        
+        # Start a dedicated push loop for this operator
+        task = asyncio.create_task(self._operator_push_loop(client_id, group))
+        self._operator_tasks[client_id] = task
+        
+        logger.info(f"Operator {client_id} registered for group {group}")
+
+    async def _operator_push_loop(self, client_id: str, group: str):
+        """Periodically poll Redis for new tasks and push to the operator via WebSocket."""
+        if not self.routing_coordinator or not self.routing_coordinator.operator_registry:
+            return
+
+        storage = self.routing_coordinator.operator_registry.storage
+        if not storage:
+            logger.warning("Storage not available for operator push loop")
+            return
+
+        stream = f"arqonbus:group:{group}"
+        
+        try:
+
+            while self.running and client_id in self._operator_tasks:
+                # Read 1 job from the group
+                # Using client_id as consumer_id ensures exactly-once within the group
+                res = await storage.read_group(stream, group, client_id, count=1, block_ms=5000)
+                
+                if not res:
+                    continue
+
+                for _, messages in res:
+                    for msg_id, data in messages:
+                        # Wrap job in Envelope for delivery
+                        task_envelope = Envelope(
+                            id=msg_id,
+                            type="command",
+                            command="truth.verify",
+                            payload=data,
+                            sender="arqonbus"
+                        )
+                        
+                        await self.send_to_client(client_id, task_envelope)
+                        # Note: We don't ACK here; worker must send an ACK command back
+                        # Or if we want AUTO-ACK (not recommended for truthloop)
+                        
+                await asyncio.sleep(0.1) # Breather
+                
+        except Exception as e:
+            logger.error(f"Error in operator push loop for {client_id}: {e}")
+        finally:
+            self._operator_tasks.pop(client_id, None)
+
     async def _disconnect_client(self, client_id: str):
         """Disconnect and cleanup a client.
         
@@ -334,6 +449,19 @@ class WebSocketBus:
             client_id: Client to disconnect
         """
         try:
+            # Cleanup operator tasks
+            task = self._operator_tasks.pop(client_id, None)
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Unregister from operator registry
+            if self.routing_coordinator and self.routing_coordinator.operator_registry:
+                await self.routing_coordinator.operator_registry.unregister_operator(client_id)
+
             await self.client_registry.unregister_client(client_id)
             self._stats["active_connections"] = max(0, self._stats["active_connections"] - 1)
             logger.info(f"Disconnected client {client_id}")
@@ -363,15 +491,20 @@ class WebSocketBus:
         Returns:
             True if message was sent successfully
         """
+        from websockets.exceptions import ConnectionClosed
         try:
             client_info = await self.client_registry.get_client(client_id)
-            if client_info and client_info.websocket.open:
+            if client_info:
                 await client_info.websocket.send(envelope.to_json())
                 return True
+        except ConnectionClosed:
+            logger.info(f"Client {client_id} disconnected during send")
+            await self._disconnect_client(client_id)
+            return False
         except Exception as e:
             logger.error(f"Error sending message to client {client_id}: {e}")
-        
-        return False
+            await self._disconnect_client(client_id)
+            return False
     
     async def get_server_stats(self) -> Dict:
         """Get server statistics.

@@ -8,6 +8,7 @@ from ..protocol.envelope import Envelope
 from .client_registry import ClientRegistry
 from .rooms import RoomManager
 from .channels import ChannelManager
+from .operator_registry import OperatorRegistry
 
 
 logger = logging.getLogger(__name__)
@@ -453,6 +454,7 @@ class RoutingCoordinator:
         self._client_registry = ClientRegistry()
         self._room_manager = RoomManager()
         self._channel_manager = ChannelManager()
+        self._operator_registry = OperatorRegistry()
         self._router = MessageRouter(
             self._client_registry,
             self._room_manager,
@@ -530,3 +532,8 @@ class RoutingCoordinator:
     def channel_manager(self, value: ChannelManager):
         """Set the channel manager (used for testing/integration)."""
         self._channel_manager = value
+
+    @property
+    def operator_registry(self) -> OperatorRegistry:
+        """Get the operator registry."""
+        return self._operator_registry

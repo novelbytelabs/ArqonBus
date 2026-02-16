@@ -20,7 +20,7 @@ class EnvelopeValidator:
     """Validates ArqonBus message envelopes according to protocol rules."""
     
     # Supported message types
-    SUPPORTED_MESSAGE_TYPES = {"message", "command", "response", "error", "telemetry"}
+    SUPPORTED_MESSAGE_TYPES = {"message", "command", "response", "error", "telemetry", "operator.join"}
     
     # Supported protocol versions
     SUPPORTED_VERSIONS = {"1.0"}
@@ -31,7 +31,8 @@ class EnvelopeValidator:
         "command": ["id", "timestamp", "type", "version", "command"],
         "response": ["id", "timestamp", "type", "version", "request_id"],
         "error": ["id", "timestamp", "type", "version", "error"],
-        "telemetry": ["id", "timestamp", "type", "version"]
+        "telemetry": ["id", "timestamp", "type", "version"],
+        "operator.join": ["id", "timestamp", "type", "version", "payload"]
     }
     
     @classmethod

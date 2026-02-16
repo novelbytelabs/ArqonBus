@@ -4,12 +4,9 @@ This module provides a Redis-based storage backend using Redis Streams
 for scalable message persistence and history retrieval.
 """
 
-import asyncio
 import json
-import logging
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Union
-import time
+from datetime import datetime
+from typing import Dict, List, Optional, Any
 
 try:
     import redis.asyncio as redis
@@ -86,6 +83,35 @@ class RedisStreamsStorage(StorageBackend):
             "last_redis_error": None
         }
     
+    async def connect(self):
+        """Connect to Redis."""
+        if self.redis_client:
+            return
+
+        try:
+            # Configure connection pool
+            kwargs = {
+                "encoding": "utf-8",
+                "decode_responses": True, # For string handling
+                "socket_timeout": 5.0,
+                "socket_connect_timeout": 5.0,
+                "retry_on_timeout": True,
+                "health_check_interval": 30
+            }
+            
+            # Create Redis client
+            self.redis_client = redis.from_url(self.redis_url, **kwargs)
+            
+            # Test connection
+            await self.redis_client.ping()
+            logger.info(f"Connected to Redis Streams at {self.redis_url}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to connect to Redis at {self.redis_url}: {e}")
+            self._stats["connection_failures"] += 1
+            self._stats["last_redis_error"] = str(e)
+            # We remain in fallback mode (redis_client is None)
+
     @classmethod
     async def create(cls, config: Dict[str, Any]) -> "RedisStreamsStorage":
         """Create Redis Streams storage backend with configuration.
@@ -477,6 +503,98 @@ class RedisStreamsStorage(StorageBackend):
         # Close fallback storage
         if self.fallback_storage:
             await self.fallback_storage.close()
+
+    # --- Extended Consumer Group API ---
+
+    async def ensure_group(self, stream: str, group: str):
+        """Ensure a consumer group exists for a stream."""
+        if not self.redis_client:
+            raise NotImplementedError("Consumer groups not supported in fallback mode")
+        
+        try:
+            await self.redis_client.xgroup_create(stream, group, id='0', mkstream=True)
+            logger.info(f"Created consumer group '{group}' for stream '{stream}'")
+        except Exception as e:
+            if "BUSYGROUP" not in str(e):
+                logger.error(f"Failed to create consumer group: {e}")
+                raise
+
+    async def read_group(self, stream: str, group: str, consumer: str, count: int = 1, block_ms: int = 5000) -> List[Any]:
+        """Read messages from a consumer group."""
+        if not self.redis_client:
+            raise NotImplementedError("Consumer groups not supported in fallback mode")
+        
+        # xreadgroup returns: [[stream, [ (id, data), ... ]]]
+        # xreadgroup returns: [[stream, [ (id, data), ... ]]]
+        res = await self.redis_client.xreadgroup(
+            groupname=group,
+            consumername=consumer,
+            streams={stream: '>'},
+            count=count,
+            block=block_ms
+        )
+        
+        if not res:
+            return []
+
+        # Decode results if they are bytes
+        decoded_res = []
+        for stream_name, messages in res:
+            decoded_messages = []
+            for msg_id, data in messages:
+                # Decode ID
+                if isinstance(msg_id, bytes):
+                    msg_id = msg_id.decode()
+                
+                # Decode data dict
+                decoded_data = {}
+                for k, v in data.items():
+                    k_str = k.decode() if isinstance(k, bytes) else k
+                    v_str = v.decode() if isinstance(v, bytes) else v
+                    # Try to parse as JSON if it looks like it
+                    if isinstance(v_str, str) and (v_str.startswith("{") or v_str.startswith("[")):
+                        try:
+                            v_str = json.loads(v_str)
+                        except:
+                            pass
+                    decoded_data[k_str] = v_str
+                
+                decoded_messages.append((msg_id, decoded_data))
+            
+            s_name = stream_name.decode() if isinstance(stream_name, bytes) else stream_name
+            decoded_res.append((s_name, decoded_messages))
+            
+        return decoded_res
+
+    async def ack(self, stream: str, group: str, *message_ids: str):
+        """Acknowledge messages in a consumer group."""
+        if not self.redis_client:
+            raise NotImplementedError("Consumer groups not supported in fallback mode")
+        
+        if message_ids:
+            await self.redis_client.xack(stream, group, *message_ids)
+
+    async def pending(self, stream: str, group: str) -> List[Any]:
+        """Get pending messages in a consumer group."""
+        if not self.redis_client:
+            raise NotImplementedError("Consumer groups not supported in fallback mode")
+        
+        # Returns a summary and a list of pending entries
+        return await self.redis_client.xpending_range(
+            stream, group, min='-', max='+', count=100
+        )
+
+    async def claim(self, stream: str, group: str, consumer: str, min_idle_ms: int, *message_ids: str) -> List[Any]:
+        """Claim stale messages in a consumer group."""
+        if not self.redis_client:
+            raise NotImplementedError("Consumer groups not supported in fallback mode")
+        
+        if not message_ids:
+            return []
+            
+        return await self.redis_client.xclaim(
+            stream, group, consumer, min_idle_ms, *message_ids
+        )
 
 
 # Export factory function for backward compatibility

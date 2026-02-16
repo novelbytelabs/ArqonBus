@@ -41,7 +41,13 @@ class ArqonBusServer:
             max_size=self.config.storage.max_history_size
         )
         self.storage = MessageStorage(storage_backend)
-        self.ws_bus = WebSocketBus(self.routing_coordinator.client_registry)
+        self.routing_coordinator.operator_registry.storage = self.storage
+        self.ws_bus = WebSocketBus(
+            self.routing_coordinator.client_registry, 
+            self.routing_coordinator, 
+            storage=self.storage,
+            config=self.config
+        )
         await self.ws_bus.start_server()
         self.running = True
 
