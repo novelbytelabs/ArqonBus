@@ -133,10 +133,13 @@ class MessageRouter:
         if channel.room and channel.room.room_id != room_id:
             raise RoutingError(f"Channel {channel_id} does not belong to room {room_id}")
         
-        # Route to channel
-        sent_count = await self.channel_manager.broadcast_to_channel(
-            envelope, channel_id, exclude_client_id=sender_client_id
+        # Route to channel via client registry (actually sends messages)
+        sent_count = await self.client_registry.broadcast_to_room_channel(
+            envelope, room_id, channel_id, exclude_client_id=sender_client_id
         )
+        
+        # Update channel stats (previously handled by broadcast_to_channel)
+        channel.update_activity()
         
         logger.debug(f"Routed message to room '{room_id}', channel '{channel_id}': {sent_count} clients")
         
