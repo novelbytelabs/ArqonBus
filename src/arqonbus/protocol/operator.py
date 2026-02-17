@@ -86,7 +86,8 @@ class Operator(ABC):
                 room=envelope.room,
                 channel=envelope.channel,
                 payload={"actions": results},
-                request_id=envelope.id
+                request_id=envelope.id,
+                status="success"
             )
             return response
 
@@ -109,3 +110,6 @@ class Operator(ABC):
         # Simplified hydration
         self._state.context.update(envelope.payload)
         self._state.history.append(envelope)
+        # Cap history to avoid unbounded growth
+        if len(self._state.history) > 100:
+            self._state.history = self._state.history[-100:]

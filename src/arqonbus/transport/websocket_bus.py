@@ -366,6 +366,12 @@ class WebSocketBus:
             client_id: Client who sent the response
         """
         logger.debug(f"Received response from {client_id}: {envelope.request_id}")
+        
+        # Forward to ResultCollector for RSI competing tasks
+        if self.routing_coordinator and hasattr(self.routing_coordinator, "collector"):
+            if envelope.request_id:
+                await self.routing_coordinator.collector.add_result(envelope.request_id, envelope)
+        
         # Response handling will be implemented with commands
     
     async def _handle_telemetry(self, envelope: Envelope, client_id: str):
@@ -539,9 +545,9 @@ class WebSocketBus:
                 "status": "healthy",
                 "uptime": stats["server"]["started_at"] and (asyncio.get_event_loop().time() - stats["server"]["started_at"]),
                 "active_connections": stats["server"]["active_connections"],
-                "total_connections": stats["server"]["total_connections"],
-                "messages_processed": stats["server"]["messages_processed"],
-                "error_rate": stats["server"]["errors"] / max(1, stats["server"]["messages_processed"]),
+                "total_messages_routed": self._stats.get("total_messages_routed", 0),
+                "routing_errors": self._stats.get("routing_errors", 0),
+                "error_rate": float(self._stats.get("routing_errors", 0)) / max(1, int(self._stats.get("total_messages_routed", 0))),
                 "checks": []
             }
             

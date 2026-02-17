@@ -1,7 +1,6 @@
-"""Message routing logic for ArqonBus."""
-import asyncio
 import logging
-from typing import Dict, Optional, List, Tuple
+import asyncio
+from typing import Dict, Any, Optional, List, Tuple, cast
 from datetime import datetime
 
 from ..protocol.envelope import Envelope
@@ -9,6 +8,7 @@ from .client_registry import ClientRegistry
 from .rooms import RoomManager
 from .channels import ChannelManager
 from .operator_registry import OperatorRegistry
+from .dispatcher import TaskDispatcher, ResultCollector
 
 
 logger = logging.getLogger(__name__)
@@ -411,14 +411,19 @@ class MessageRouter:
             
             health = {
                 "status": "healthy",
-                "total_messages_routed": self._stats["total_messages_routed"],
-                "routing_errors": self._stats["routing_errors"],
-                "error_rate": self._stats["routing_errors"] / max(1, self._stats["total_messages_routed"]),
+                "router": {
+                    "total_messages_routed": int(self._stats.get("total_messages_routed", 0)),
+                    "routing_errors": int(self._stats.get("routing_errors", 0)),
+                    "error_rate": float(self._stats.get("routing_errors", 0)) / max(1, int(self._stats.get("total_messages_routed", 0))),
+                    "messages_by_type": self._stats.get("messages_by_type", {}),
+                    "messages_by_destination": self._stats.get("messages_by_destination", {}),
+                    "last_activity": self._stats.get("last_activity")
+                },
                 "checks": []
             }
             
             # Check for potential issues
-            if health["error_rate"] > 0.05:  # 5% error rate
+            if health["router"]["error_rate"] > 0.05:  # 5% error rate
                 health["checks"].append({"type": "error", "message": "High routing error rate"})
             
             # Check component health
@@ -462,6 +467,12 @@ class RoutingCoordinator:
             self._client_registry,
             self._room_manager,
             self._channel_manager
+        )
+        self._collector = ResultCollector()
+        self._dispatcher = TaskDispatcher(
+            self._operator_registry,
+            self._router,
+            self._collector
         )
     
     async def initialize(self):
@@ -540,3 +551,13 @@ class RoutingCoordinator:
     def operator_registry(self) -> OperatorRegistry:
         """Get the operator registry."""
         return self._operator_registry
+
+    @property
+    def dispatcher(self) -> TaskDispatcher:
+        """Get the task dispatcher."""
+        return self._dispatcher
+
+    @property
+    def collector(self) -> ResultCollector:
+        """Get the result collector."""
+        return self._collector

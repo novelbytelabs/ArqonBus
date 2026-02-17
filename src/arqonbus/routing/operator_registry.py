@@ -30,8 +30,20 @@ class OperatorRegistry:
         self.client_to_group: Dict[str, str] = {}
         self._lock = asyncio.Lock()
 
-    async def register_operator(self, client_id: str, group: str):
-        """Register a client as an operator for a specific group."""
+    async def register_operator(self, client_id: str, group: str, auth_token: str = ""):
+        """Register a client as an operator for a specific group.
+        
+        Enforces a simple capability token check to prevent unauthorized 
+        operators from joining critical groups.
+        """
+        # Simple hardcoded check for the audit fix. 
+        # In production, this would be a proper secret management system.
+        expected_token = "rsi_secret_token_123"
+        
+        if auth_token != expected_token:
+            logger.warning(f"Operator {client_id} failed auth for group {group}")
+            return False
+
         async with self._lock:
             if group not in self.groups:
                 self.groups[group] = {}
@@ -43,24 +55,25 @@ class OperatorRegistry:
 
             self.groups[group][client_id] = OperatorInfo(client_id, group)
             self.client_to_group[client_id] = group
-            logger.info(f"Operator {client_id} joined group {group}")
+            logger.info(f"Operator {client_id} joined group {group} (Authenticated)")
+            return True
 
     async def unregister_operator(self, client_id: str):
         """Clean up operator registration on disconnect."""
         async with self._lock:
             group = self.client_to_group.pop(client_id, None)
-            if group and group in self.groups:
-                self.groups[group].pop(client_id, None)
-                if not self.groups[group]:
-                    del self.groups[group]
-            logger.info(f"Operator {client_id} left group {group}")
+            if group:
+                if group in self.groups:
+                    self.groups[group].pop(client_id, None)
+                    if not self.groups[group]:
+                        del self.groups[group]
+                logger.info(f"Operator {client_id} left group {group}")
 
     async def get_operators(self, group: str) -> List[str]:
         """Get all active client IDs for a group."""
         async with self._lock:
-            if group in self.groups:
-                return list(self.groups[group].keys())
-            return []
+            group_operators = self.groups.get(group, {})
+            return list(group_operators.keys())
 
     async def get_stats(self) -> Dict[str, Any]:
         """Get registry statistics."""
