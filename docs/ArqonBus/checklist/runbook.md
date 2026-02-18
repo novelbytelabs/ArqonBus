@@ -109,6 +109,20 @@ arqon status --http-url http://127.0.0.1:8080
 arqon tail --ws-url ws://127.0.0.1:9100 --jwt "$ARQONBUS_AUTH_JWT" --raw --limit 1
 ```
 
+### Epoch 2 Operator Pack Quick Checks
+
+Command envelopes (send via WebSocket client or `wscat`) supported:
+
+- `op.webhook.register|list|unregister`
+- `op.cron.schedule|list|cancel`
+- `op.store.set|get|list|delete`
+
+Hello-world bot smoke:
+
+```bash
+ARQONBUS_WS_URL=ws://127.0.0.1:9100 python examples/python/hello_world_bot.py
+```
+
 ### Epoch 1 Manual Gate Evidence (`wscat`)
 
 Validated on 2026-02-18 in this sandbox:

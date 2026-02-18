@@ -77,7 +77,7 @@ We cannot build the "Emergent Intelligence" (Epoch 3) until the "Road" (Epoch 1)
     *   `op-store`: Simple KV storage for Agents.
 
 ### 3.2 The Checkpoint (Gate to Epoch 3)
-*   [ ] Can a junior dev write a "Hello World" bot in Python in < 5 mins?
+*   [x] Can a junior dev write a "Hello World" bot in Python in < 5 mins? (SDK bot example + e2e test landed)
 *   [ ] Can we deploy a safety policy without restarting the gateway?
 *   [x] Is there a "Tail" (Log stream) visible in the CLI? (`arqon tail` + e2e coverage)
 

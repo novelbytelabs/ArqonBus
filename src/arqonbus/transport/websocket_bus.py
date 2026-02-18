@@ -1,6 +1,12 @@
 """WebSocket server for ArqonBus real-time messaging."""
 import asyncio
+import json
 import logging
+import urllib.error
+import urllib.request
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Dict, Optional, Set, Callable, Any
 from urllib.parse import parse_qs, urlsplit
 from websockets import Response, serve
@@ -8,6 +14,7 @@ from websockets.exceptions import ConnectionClosed
 from websockets.datastructures import Headers
 
 from ..protocol.envelope import Envelope
+from ..protocol.ids import generate_message_id
 from ..protocol.validator import EnvelopeValidator
 from ..routing.client_registry import ClientRegistry
 from ..config.config import get_config
@@ -17,6 +24,31 @@ from ..security.jwt_auth import JWTAuthError, validate_jwt
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _WebhookRule:
+    rule_id: str
+    url: str
+    owner_client_id: str
+    room: Optional[str] = None
+    channel: Optional[str] = None
+    headers: Optional[Dict[str, str]] = None
+    timeout_seconds: float = 2.0
+    created_at: str = ""
+
+
+@dataclass
+class _CronJob:
+    job_id: str
+    owner_client_id: str
+    room: str
+    channel: str
+    payload: Dict[str, Any]
+    delay_seconds: float
+    interval_seconds: Optional[float]
+    repeat_count: int
+    created_at: str
 
 
 class WebSocketBus:
@@ -59,6 +91,13 @@ class WebSocketBus:
         
         # Task delivery loops {client_id: asyncio.Task}
         self._operator_tasks: Dict[str, asyncio.Task] = {}
+
+        # Epoch 2 standard operator state.
+        self._webhook_rules: Dict[str, _WebhookRule] = {}
+        self._cron_jobs: Dict[str, _CronJob] = {}
+        self._cron_tasks: Dict[str, asyncio.Task] = {}
+        self._store: Dict[str, Dict[str, Any]] = {}
+        self._ops_lock = asyncio.Lock()
         
         # Statistics
         self._stats = {
@@ -143,6 +182,9 @@ class WebSocketBus:
                 await self._disconnect_client(client.client_id)
             except Exception as e:
                 logger.error(f"Error disconnecting client {client.client_id}: {e}")
+
+        # Cleanup scheduled operator jobs.
+        await self._cancel_all_cron_jobs()
         
         # Close server
         self.server.close()
@@ -204,6 +246,403 @@ class WebSocketBus:
                     return values[0]
 
         return None
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _parse_positive_float(raw_value: Any, field_name: str) -> float:
+        value = float(raw_value)
+        if value <= 0:
+            raise ValueError(f"'{field_name}' must be > 0")
+        return value
+
+    @staticmethod
+    def _parse_positive_int(raw_value: Any, field_name: str) -> int:
+        value = int(raw_value)
+        if value <= 0:
+            raise ValueError(f"'{field_name}' must be > 0")
+        return value
+
+    async def _client_metadata(self, client_id: str) -> Dict[str, Any]:
+        client_info = await self.client_registry.get_client(client_id)
+        metadata = getattr(client_info, "metadata", None) if client_info else None
+        if isinstance(metadata, dict):
+            return dict(metadata)
+        return {}
+
+    async def _client_is_admin(self, client_id: str) -> bool:
+        metadata = await self._client_metadata(client_id)
+        return str(metadata.get("role", "")).lower() == "admin"
+
+    async def _default_store_namespace(self, client_id: str) -> str:
+        metadata = await self._client_metadata(client_id)
+        tenant_id = metadata.get("tenant_id")
+        if tenant_id:
+            return f"tenant:{tenant_id}"
+        return "default"
+
+    async def _send_command_response(
+        self,
+        client_id: str,
+        request_id: str,
+        *,
+        success: bool,
+        message: str,
+        data: Optional[Dict[str, Any]] = None,
+        error_code: Optional[str] = None,
+    ) -> None:
+        response = Envelope(
+            type="response",
+            request_id=request_id,
+            status="success" if success else "error",
+            payload={"message": message, "data": data or {}},
+            error_code=error_code,
+            sender="arqonbus",
+        )
+        await self.send_to_client(client_id, response)
+
+    async def _register_webhook_rule(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        url = str(args.get("url", "")).strip()
+        if not url:
+            raise ValueError("'url' is required")
+        if not (url.startswith("http://") or url.startswith("https://")):
+            raise ValueError("'url' must start with http:// or https://")
+
+        room = args.get("room")
+        channel = args.get("channel")
+        timeout_seconds = self._parse_positive_float(
+            args.get("timeout_seconds", 2.0),
+            "timeout_seconds",
+        )
+        headers = args.get("headers") or {}
+        if not isinstance(headers, dict):
+            raise ValueError("'headers' must be an object")
+
+        rule = _WebhookRule(
+            rule_id=f"wh_{uuid.uuid4().hex[:12]}",
+            url=url,
+            owner_client_id=client_id,
+            room=str(room) if room is not None else None,
+            channel=str(channel) if channel is not None else None,
+            headers={str(k): str(v) for k, v in headers.items()},
+            timeout_seconds=timeout_seconds,
+            created_at=self._utc_now_iso(),
+        )
+
+        async with self._ops_lock:
+            self._webhook_rules[rule.rule_id] = rule
+
+        return {
+            "rule_id": rule.rule_id,
+            "url": rule.url,
+            "room": rule.room,
+            "channel": rule.channel,
+            "timeout_seconds": rule.timeout_seconds,
+            "created_at": rule.created_at,
+        }
+
+    async def _unregister_webhook_rule(self, client_id: str, rule_id: str) -> bool:
+        is_admin = await self._client_is_admin(client_id)
+        async with self._ops_lock:
+            rule = self._webhook_rules.get(rule_id)
+            if not rule:
+                return False
+            if rule.owner_client_id != client_id and not is_admin:
+                raise PermissionError("Cannot remove webhook rule owned by another client")
+            self._webhook_rules.pop(rule_id, None)
+        return True
+
+    async def _list_webhook_rules(self, client_id: str) -> Dict[str, Any]:
+        is_admin = await self._client_is_admin(client_id)
+        async with self._ops_lock:
+            rules = list(self._webhook_rules.values())
+
+        visible_rules = []
+        for rule in rules:
+            if not is_admin and rule.owner_client_id != client_id:
+                continue
+            visible_rules.append(
+                {
+                    "rule_id": rule.rule_id,
+                    "url": rule.url,
+                    "owner_client_id": rule.owner_client_id,
+                    "room": rule.room,
+                    "channel": rule.channel,
+                    "timeout_seconds": rule.timeout_seconds,
+                    "created_at": rule.created_at,
+                }
+            )
+        return {"rules": visible_rules, "count": len(visible_rules)}
+
+    async def _remove_webhook_rules_for_client(self, client_id: str) -> None:
+        async with self._ops_lock:
+            owned_rule_ids = [
+                rule_id
+                for rule_id, rule in self._webhook_rules.items()
+                if rule.owner_client_id == client_id
+            ]
+            for rule_id in owned_rule_ids:
+                self._webhook_rules.pop(rule_id, None)
+
+    @staticmethod
+    def _webhook_matches(rule: _WebhookRule, envelope: Envelope) -> bool:
+        if rule.room and envelope.room != rule.room:
+            return False
+        if rule.channel and envelope.channel != rule.channel:
+            return False
+        return True
+
+    async def _dispatch_webhooks_for_message(
+        self,
+        envelope: Envelope,
+        sender_client_id: str,
+    ) -> None:
+        async with self._ops_lock:
+            rules = [
+                rule
+                for rule in self._webhook_rules.values()
+                if self._webhook_matches(rule, envelope)
+            ]
+
+        if not rules:
+            return
+
+        payload = {
+            "rule_version": "v1",
+            "sender_client_id": sender_client_id,
+            "envelope": envelope.to_dict(),
+        }
+
+        await asyncio.gather(
+            *(self._send_webhook_post(rule, payload) for rule in rules),
+            return_exceptions=True,
+        )
+
+    async def _send_webhook_post(self, rule: _WebhookRule, payload: Dict[str, Any]) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        headers.update(rule.headers or {})
+        request = urllib.request.Request(rule.url, data=body, headers=headers, method="POST")
+
+        def _post() -> int:
+            with urllib.request.urlopen(request, timeout=rule.timeout_seconds) as response:
+                return int(getattr(response, "status", 200))
+
+        try:
+            status_code = await asyncio.to_thread(_post)
+            logger.debug("Webhook %s delivered status=%s", rule.rule_id, status_code)
+        except urllib.error.URLError as exc:
+            logger.warning("Webhook %s delivery failed: %s", rule.rule_id, exc.reason)
+        except Exception as exc:
+            logger.warning("Webhook %s delivery error: %s", rule.rule_id, exc)
+
+    async def _schedule_cron_job(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        room = str(args.get("room", "")).strip()
+        channel = str(args.get("channel", "")).strip()
+        if not room or not channel:
+            raise ValueError("'room' and 'channel' are required")
+
+        payload = args.get("payload")
+        if not isinstance(payload, dict):
+            raise ValueError("'payload' must be an object")
+
+        delay_seconds = self._parse_positive_float(args.get("delay_seconds", 1.0), "delay_seconds")
+        interval_raw = args.get("interval_seconds")
+        interval_seconds = (
+            self._parse_positive_float(interval_raw, "interval_seconds")
+            if interval_raw is not None
+            else None
+        )
+        repeat_count = self._parse_positive_int(args.get("repeat_count", 1), "repeat_count")
+
+        if repeat_count > 1 and interval_seconds is None:
+            raise ValueError("'interval_seconds' is required when repeat_count > 1")
+
+        job = _CronJob(
+            job_id=f"cron_{uuid.uuid4().hex[:12]}",
+            owner_client_id=client_id,
+            room=room,
+            channel=channel,
+            payload=payload,
+            delay_seconds=delay_seconds,
+            interval_seconds=interval_seconds,
+            repeat_count=repeat_count,
+            created_at=self._utc_now_iso(),
+        )
+
+        task = asyncio.create_task(self._run_cron_job(job))
+        async with self._ops_lock:
+            self._cron_jobs[job.job_id] = job
+            self._cron_tasks[job.job_id] = task
+
+        return {
+            "job_id": job.job_id,
+            "room": job.room,
+            "channel": job.channel,
+            "delay_seconds": job.delay_seconds,
+            "interval_seconds": job.interval_seconds,
+            "repeat_count": job.repeat_count,
+            "created_at": job.created_at,
+        }
+
+    async def _run_cron_job(self, job: _CronJob) -> None:
+        try:
+            await asyncio.sleep(job.delay_seconds)
+            for iteration in range(1, job.repeat_count + 1):
+                cron_envelope = Envelope(
+                    id=generate_message_id(),
+                    type="message",
+                    room=job.room,
+                    channel=job.channel,
+                    payload=job.payload,
+                    sender="op-cron",
+                    metadata={"cron_job_id": job.job_id, "iteration": iteration},
+                )
+                if self.config.storage.enable_persistence and self.storage:
+                    try:
+                        await self.storage.store_message(cron_envelope)
+                    except Exception as exc:
+                        logger.warning("Cron job %s storage write failed: %s", job.job_id, exc)
+                await self.client_registry.broadcast_to_room_channel(
+                    cron_envelope,
+                    job.room,
+                    job.channel,
+                    exclude_client_id=None,
+                )
+
+                if iteration < job.repeat_count:
+                    await asyncio.sleep(job.interval_seconds or 0.0)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.error("Cron job %s failed: %s", job.job_id, exc)
+        finally:
+            async with self._ops_lock:
+                self._cron_jobs.pop(job.job_id, None)
+                self._cron_tasks.pop(job.job_id, None)
+
+    async def _cancel_cron_job(self, client_id: str, job_id: str) -> bool:
+        is_admin = await self._client_is_admin(client_id)
+        task = None
+        async with self._ops_lock:
+            job = self._cron_jobs.get(job_id)
+            if not job:
+                return False
+            if job.owner_client_id != client_id and not is_admin:
+                raise PermissionError("Cannot cancel cron job owned by another client")
+            task = self._cron_tasks.pop(job_id, None)
+            self._cron_jobs.pop(job_id, None)
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        return True
+
+    async def _list_cron_jobs(self, client_id: str) -> Dict[str, Any]:
+        is_admin = await self._client_is_admin(client_id)
+        async with self._ops_lock:
+            jobs = list(self._cron_jobs.values())
+
+        visible_jobs = []
+        for job in jobs:
+            if not is_admin and job.owner_client_id != client_id:
+                continue
+            visible_jobs.append(
+                {
+                    "job_id": job.job_id,
+                    "owner_client_id": job.owner_client_id,
+                    "room": job.room,
+                    "channel": job.channel,
+                    "delay_seconds": job.delay_seconds,
+                    "interval_seconds": job.interval_seconds,
+                    "repeat_count": job.repeat_count,
+                    "created_at": job.created_at,
+                }
+            )
+        return {"jobs": visible_jobs, "count": len(visible_jobs)}
+
+    async def _cancel_cron_jobs_for_client(self, client_id: str) -> None:
+        async with self._ops_lock:
+            owned_job_ids = [
+                job_id
+                for job_id, job in self._cron_jobs.items()
+                if job.owner_client_id == client_id
+            ]
+
+        for job_id in owned_job_ids:
+            try:
+                await self._cancel_cron_job(client_id, job_id)
+            except Exception:
+                logger.warning(
+                    "Failed to cleanup cron job %s for disconnected client %s",
+                    job_id,
+                    client_id,
+                )
+
+    async def _cancel_all_cron_jobs(self) -> None:
+        async with self._ops_lock:
+            items = list(self._cron_tasks.items())
+            self._cron_tasks = {}
+            self._cron_jobs = {}
+
+        for _, task in items:
+            task.cancel()
+        for _, task in items:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+
+    async def _store_set(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        key = str(args.get("key", "")).strip()
+        if not key:
+            raise ValueError("'key' is required")
+        namespace = str(args.get("namespace") or await self._default_store_namespace(client_id))
+        value = args.get("value")
+        if value is None:
+            raise ValueError("'value' is required")
+
+        async with self._ops_lock:
+            namespace_store = self._store.setdefault(namespace, {})
+            existed = key in namespace_store
+            namespace_store[key] = value
+        return {"namespace": namespace, "key": key, "updated": existed}
+
+    async def _store_get(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        key = str(args.get("key", "")).strip()
+        if not key:
+            raise ValueError("'key' is required")
+        namespace = str(args.get("namespace") or await self._default_store_namespace(client_id))
+        async with self._ops_lock:
+            namespace_store = self._store.get(namespace, {})
+            found = key in namespace_store
+            value = namespace_store.get(key)
+        return {"namespace": namespace, "key": key, "found": found, "value": value}
+
+    async def _store_delete(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        key = str(args.get("key", "")).strip()
+        if not key:
+            raise ValueError("'key' is required")
+        namespace = str(args.get("namespace") or await self._default_store_namespace(client_id))
+        async with self._ops_lock:
+            namespace_store = self._store.get(namespace, {})
+            deleted = key in namespace_store
+            if deleted:
+                namespace_store.pop(key, None)
+        return {"namespace": namespace, "key": key, "deleted": deleted}
+
+    async def _store_list(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        namespace = str(args.get("namespace") or await self._default_store_namespace(client_id))
+        async with self._ops_lock:
+            namespace_store = self._store.get(namespace, {})
+            keys = sorted(namespace_store.keys())
+        return {"namespace": namespace, "count": len(keys), "keys": keys}
 
     async def _handle_connection(self, websocket: Any):
         """Handle new WebSocket connection.
@@ -393,6 +832,8 @@ class WebSocketBus:
         sent_count = await self.client_registry.broadcast_to_room_channel(
             envelope, envelope.room, envelope.channel, exclude_client_id=client_id
         )
+
+        await self._dispatch_webhooks_for_message(envelope, client_id)
         
         logger.debug(f"Broadcasted message from {client_id} to {sent_count} clients in {envelope.room}:{envelope.channel}")
     
@@ -403,6 +844,173 @@ class WebSocketBus:
             envelope: Command envelope
             client_id: Client who sent the command
         """
+        args = envelope.args or {}
+
+        try:
+            if envelope.command == "op.webhook.register":
+                data = await self._register_webhook_rule(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Webhook rule registered",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.webhook.unregister":
+                rule_id = str(args.get("rule_id", "")).strip()
+                if not rule_id:
+                    raise ValueError("'rule_id' is required")
+                removed = await self._unregister_webhook_rule(client_id, rule_id)
+                if not removed:
+                    await self._send_command_response(
+                        client_id,
+                        envelope.id,
+                        success=False,
+                        message=f"Webhook rule '{rule_id}' not found",
+                        data={"rule_id": rule_id},
+                        error_code="NOT_FOUND",
+                    )
+                    return
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Webhook rule removed",
+                    data={"rule_id": rule_id},
+                )
+                return
+
+            if envelope.command == "op.webhook.list":
+                data = await self._list_webhook_rules(client_id)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Webhook rules retrieved",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.cron.schedule":
+                data = await self._schedule_cron_job(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Cron job scheduled",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.cron.cancel":
+                job_id = str(args.get("job_id", "")).strip()
+                if not job_id:
+                    raise ValueError("'job_id' is required")
+                cancelled = await self._cancel_cron_job(client_id, job_id)
+                if not cancelled:
+                    await self._send_command_response(
+                        client_id,
+                        envelope.id,
+                        success=False,
+                        message=f"Cron job '{job_id}' not found",
+                        data={"job_id": job_id},
+                        error_code="NOT_FOUND",
+                    )
+                    return
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Cron job cancelled",
+                    data={"job_id": job_id},
+                )
+                return
+
+            if envelope.command == "op.cron.list":
+                data = await self._list_cron_jobs(client_id)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Cron jobs retrieved",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.store.set":
+                data = await self._store_set(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Store value written",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.store.get":
+                data = await self._store_get(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Store value retrieved",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.store.delete":
+                data = await self._store_delete(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Store value deleted",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.store.list":
+                data = await self._store_list(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Store keys listed",
+                    data=data,
+                )
+                return
+        except PermissionError as exc:
+            await self._send_command_response(
+                client_id,
+                envelope.id,
+                success=False,
+                message=str(exc),
+                error_code="AUTHORIZATION_ERROR",
+            )
+            return
+        except (TypeError, ValueError) as exc:
+            await self._send_command_response(
+                client_id,
+                envelope.id,
+                success=False,
+                message=f"Validation error: {exc}",
+                error_code="VALIDATION_ERROR",
+            )
+            return
+        except Exception as exc:
+            logger.error("Operator command failed (%s): %s", envelope.command, exc)
+            await self._send_command_response(
+                client_id,
+                envelope.id,
+                success=False,
+                message=f"Execution error: {exc}",
+                error_code="EXECUTION_ERROR",
+            )
+            return
+
         if envelope.command == "truth.verify":
             # Bridge to distributed task queue (Phase 2 completion)
             if self.routing_coordinator and self.routing_coordinator.operator_registry:
@@ -590,6 +1198,8 @@ class WebSocketBus:
             if self.routing_coordinator and self.routing_coordinator.operator_registry:
                 await self.routing_coordinator.operator_registry.unregister_operator(client_id)
 
+            await self._cancel_cron_jobs_for_client(client_id)
+            await self._remove_webhook_rules_for_client(client_id)
             await self.client_registry.unregister_client(client_id)
             self._stats["active_connections"] = max(0, self._stats["active_connections"] - 1)
             logger.info(f"Disconnected client {client_id}")

@@ -156,6 +156,14 @@ arqon status --http-url http://127.0.0.1:8080
 arqon tail --ws-url ws://127.0.0.1:9100 --jwt "$ARQONBUS_AUTH_JWT" --raw --limit 1
 ```
 
+### Standard Operators (Epoch 2)
+
+These are available as WebSocket `type: "command"` operations:
+
+- `op.webhook.register|list|unregister` - Route matching room/channel envelopes to HTTP POST webhooks.
+- `op.cron.schedule|list|cancel` - Schedule delayed or recurring envelope broadcasts.
+- `op.store.set|get|list|delete` - Tenant-scoped in-memory KV storage for agent state.
+
 ### Minimal Python SDK Usage
 
 ```python
@@ -170,4 +178,10 @@ async def main():
 
 
 asyncio.run(main())
+```
+
+### Hello-World Bot (< 5 min path)
+
+```bash
+ARQONBUS_WS_URL=ws://127.0.0.1:9100 python examples/python/hello_world_bot.py
 ```

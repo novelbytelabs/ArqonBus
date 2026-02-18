@@ -31,7 +31,7 @@ Out of scope for this slice:
 | M0: Baseline and truth alignment | Completed | Canonical status file and doc links aligned. |
 | M1: Core Python stability pass | Completed | Dispatch/auth/http/websocket stabilization merged on branch. |
 | M2: Test/Quality hardening gate | Completed | Unit/integration/e2e/regression + coverage/codecov wired. |
-| M3: Epoch 2 Factory gate | In Progress | CLI + Python SDK bootstrap landed; operator pack pending. |
+| M3: Epoch 2 Factory gate | In Progress | CLI + Python SDK + standard operator pack landed; safety policy hot reload remains. |
 | M4: Tier-Omega experimental lane | Not Started | Will remain feature-flagged and isolated. |
 
 ## Phase 0 Completion Checklist
@@ -97,7 +97,9 @@ python -m pytest -q -m performance
 - [x] Added minimal Python SDK client for JWT-authenticated WebSocket usage
 - [x] Added unit/integration/e2e coverage for CLI + SDK bootstrap paths
 - [x] Added regression coverage for RFC3339 `Z` timestamp envelope parsing
-- [ ] Add standard operator starter pack (`op-webhook`, `op-cron`, `op-store`)
+- [x] Added standard operator starter pack (`op.webhook`, `op.cron`, `op.store`)
+- [x] Added SDK hello-world bot path (`examples/python/hello_world_bot.py`) with e2e validation
+- [ ] Add policy hot-reload path to satisfy Epoch 2 checkpoint item 3.2(2)
 
 ## Epoch 1 Checkpoint 2.2 Progress
 
