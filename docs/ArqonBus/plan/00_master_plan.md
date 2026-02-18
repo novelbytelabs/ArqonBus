@@ -51,7 +51,7 @@ We cannot build the "Emergent Intelligence" (Epoch 3) until the "Road" (Epoch 1)
     *   Strict message envelopes.
 
 ### 2.2 The Checkpoint (Gate to Epoch 2)
-*   [ ] Can I connect via `wscat`? (manual CLI validation still pending in this sandbox)
+*   [x] Can I connect via `wscat`? (validated 2026-02-18: unauthenticated `401`, authenticated connect + welcome)
 *   [x] Can I auth with a JWT?
 *   [x] Can I send a message and see it echoed?
 *   [x] Does the Wasm Safety Layer block a "bad" message? (validated via CASIL enforce policy path)
@@ -79,7 +79,7 @@ We cannot build the "Emergent Intelligence" (Epoch 3) until the "Road" (Epoch 1)
 ### 3.2 The Checkpoint (Gate to Epoch 3)
 *   [ ] Can a junior dev write a "Hello World" bot in Python in < 5 mins?
 *   [ ] Can we deploy a safety policy without restarting the gateway?
-*   [ ] Is there a "Tail" (Log stream) visible in the CLI?
+*   [x] Is there a "Tail" (Log stream) visible in the CLI? (`arqon tail` + e2e coverage)
 
 ---
 

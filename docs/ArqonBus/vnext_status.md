@@ -11,16 +11,17 @@ with this file, this file wins until the conflicting document is updated.
 
 ## Scope Freeze (Phase 0)
 
-Current implementation scope is frozen to Epoch 1:
+Epoch 1 scope freeze is complete. As of 2026-02-18, Checkpoint 2.2 is green and
+execution has moved into Epoch 2 bootstrap work.
 
-- Shield gateway hardening (auth, policy gate, schema validation)
-- Spine transport/routing reliability
-- Protocol consistency and envelope contracts
-- CASIL integration and operations safety
+Current implementation scope:
 
-Out of scope for this freeze:
+- Epoch 2 CLI/SDK developer experience bootstrap
+- Stability hardening discovered during manual gate validation
 
-- Epoch 2 DevEx expansion work
+Out of scope for this slice:
+
+- Epoch 2 standard operators backlog (`op-webhook`, `op-cron`, `op-store`)
 - Epoch 3 Tier-Omega / substrate ambitions
 
 ## Program Milestones
@@ -30,7 +31,7 @@ Out of scope for this freeze:
 | M0: Baseline and truth alignment | Completed | Canonical status file and doc links aligned. |
 | M1: Core Python stability pass | Completed | Dispatch/auth/http/websocket stabilization merged on branch. |
 | M2: Test/Quality hardening gate | Completed | Unit/integration/e2e/regression + coverage/codecov wired. |
-| M3: Epoch 2 Factory gate | Not Started | CLI/SDK/operator DX remains partial. |
+| M3: Epoch 2 Factory gate | In Progress | CLI + Python SDK bootstrap landed; operator pack pending. |
 | M4: Tier-Omega experimental lane | Not Started | Will remain feature-flagged and isolated. |
 
 ## Phase 0 Completion Checklist
@@ -90,10 +91,18 @@ python -m pytest -q -m performance
 - [x] Added top-level docs runbook entrypoint (`docs/runbook.md`)
 - [x] Fixed README/docs index links to canonical architecture/API/runbook docs
 
+## Phase 5: Epoch 2 Factory Bootstrap (In Progress)
+
+- [x] Added first-party `arqon` CLI entrypoint (`status`, `version`, `tail`)
+- [x] Added minimal Python SDK client for JWT-authenticated WebSocket usage
+- [x] Added unit/integration/e2e coverage for CLI + SDK bootstrap paths
+- [x] Added regression coverage for RFC3339 `Z` timestamp envelope parsing
+- [ ] Add standard operator starter pack (`op-webhook`, `op-cron`, `op-store`)
+
 ## Epoch 1 Checkpoint 2.2 Progress
 
 - [x] WebSocket connect path validated with authenticated test client
 - [x] JWT authentication enforced at edge (missing/invalid/expired rejected)
 - [x] Authenticated room echo validated between two clients
 - [x] Safety policy blocking validated in enforce mode (bad payload not routed)
-- [ ] Manual `wscat` handshake validation in this sandbox (blocked by local EPERM in this environment)
+- [x] Manual `wscat` handshake validation completed in sandbox on 2026-02-18 (unauthenticated `401`; authenticated connect + welcome)

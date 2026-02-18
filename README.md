@@ -139,4 +139,35 @@ Built-in commands (via `type: "command"`):
 ## Getting Started (Very Rough)
 
 ```bash
-python websocket_bus.py --host localhost --port 9100 --telemetry-port 9101
+python -m arqonbus.transport.websocket_bus
+```
+
+### Epoch 2 CLI Bootstrap
+
+```bash
+# Install in editable mode once
+pip install -e .
+
+# HTTP snapshots
+arqon version --http-url http://127.0.0.1:8080
+arqon status --http-url http://127.0.0.1:8080
+
+# WebSocket tail (JWT required only when auth is enabled)
+arqon tail --ws-url ws://127.0.0.1:9100 --jwt "$ARQONBUS_AUTH_JWT" --raw --limit 1
+```
+
+### Minimal Python SDK Usage
+
+```python
+import asyncio
+from arqonbus.sdk import ArqonBusClient
+
+
+async def main():
+    async with ArqonBusClient("ws://127.0.0.1:9100") as client:
+        message = await client.recv_json(timeout=2.0)
+        print(message["type"], message.get("payload", {}))
+
+
+asyncio.run(main())
+```

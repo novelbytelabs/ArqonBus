@@ -5,6 +5,19 @@ from datetime import datetime
 from .ids import generate_message_id
 
 
+def _parse_iso8601_timestamp(raw_timestamp: Any) -> datetime:
+    """Parse ISO 8601 timestamps, including RFC3339 'Z' suffix."""
+    if isinstance(raw_timestamp, datetime):
+        return raw_timestamp
+    if not isinstance(raw_timestamp, str):
+        raise TypeError(f"timestamp must be datetime or str, got {type(raw_timestamp).__name__}")
+
+    normalized = raw_timestamp.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    return datetime.fromisoformat(normalized)
+
+
 @dataclass
 class Envelope:
     """Structured message envelope for ArqonBus communication.
@@ -84,9 +97,11 @@ class Envelope:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Envelope":
         """Create envelope from dictionary (e.g., from JSON deserialization)."""
+        data = dict(data)
+
         # Handle datetime parsing
         if "timestamp" in data:
-            data["timestamp"] = datetime.fromisoformat(data["timestamp"])
+            data["timestamp"] = _parse_iso8601_timestamp(data["timestamp"])
 
         # Legacy command shape: command details nested under payload
         if data.get("type") == "command" and "command" not in data:

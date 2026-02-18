@@ -98,6 +98,35 @@ python -m arqonbus.main
 - **Metrics**: `GET /metrics`
 - **Version**: `GET /version`
 
+### CLI Quick Checks (`arqon`)
+
+```bash
+# HTTP health snapshots
+arqon version --http-url http://127.0.0.1:8080
+arqon status --http-url http://127.0.0.1:8080
+
+# WebSocket stream tail (JWT optional unless auth is enabled)
+arqon tail --ws-url ws://127.0.0.1:9100 --jwt "$ARQONBUS_AUTH_JWT" --raw --limit 1
+```
+
+### Epoch 1 Manual Gate Evidence (`wscat`)
+
+Validated on 2026-02-18 in this sandbox:
+
+```bash
+# Reproducible one-shot validator
+scripts/validate_epoch1_wscat.sh
+
+# 1) Unauthenticated handshake (expected 401)
+wscat --no-color -c ws://127.0.0.1:47001 -w 1
+# observed: error: Unexpected server response: 401
+
+# 2) Authenticated handshake (expected connect + welcome envelope)
+wscat --no-color -H "Authorization: Bearer <jwt>" -c ws://127.0.0.1:47001 -w 1
+# observed: Connected (press CTRL+C to quit)
+# observed: < {"type":"message","payload":{"welcome":"Connected to ArqonBus",...}}
+```
+
 ### Key Metrics to Monitor
 
 ```bash
