@@ -121,9 +121,9 @@ Command envelopes (send via WebSocket client or `wscat`) supported:
 Tier-Omega experimental lane (feature-flagged):
 
 - `op.omega.status`
-- `op.omega.register_substrate|list_substrates` (admin-only registration)
+- `op.omega.register_substrate|list_substrates|unregister_substrate` (admin-only registration/removal)
 - `op.omega.emit_event` (admin-only event emission)
-- `op.omega.list_events`
+- `op.omega.list_events|clear_events` (`clear_events` is admin-only)
 
 Tier-Omega flags:
 
@@ -132,6 +132,7 @@ export ARQONBUS_OMEGA_ENABLED=false
 export ARQONBUS_OMEGA_LAB_ROOM=omega-lab
 export ARQONBUS_OMEGA_LAB_CHANNEL=signals
 export ARQONBUS_OMEGA_MAX_EVENTS=1000
+export ARQONBUS_OMEGA_MAX_SUBSTRATES=128
 ```
 
 CASIL hot reload example envelope:

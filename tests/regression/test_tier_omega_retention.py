@@ -63,3 +63,44 @@ async def test_omega_event_window_retains_latest_entries():
     assert len(events) == 2
     assert events[0]["signal"] == "pulse-1"
     assert events[1]["signal"] == "pulse-2"
+
+
+@pytest.mark.asyncio
+async def test_omega_list_events_filter_isolates_substrate():
+    bus = _make_bus(max_events=10)
+
+    await bus._handle_command(
+        _command("op.omega.register_substrate", {"name": "alpha", "kind": "relational"}),
+        "client-1",
+    )
+    alpha_id = bus.send_to_client.call_args.args[1].payload["data"]["substrate_id"]
+
+    await bus._handle_command(
+        _command("op.omega.register_substrate", {"name": "beta", "kind": "symbolic"}),
+        "client-1",
+    )
+    beta_id = bus.send_to_client.call_args.args[1].payload["data"]["substrate_id"]
+
+    await bus._handle_command(
+        _command(
+            "op.omega.emit_event",
+            {"substrate_id": alpha_id, "signal": "pulse", "payload": {"source": "alpha"}},
+        ),
+        "client-1",
+    )
+    await bus._handle_command(
+        _command(
+            "op.omega.emit_event",
+            {"substrate_id": beta_id, "signal": "pulse", "payload": {"source": "beta"}},
+        ),
+        "client-1",
+    )
+
+    await bus._handle_command(
+        _command("op.omega.list_events", {"substrate_id": alpha_id, "limit": 10}),
+        "client-1",
+    )
+    response = bus.send_to_client.call_args.args[1]
+    events = response.payload["data"]["events"]
+    assert len(events) == 1
+    assert events[0]["substrate_id"] == alpha_id

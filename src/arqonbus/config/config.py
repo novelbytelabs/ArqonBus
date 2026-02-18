@@ -129,6 +129,7 @@ class TierOmegaConfig:
     lab_room: str = "omega-lab"
     lab_channel: str = "signals"
     max_events: int = 1000
+    max_substrates: int = 128
 
 
 @dataclass
@@ -238,6 +239,9 @@ class ArqonBusConfig:
         config.tier_omega.max_events = int(
             os.getenv("ARQONBUS_OMEGA_MAX_EVENTS", config.tier_omega.max_events)
         )
+        config.tier_omega.max_substrates = int(
+            os.getenv("ARQONBUS_OMEGA_MAX_SUBSTRATES", config.tier_omega.max_substrates)
+        )
         
         # Feature Flags
         config.holonomy_enabled = os.getenv("ARQONBUS_HOLONOMY_ENABLED", "false").lower() == "true"
@@ -309,6 +313,8 @@ class ArqonBusConfig:
             errors.append("Tier-Omega lab_channel must be non-empty")
         if self.tier_omega.max_events < 1:
             errors.append("Tier-Omega max_events must be >= 1")
+        if self.tier_omega.max_substrates < 1:
+            errors.append("Tier-Omega max_substrates must be >= 1")
             
         return errors
     
@@ -383,6 +389,7 @@ class ArqonBusConfig:
                 "lab_room": self.tier_omega.lab_room,
                 "lab_channel": self.tier_omega.lab_channel,
                 "max_events": self.tier_omega.max_events,
+                "max_substrates": self.tier_omega.max_substrates,
             },
             "environment": self.environment,
             "debug": self.debug

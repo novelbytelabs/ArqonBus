@@ -18,6 +18,7 @@ Current implementation scope:
 
 - Epoch 2 Factory gate closure (CLI/SDK/operators/policy hot reload)
 - Epoch 3 Tier-Omega experimental lane bootstrap (feature-flagged, isolated)
+- Tier-Omega lifecycle hardening (bounded substrates/events with admin controls)
 - Stability hardening discovered during manual gate validation
 
 Out of scope for this slice:
@@ -34,6 +35,7 @@ Out of scope for this slice:
 | M2: Test/Quality hardening gate | Completed | Unit/integration/e2e/regression + coverage/codecov wired. |
 | M3: Epoch 2 Factory gate | Completed | CLI + SDK + standard operators + CASIL hot reload checkpoint closed. |
 | M4: Tier-Omega experimental lane | Completed | Added feature-flagged `op.omega.*` path with unit/integration/e2e/regression coverage. |
+| M5: Tier-Omega lifecycle hardening | Completed | Added substrate/event lifecycle controls and bounded lane governance. |
 
 ## Phase 0 Completion Checklist
 
@@ -108,6 +110,13 @@ python -m pytest -q -m performance
 - [x] Added isolated Tier-Omega command lane (`op.omega.status|register_substrate|list_substrates|emit_event|list_events`)
 - [x] Enforced admin-only mutation commands and explicit feature-disabled response (`FEATURE_DISABLED`)
 - [x] Added unit/integration/e2e regression coverage for lane behavior and event retention window
+
+## Phase 7: Tier-Omega Lifecycle Hardening (Completed)
+
+- [x] Added bounded substrate governance (`ARQONBUS_OMEGA_MAX_SUBSTRATES`) with validation/export coverage
+- [x] Added admin lifecycle commands (`op.omega.unregister_substrate`, `op.omega.clear_events`)
+- [x] Added event query filters (`substrate_id`, `signal`) for `op.omega.list_events`
+- [x] Added unit/integration/e2e/regression coverage for lifecycle controls and filter isolation
 
 ## Epoch 1 Checkpoint 2.2 Progress
 

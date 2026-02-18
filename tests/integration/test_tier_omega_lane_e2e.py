@@ -166,3 +166,120 @@ async def test_tier_omega_enabled_can_emit_isolated_lab_event():
                 assert omega_event["substrate_id"] == substrate_id
     finally:
         await bus.stop_server()
+
+
+@pytest.mark.asyncio
+async def test_tier_omega_admin_can_unregister_and_clear_events():
+    cfg = ArqonBusConfig()
+    cfg.server.host = "127.0.0.1"
+    cfg.websocket.port = _next_port()
+    cfg.security.enable_authentication = True
+    cfg.security.jwt_secret = "omega-lifecycle-secret"
+    cfg.security.jwt_algorithm = "HS256"
+    cfg.tier_omega.enabled = True
+    cfg.tier_omega.max_substrates = 1
+    cfg.storage.enable_persistence = False
+
+    bus = WebSocketBus(ClientRegistry(), config=cfg)
+    await bus.start_server()
+    uri = f"ws://{cfg.server.host}:{cfg.websocket.port}"
+
+    try:
+        now = int(time.time())
+        admin_token = issue_hs256_token(
+            {"sub": "admin", "role": "admin", "tenant_id": "tenant-a", "exp": now + 120},
+            cfg.security.jwt_secret or "",
+        )
+        async with websockets.connect(uri, additional_headers={"Authorization": f"Bearer {admin_token}"}) as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2.0)
+
+            register_id = generate_message_id()
+            await ws.send(
+                json.dumps(
+                    {
+                        "id": register_id,
+                        "type": "command",
+                        "timestamp": _now_iso(),
+                        "version": "1.0",
+                        "command": "op.omega.register_substrate",
+                        "args": {"name": "alpha", "kind": "relational"},
+                    }
+                )
+            )
+            register_resp = await _recv_command_response(ws, register_id)
+            assert register_resp["status"] == "success"
+            substrate_id = register_resp["payload"]["data"]["substrate_id"]
+
+            # Exceeds max_substrates=1 and should fail.
+            second_register_id = generate_message_id()
+            await ws.send(
+                json.dumps(
+                    {
+                        "id": second_register_id,
+                        "type": "command",
+                        "timestamp": _now_iso(),
+                        "version": "1.0",
+                        "command": "op.omega.register_substrate",
+                        "args": {"name": "beta", "kind": "symbolic"},
+                    }
+                )
+            )
+            second_register_resp = await _recv_command_response(ws, second_register_id)
+            assert second_register_resp["status"] == "error"
+            assert second_register_resp["error_code"] == "VALIDATION_ERROR"
+
+            emit_id = generate_message_id()
+            await ws.send(
+                json.dumps(
+                    {
+                        "id": emit_id,
+                        "type": "command",
+                        "timestamp": _now_iso(),
+                        "version": "1.0",
+                        "command": "op.omega.emit_event",
+                        "args": {
+                            "substrate_id": substrate_id,
+                            "signal": "pulse",
+                            "payload": {"value": 1},
+                        },
+                    }
+                )
+            )
+            emit_resp = await _recv_command_response(ws, emit_id)
+            assert emit_resp["status"] == "success"
+
+            clear_id = generate_message_id()
+            await ws.send(
+                json.dumps(
+                    {
+                        "id": clear_id,
+                        "type": "command",
+                        "timestamp": _now_iso(),
+                        "version": "1.0",
+                        "command": "op.omega.clear_events",
+                        "args": {"substrate_id": substrate_id},
+                    }
+                )
+            )
+            clear_resp = await _recv_command_response(ws, clear_id)
+            assert clear_resp["status"] == "success"
+            assert clear_resp["payload"]["data"]["removed_count"] == 1
+
+            unregister_id = generate_message_id()
+            await ws.send(
+                json.dumps(
+                    {
+                        "id": unregister_id,
+                        "type": "command",
+                        "timestamp": _now_iso(),
+                        "version": "1.0",
+                        "command": "op.omega.unregister_substrate",
+                        "args": {"substrate_id": substrate_id},
+                    }
+                )
+            )
+            unregister_resp = await _recv_command_response(ws, unregister_id)
+            assert unregister_resp["status"] == "success"
+            assert unregister_resp["payload"]["data"]["removed"] is True
+    finally:
+        await bus.stop_server()

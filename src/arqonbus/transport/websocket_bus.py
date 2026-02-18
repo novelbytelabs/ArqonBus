@@ -794,6 +794,7 @@ class WebSocketBus:
             "lab_room": self.config.tier_omega.lab_room,
             "lab_channel": self.config.tier_omega.lab_channel,
             "max_events": self.config.tier_omega.max_events,
+            "max_substrates": self.config.tier_omega.max_substrates,
             "substrate_count": len(self._omega_substrates),
             "event_count": len(self._omega_events),
         }
@@ -827,6 +828,9 @@ class WebSocketBus:
         )
 
         async with self._ops_lock:
+            max_substrates = max(1, int(self.config.tier_omega.max_substrates))
+            if len(self._omega_substrates) >= max_substrates:
+                raise ValueError("Tier-Omega substrate limit reached")
             self._omega_substrates[substrate.substrate_id] = substrate
 
         return {
@@ -834,6 +838,34 @@ class WebSocketBus:
             "name": substrate.name,
             "kind": substrate.kind,
             "created_at": substrate.created_at,
+        }
+
+    async def _omega_unregister_substrate(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can unregister Tier-Omega substrates")
+
+        substrate_id = str(args.get("substrate_id", "")).strip()
+        if not substrate_id:
+            raise ValueError("'substrate_id' is required")
+
+        async with self._ops_lock:
+            substrate = self._omega_substrates.pop(substrate_id, None)
+            if substrate is None:
+                return {"removed": False, "substrate_id": substrate_id, "removed_events": 0}
+
+            previous_count = len(self._omega_events)
+            self._omega_events = [
+                event for event in self._omega_events if event.get("substrate_id") != substrate_id
+            ]
+            removed_events = previous_count - len(self._omega_events)
+
+        return {
+            "removed": True,
+            "substrate_id": substrate_id,
+            "name": substrate.name,
+            "kind": substrate.kind,
+            "removed_events": removed_events,
         }
 
     async def _omega_list_substrates(self) -> Dict[str, Any]:
@@ -907,9 +939,52 @@ class WebSocketBus:
         limit = int(args.get("limit", 50))
         if limit < 1:
             raise ValueError("'limit' must be >= 1")
+        substrate_id = str(args.get("substrate_id", "")).strip() or None
+        signal = str(args.get("signal", "")).strip() or None
         async with self._ops_lock:
-            events = list(self._omega_events[-limit:])
-        return {"events": events, "count": len(events)}
+            events = list(self._omega_events)
+
+        if substrate_id:
+            events = [event for event in events if event.get("substrate_id") == substrate_id]
+        if signal:
+            events = [event for event in events if event.get("signal") == signal]
+
+        events = events[-limit:]
+        return {
+            "events": events,
+            "count": len(events),
+            "limit": limit,
+            "substrate_id": substrate_id,
+            "signal": signal,
+        }
+
+    async def _omega_clear_events(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can clear Tier-Omega events")
+
+        substrate_id = str(args.get("substrate_id", "")).strip() or None
+        signal = str(args.get("signal", "")).strip() or None
+
+        async with self._ops_lock:
+            previous_count = len(self._omega_events)
+            retained = []
+            for event in self._omega_events:
+                substrate_match = substrate_id is None or event.get("substrate_id") == substrate_id
+                signal_match = signal is None or event.get("signal") == signal
+                if substrate_match and signal_match:
+                    continue
+                retained.append(event)
+            self._omega_events = retained
+            remaining_count = len(self._omega_events)
+
+        removed_count = previous_count - remaining_count
+        return {
+            "removed_count": removed_count,
+            "remaining_count": remaining_count,
+            "substrate_id": substrate_id,
+            "signal": signal,
+        }
 
     async def _handle_connection(self, websocket: Any):
         """Handle new WebSocket connection.
@@ -1147,6 +1222,27 @@ class WebSocketBus:
                 )
                 return
 
+            if envelope.command == "op.omega.unregister_substrate":
+                data = await self._omega_unregister_substrate(client_id, args)
+                if not data.get("removed"):
+                    await self._send_command_response(
+                        client_id,
+                        envelope.id,
+                        success=False,
+                        message=f"Tier-Omega substrate '{data['substrate_id']}' not found",
+                        data={"substrate_id": data["substrate_id"]},
+                        error_code="NOT_FOUND",
+                    )
+                    return
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega substrate removed",
+                    data=data,
+                )
+                return
+
             if envelope.command == "op.omega.emit_event":
                 data = await self._omega_emit_event(client_id, args)
                 await self._send_command_response(
@@ -1154,6 +1250,17 @@ class WebSocketBus:
                     envelope.id,
                     success=True,
                     message="Tier-Omega event emitted",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.clear_events":
+                data = await self._omega_clear_events(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega events cleared",
                     data=data,
                 )
                 return
