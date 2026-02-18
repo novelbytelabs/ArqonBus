@@ -123,6 +123,15 @@ class CASILConfig:
 
 
 @dataclass
+class TierOmegaConfig:
+    """Experimental Tier-Omega lane configuration."""
+    enabled: bool = False
+    lab_room: str = "omega-lab"
+    lab_channel: str = "signals"
+    max_events: int = 1000
+
+
+@dataclass
 class ArqonBusConfig:
     """Main configuration for ArqonBus."""
     server: ServerConfig = field(default_factory=ServerConfig)
@@ -132,6 +141,7 @@ class ArqonBusConfig:
     telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     casil: CASILConfig = field(default_factory=CASILConfig)
+    tier_omega: TierOmegaConfig = field(default_factory=TierOmegaConfig)
     
     # Feature Flags
     holonomy_enabled: bool = False
@@ -211,6 +221,23 @@ class ArqonBusConfig:
         config.casil.metadata.to_logs = os.getenv("ARQONBUS_CASIL_METADATA_TO_LOGS", str(config.casil.metadata.to_logs)).lower() == "true"
         config.casil.metadata.to_telemetry = os.getenv("ARQONBUS_CASIL_METADATA_TO_TELEMETRY", str(config.casil.metadata.to_telemetry)).lower() == "true"
         config.casil.metadata.to_envelope = os.getenv("ARQONBUS_CASIL_METADATA_TO_ENVELOPE", str(config.casil.metadata.to_envelope)).lower() == "true"
+
+        # Tier-Omega experimental lane
+        config.tier_omega.enabled = os.getenv(
+            "ARQONBUS_OMEGA_ENABLED",
+            str(config.tier_omega.enabled),
+        ).lower() == "true"
+        config.tier_omega.lab_room = os.getenv(
+            "ARQONBUS_OMEGA_LAB_ROOM",
+            config.tier_omega.lab_room,
+        )
+        config.tier_omega.lab_channel = os.getenv(
+            "ARQONBUS_OMEGA_LAB_CHANNEL",
+            config.tier_omega.lab_channel,
+        )
+        config.tier_omega.max_events = int(
+            os.getenv("ARQONBUS_OMEGA_MAX_EVENTS", config.tier_omega.max_events)
+        )
         
         # Feature Flags
         config.holonomy_enabled = os.getenv("ARQONBUS_HOLONOMY_ENABLED", "false").lower() == "true"
@@ -274,6 +301,14 @@ class ArqonBusConfig:
             errors.append("CASIL max_patterns must be non-negative")
         if self.casil.policies.max_payload_bytes < 0:
             errors.append("CASIL max_payload_bytes must be non-negative")
+
+        # Tier-Omega validation
+        if not self.tier_omega.lab_room:
+            errors.append("Tier-Omega lab_room must be non-empty")
+        if not self.tier_omega.lab_channel:
+            errors.append("Tier-Omega lab_channel must be non-empty")
+        if self.tier_omega.max_events < 1:
+            errors.append("Tier-Omega max_events must be >= 1")
             
         return errors
     
@@ -342,6 +377,12 @@ class ArqonBusConfig:
                     "to_telemetry": self.casil.metadata.to_telemetry,
                     "to_envelope": self.casil.metadata.to_envelope,
                 },
+            },
+            "tier_omega": {
+                "enabled": self.tier_omega.enabled,
+                "lab_room": self.tier_omega.lab_room,
+                "lab_channel": self.tier_omega.lab_channel,
+                "max_events": self.tier_omega.max_events,
             },
             "environment": self.environment,
             "debug": self.debug

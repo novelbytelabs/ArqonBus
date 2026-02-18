@@ -52,6 +52,20 @@ class _CronJob:
     created_at: str
 
 
+@dataclass
+class _OmegaSubstrate:
+    substrate_id: str
+    name: str
+    kind: str
+    owner_client_id: str
+    metadata: Dict[str, Any]
+    created_at: str
+
+
+class _FeatureDisabledError(RuntimeError):
+    """Raised when a feature-flagged command path is disabled."""
+
+
 class WebSocketBus:
     """WebSocket server for ArqonBus message routing.
     
@@ -98,6 +112,8 @@ class WebSocketBus:
         self._cron_jobs: Dict[str, _CronJob] = {}
         self._cron_tasks: Dict[str, asyncio.Task] = {}
         self._store: Dict[str, Dict[str, Any]] = {}
+        self._omega_substrates: Dict[str, _OmegaSubstrate] = {}
+        self._omega_events: list[Dict[str, Any]] = []
         self._ops_lock = asyncio.Lock()
         
         # Statistics
@@ -772,6 +788,129 @@ class WebSocketBus:
 
         return self._casil_snapshot(candidate)
 
+    def _omega_snapshot(self) -> Dict[str, Any]:
+        return {
+            "enabled": self.config.tier_omega.enabled,
+            "lab_room": self.config.tier_omega.lab_room,
+            "lab_channel": self.config.tier_omega.lab_channel,
+            "max_events": self.config.tier_omega.max_events,
+            "substrate_count": len(self._omega_substrates),
+            "event_count": len(self._omega_events),
+        }
+
+    def _require_omega_enabled(self) -> None:
+        if not self.config.tier_omega.enabled:
+            raise _FeatureDisabledError("Tier-Omega experimental lane is disabled")
+
+    async def _omega_register_substrate(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can register Tier-Omega substrates")
+
+        name = str(args.get("name", "")).strip()
+        kind = str(args.get("kind", "")).strip()
+        metadata = args.get("metadata") or {}
+        if not name:
+            raise ValueError("'name' is required")
+        if not kind:
+            raise ValueError("'kind' is required")
+        if not isinstance(metadata, dict):
+            raise ValueError("'metadata' must be an object")
+
+        substrate = _OmegaSubstrate(
+            substrate_id=f"omega_{uuid.uuid4().hex[:12]}",
+            name=name,
+            kind=kind,
+            owner_client_id=client_id,
+            metadata=metadata,
+            created_at=self._utc_now_iso(),
+        )
+
+        async with self._ops_lock:
+            self._omega_substrates[substrate.substrate_id] = substrate
+
+        return {
+            "substrate_id": substrate.substrate_id,
+            "name": substrate.name,
+            "kind": substrate.kind,
+            "created_at": substrate.created_at,
+        }
+
+    async def _omega_list_substrates(self) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        async with self._ops_lock:
+            substrates = list(self._omega_substrates.values())
+
+        payload = []
+        for substrate in substrates:
+            payload.append(
+                {
+                    "substrate_id": substrate.substrate_id,
+                    "name": substrate.name,
+                    "kind": substrate.kind,
+                    "owner_client_id": substrate.owner_client_id,
+                    "metadata": substrate.metadata,
+                    "created_at": substrate.created_at,
+                }
+            )
+        return {"substrates": payload, "count": len(payload)}
+
+    async def _omega_emit_event(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can emit Tier-Omega events")
+
+        substrate_id = str(args.get("substrate_id", "")).strip()
+        signal = str(args.get("signal", "")).strip()
+        payload = args.get("payload") or {}
+        if not substrate_id:
+            raise ValueError("'substrate_id' is required")
+        if not signal:
+            raise ValueError("'signal' is required")
+        if not isinstance(payload, dict):
+            raise ValueError("'payload' must be an object")
+
+        async with self._ops_lock:
+            if substrate_id not in self._omega_substrates:
+                raise ValueError(f"Unknown substrate_id: {substrate_id}")
+            event = {
+                "event_id": f"omega_evt_{uuid.uuid4().hex[:12]}",
+                "substrate_id": substrate_id,
+                "signal": signal,
+                "payload": payload,
+                "emitted_by": client_id,
+                "timestamp": self._utc_now_iso(),
+            }
+            self._omega_events.append(event)
+            max_events = max(1, int(self.config.tier_omega.max_events))
+            if len(self._omega_events) > max_events:
+                self._omega_events = self._omega_events[-max_events:]
+
+        event_envelope = Envelope(
+            id=generate_message_id(),
+            type="telemetry",
+            room=self.config.tier_omega.lab_room,
+            channel=self.config.tier_omega.lab_channel,
+            payload={"omega_event": event},
+            sender="op-omega",
+        )
+        await self.client_registry.broadcast_to_room_channel(
+            event_envelope,
+            self.config.tier_omega.lab_room,
+            self.config.tier_omega.lab_channel,
+            exclude_client_id=None,
+        )
+        return event
+
+    async def _omega_list_events(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        limit = int(args.get("limit", 50))
+        if limit < 1:
+            raise ValueError("'limit' must be >= 1")
+        async with self._ops_lock:
+            events = list(self._omega_events[-limit:])
+        return {"events": events, "count": len(events)}
+
     async def _handle_connection(self, websocket: Any):
         """Handle new WebSocket connection.
         
@@ -975,6 +1114,61 @@ class WebSocketBus:
         args = envelope.args or {}
 
         try:
+            if envelope.command == "op.omega.status":
+                data = self._omega_snapshot()
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega lane status",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.register_substrate":
+                data = await self._omega_register_substrate(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega substrate registered",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.list_substrates":
+                data = await self._omega_list_substrates()
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega substrates listed",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.emit_event":
+                data = await self._omega_emit_event(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega event emitted",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.list_events":
+                data = await self._omega_list_events(args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega events listed",
+                    data=data,
+                )
+                return
+
             if envelope.command == "op.casil.get":
                 data = self._casil_snapshot(self.config.casil)
                 await self._send_command_response(
@@ -1139,6 +1333,15 @@ class WebSocketBus:
                 success=False,
                 message=str(exc),
                 error_code="AUTHORIZATION_ERROR",
+            )
+            return
+        except _FeatureDisabledError as exc:
+            await self._send_command_response(
+                client_id,
+                envelope.id,
+                success=False,
+                message=str(exc),
+                error_code="FEATURE_DISABLED",
             )
             return
         except (TypeError, ValueError) as exc:

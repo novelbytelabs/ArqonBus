@@ -118,6 +118,22 @@ Command envelopes (send via WebSocket client or `wscat`) supported:
 - `op.cron.schedule|list|cancel`
 - `op.store.set|get|list|delete`
 
+Tier-Omega experimental lane (feature-flagged):
+
+- `op.omega.status`
+- `op.omega.register_substrate|list_substrates` (admin-only registration)
+- `op.omega.emit_event` (admin-only event emission)
+- `op.omega.list_events`
+
+Tier-Omega flags:
+
+```bash
+export ARQONBUS_OMEGA_ENABLED=false
+export ARQONBUS_OMEGA_LAB_ROOM=omega-lab
+export ARQONBUS_OMEGA_LAB_CHANNEL=signals
+export ARQONBUS_OMEGA_MAX_EVENTS=1000
+```
+
 CASIL hot reload example envelope:
 
 ```json

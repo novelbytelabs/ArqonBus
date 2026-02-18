@@ -17,12 +17,13 @@ execution has moved into Epoch 2 bootstrap work.
 Current implementation scope:
 
 - Epoch 2 Factory gate closure (CLI/SDK/operators/policy hot reload)
+- Epoch 3 Tier-Omega experimental lane bootstrap (feature-flagged, isolated)
 - Stability hardening discovered during manual gate validation
 
 Out of scope for this slice:
 
 - Epoch 2 observability dashboard packaging
-- Epoch 3 Tier-Omega / substrate ambitions
+- Tier-Omega autonomous optimization loops or non-isolated substrate execution
 
 ## Program Milestones
 
@@ -32,7 +33,7 @@ Out of scope for this slice:
 | M1: Core Python stability pass | Completed | Dispatch/auth/http/websocket stabilization merged on branch. |
 | M2: Test/Quality hardening gate | Completed | Unit/integration/e2e/regression + coverage/codecov wired. |
 | M3: Epoch 2 Factory gate | Completed | CLI + SDK + standard operators + CASIL hot reload checkpoint closed. |
-| M4: Tier-Omega experimental lane | Not Started | Will remain feature-flagged and isolated. |
+| M4: Tier-Omega experimental lane | Completed | Added feature-flagged `op.omega.*` path with unit/integration/e2e/regression coverage. |
 
 ## Phase 0 Completion Checklist
 
@@ -100,6 +101,13 @@ python -m pytest -q -m performance
 - [x] Added standard operator starter pack (`op.webhook`, `op.cron`, `op.store`)
 - [x] Added SDK hello-world bot path (`examples/python/hello_world_bot.py`) with e2e validation
 - [x] Added live CASIL policy hot reload command path (`op.casil.reload`) with integration/e2e coverage
+
+## Phase 6: Tier-Omega Experimental Lane (Completed)
+
+- [x] Added Tier-Omega config surface (`ARQONBUS_OMEGA_*`) with validation and config export
+- [x] Added isolated Tier-Omega command lane (`op.omega.status|register_substrate|list_substrates|emit_event|list_events`)
+- [x] Enforced admin-only mutation commands and explicit feature-disabled response (`FEATURE_DISABLED`)
+- [x] Added unit/integration/e2e regression coverage for lane behavior and event retention window
 
 ## Epoch 1 Checkpoint 2.2 Progress
 

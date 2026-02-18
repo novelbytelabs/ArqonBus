@@ -164,6 +164,16 @@ These are available as WebSocket `type: "command"` operations:
 - `op.webhook.register|list|unregister` - Route matching room/channel envelopes to HTTP POST webhooks.
 - `op.cron.schedule|list|cancel` - Schedule delayed or recurring envelope broadcasts.
 - `op.store.set|get|list|delete` - Tenant-scoped in-memory KV storage for agent state.
+- `op.omega.status|register_substrate|list_substrates|emit_event|list_events` - Feature-flagged Tier-Omega experimental lane (admin-only mutations).
+
+Tier-Omega lane environment flags:
+
+```bash
+ARQONBUS_OMEGA_ENABLED=false
+ARQONBUS_OMEGA_LAB_ROOM=omega-lab
+ARQONBUS_OMEGA_LAB_CHANNEL=signals
+ARQONBUS_OMEGA_MAX_EVENTS=1000
+```
 
 ### Minimal Python SDK Usage
 
