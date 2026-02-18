@@ -306,7 +306,7 @@ class WebSocketBus:
                             "Failed to persist message %s from %s: %s",
                             envelope.id,
                             client_id,
-                            result.error,
+                            result.error_message,
                         )
                 except Exception as e:
                     logger.error("Message persistence error for %s: %s", envelope.id, e)

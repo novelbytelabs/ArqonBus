@@ -1,5 +1,6 @@
 import os
 import sys
+import socket
 from pathlib import Path
 import pytest
 
@@ -51,3 +52,23 @@ def pytest_collection_modifyitems(config, items):
 
         for marker in _ROOT_FILE_MARKERS.get(file_name, ("unit",)):
             item.add_marker(getattr(pytest.mark, marker))
+
+
+def _socket_capable() -> bool:
+    """Check whether this environment allows local TCP socket operations."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            s.listen(1)
+        return True
+    except OSError:
+        return False
+
+
+def pytest_runtest_setup(item):
+    if item.get_closest_marker("socket"):
+        if _socket_capable():
+            return
+        if os.getenv("ARQONBUS_REQUIRE_SOCKET_TESTS", "0") == "1":
+            pytest.fail("Socket-marked tests are required but local TCP socket capability is unavailable")
+        pytest.skip("Socket capability unavailable in this environment")

@@ -36,6 +36,7 @@ def _ws_uri(config: dict) -> str:
 
 class TestEndToEndMessaging:
     """End-to-end integration tests for ArqonBus."""
+    pytestmark = [pytest.mark.e2e, pytest.mark.socket]
     
     @pytest.fixture
     def server_config(self):

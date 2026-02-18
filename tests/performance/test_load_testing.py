@@ -21,6 +21,8 @@ from arqonbus.protocol.envelope import Envelope
 from arqonbus.protocol.ids import generate_message_id
 from arqonbus.config.config import load_config
 
+pytestmark = [pytest.mark.socket]
+
 _port_sequence = itertools.count(42000)
 
 
