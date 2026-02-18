@@ -27,9 +27,9 @@ Out of scope for this freeze:
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
-| M0: Baseline and truth alignment | In Progress | This file established; docs being reconciled. |
-| M1: Core Python stability pass | In Progress | Dispatch/auth regressions under active fixes. |
-| M2: Test/Quality hardening gate | In Progress | Unit/integration/e2e/regression + coverage wiring underway. |
+| M0: Baseline and truth alignment | Completed | Canonical status file and doc links aligned. |
+| M1: Core Python stability pass | Completed | Dispatch/auth/http/websocket stabilization merged on branch. |
+| M2: Test/Quality hardening gate | Completed | Unit/integration/e2e/regression + coverage/codecov wired. |
 | M3: Epoch 2 Factory gate | Not Started | CLI/SDK/operator DX remains partial. |
 | M4: Tier-Omega experimental lane | Not Started | Will remain feature-flagged and isolated. |
 
@@ -73,3 +73,19 @@ python -m pytest -q -m performance
 - [x] CI split into unit/integration/e2e/regression jobs
 - [x] Combined coverage gate with XML export
 - [x] Codecov upload workflow + repository config
+
+## Phase 3: Socket-Gated Test Reliability
+
+- [x] Socket capability marker added (`socket`)
+- [x] Runtime skip/fail policy added for socket-required tests
+- [x] CI e2e job enforces socket capability (`ARQONBUS_REQUIRE_SOCKET_TESTS=1`)
+- [x] Optional performance job enforces socket capability
+- [x] Added unit tests for command authorization/admin/http transport behavior
+
+## Phase 4: Monitoring + Deployment Polish (In Progress)
+
+- [x] Added HTTP `/version` endpoint
+- [x] Added HTTP request instrumentation wrapper (count, latency, errors)
+- [x] Added unit tests for `/version` and tracked handler metrics/error paths
+- [x] Added top-level docs runbook entrypoint (`docs/runbook.md`)
+- [x] Fixed README/docs index links to canonical architecture/API/runbook docs

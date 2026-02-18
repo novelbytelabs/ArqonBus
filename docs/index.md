@@ -186,8 +186,9 @@ Create engaging multiplayer experiences with:
 
 Transform your real-time communication architecture with **ArqonBus** - where enterprise performance meets developer simplicity.
 
-[![Get Started](https://img.shields.io/badge/📚-View_Documentation-blue?style=for-the-badge)](./api.md)
-[![Quick Start](https://img.shields.io/badge/⚡-Quick_Start-green?style=for-the-badge)](./architecture.md)
+[![Get Started](https://img.shields.io/badge/📚-View_Documentation-blue?style=for-the-badge)](./ArqonBus/spec/api.md)
+[![Quick Start](https://img.shields.io/badge/⚡-Quick_Start-green?style=for-the-badge)](./quickstart.md)
+[![Runbook](https://img.shields.io/badge/🛠-Runbook-purple?style=for-the-badge)](./runbook.md)
 [![Examples](https://img.shields.io/badge="💡"-Examples-orange?style=for-the-badge)](../examples/)
 
 ---

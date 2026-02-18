@@ -128,9 +128,10 @@ Built-in commands (via `type: "command"`):
 - **[HTTP Endpoints](specs/001-core-message-bus/contracts/http-endpoints.md)** - Health, metrics, and monitoring APIs
 
 ### Additional Documentation
-- **[Architecture Guide](docs/architecture.md)** - Detailed system architecture and component descriptions
-- **[API Documentation](docs/api.md)** - Complete API reference and usage examples
-- **[ArqonTech Ecosystem](docs/arqon_ecosystem.md)** - Product positioning and roadmap
+- **[Architecture Guide](docs/ArqonBus/plan/architecture.md)** - Detailed system architecture and component descriptions
+- **[API Documentation](docs/ArqonBus/spec/api.md)** - Complete API reference and usage examples
+- **[Operations Runbook](docs/runbook.md)** - Deployment and operational troubleshooting
+- **[ArqonTech Ecosystem](docs/projects/arqon_ecosystem.md)** - Product positioning and roadmap
 - **[ArqonBus v1.0 Scope](docs/arqonbus_v1_scope.md)** - Product evolution plan and gap analysis
 
 ---
