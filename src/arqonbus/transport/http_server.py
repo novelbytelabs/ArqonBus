@@ -491,6 +491,16 @@ class ArqonBusHTTPServer:
                 "error": "Failed to get telemetry stats",
                 "details": str(e)
             }, status=500)
+
+    def _is_admin_request_authorized(self, request: web_request.Request) -> bool:
+        """Validate admin request authorization.
+
+        If no API key is configured, admin endpoints are treated as local/dev open.
+        """
+        if not self.api_key:
+            return True
+        provided = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
+        return provided == self.api_key
     
     async def admin_shutdown(self, request: web_request.Request) -> web_response.Response:
         """Admin shutdown endpoint.
@@ -501,7 +511,11 @@ class ArqonBusHTTPServer:
         Returns:
             Shutdown response
         """
-        # TODO: Add authentication check
+        if not self._is_admin_request_authorized(request):
+            return web.json_response(
+                {"error": "Unauthorized", "details": "Valid X-API-Key required"},
+                status=401,
+            )
         logger.warning("Admin shutdown requested via HTTP endpoint")
         
         try:
@@ -529,7 +543,11 @@ class ArqonBusHTTPServer:
         Returns:
             Restart response
         """
-        # TODO: Add authentication check
+        if not self._is_admin_request_authorized(request):
+            return web.json_response(
+                {"error": "Unauthorized", "details": "Valid X-API-Key required"},
+                status=401,
+            )
         logger.warning("Admin restart requested via HTTP endpoint")
         
         try:
@@ -552,13 +570,14 @@ class ArqonBusHTTPServer:
         """Shutdown the server."""
         await asyncio.sleep(1)  # Give time for response
         await self.stop()
-        # TODO: Implement full server shutdown
+        logger.info("HTTP shutdown sequence completed")
     
     async def _restart_server(self):
         """Restart the server."""
         await asyncio.sleep(1)  # Give time for response
         await self.stop()
-        # TODO: Implement server restart logic
+        await self.start()
+        logger.info("HTTP restart sequence completed")
     
     async def _health_monitor(self):
         """Monitor HTTP server health."""

@@ -46,6 +46,13 @@ class ResultCollector:
         logger.debug(f"Opened selection window for task {task_id} (expected: {expected_count})")
         return future
 
+    def get_future(self, task_id: str) -> Optional[asyncio.Future]:
+        """Get the open selection future for a task if present."""
+        window = self.windows.get(task_id)
+        if not window:
+            return None
+        return window.get("future")
+
     async def add_result(self, task_id: str, result_envelope: Envelope):
         """Add a result to an open window."""
         if task_id not in self.windows:
@@ -108,7 +115,8 @@ class TaskDispatcher:
         self,
         task_envelope: Envelope,
         required_capability: str,
-        strategy: DispatchStrategy = DispatchStrategy.ROUND_ROBIN
+        strategy: DispatchStrategy = DispatchStrategy.ROUND_ROBIN,
+        return_selection_future: bool = False,
     ) -> Any:
         """Dispatch a task to suitable operators.
         
@@ -116,9 +124,11 @@ class TaskDispatcher:
             task_envelope: The task to dispatch
             required_capability: The capability group needed (e.g., 'code.python')
             strategy: Dispatch strategy to use
+            return_selection_future: If True with COMPETING strategy, return selection future.
             
         Returns:
-            Number of operators the task was sent to.
+            Number of operators the task was sent to by default.
+            If `return_selection_future=True` and strategy is COMPETING, returns an asyncio.Future.
         """
         try:
             # 1. Resolve Operators
@@ -146,7 +156,11 @@ class TaskDispatcher:
             
             # If strategy is COMPETING, register with collector BEFORE sending
             selection_future = None
-            if strategy == DispatchStrategy.COMPETING and self.collector:
+            if (
+                strategy == DispatchStrategy.COMPETING
+                and self.collector
+                and return_selection_future
+            ):
                 selection_future = await self.collector.open_window(
                     task_envelope.id, 
                     expected_count=len(target_operator_ids),
@@ -169,8 +183,12 @@ class TaskDispatcher:
                 f"(Strategy: {strategy}, Capability: {required_capability})"
             )
             
-            # If COMPETING, return the future so caller can await the winner
-            if strategy == DispatchStrategy.COMPETING and selection_future:
+            # Optional: return selection future for RSI workflows.
+            if (
+                strategy == DispatchStrategy.COMPETING
+                and return_selection_future
+                and selection_future
+            ):
                 return selection_future
                 
             return sent_count

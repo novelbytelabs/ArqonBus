@@ -1,5 +1,9 @@
 # ArqonBus v1.0 Core Message Bus - Implementation Completion Report
 
+> Historical note: this file is a point-in-time v1 report and is **not** the canonical
+> current project status for vNext execution.  
+> Canonical status: `docs/ArqonBus/vnext_status.md`
+
 **Project**: ArqonBus Core Message Bus  
 **Version**: 1.0.0  
 **Status**: ✅ COMPLETED  

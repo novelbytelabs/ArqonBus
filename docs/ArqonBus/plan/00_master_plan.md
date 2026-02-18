@@ -2,6 +2,8 @@
 
 This document defines the **execution strategy** for ArqonBus vNext. It maps the Vision (Constitution) to a concrete roadmap of Engineering Epochs.
 
+Operational status source of truth: `docs/ArqonBus/vnext_status.md`.
+
 ## 1. The Strategy: Epoch-Based Execution
 
 We cannot build the "Emergent Intelligence" (Epoch 3) until the "Road" (Epoch 1) is paved. We proceed in three distinct phases.
@@ -53,6 +55,10 @@ We cannot build the "Emergent Intelligence" (Epoch 3) until the "Road" (Epoch 1)
 *   [ ] Can I auth with a JWT?
 *   [ ] Can I send a message and see it echoed?
 *   [ ] Does the Wasm Safety Layer block a "bad" message?
+
+### 2.3 Scope Freeze (Phase 0)
+*   [x] Scope is frozen to Epoch 1 deliverables until checkpoint 2.2 is green.
+*   [x] Epoch 2/3 work remains explicitly out of scope for current stabilization.
 
 ---
 

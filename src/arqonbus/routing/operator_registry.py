@@ -5,6 +5,7 @@ enabling 1:1 task distribution via Redis Streams.
 """
 import logging
 import asyncio
+import os
 from typing import Dict, List, Any
 from datetime import datetime
 
@@ -29,20 +30,27 @@ class OperatorRegistry:
         # {client_id: group_name}
         self.client_to_group: Dict[str, str] = {}
         self._lock = asyncio.Lock()
+        self.operator_auth_required = str(
+            os.getenv("ARQONBUS_OPERATOR_AUTH_REQUIRED", "false")
+        ).lower() in {"1", "true", "yes", "on"}
+        self.operator_auth_token = os.getenv("ARQONBUS_OPERATOR_AUTH_TOKEN", "")
 
     async def register_operator(self, client_id: str, group: str, auth_token: str = ""):
         """Register a client as an operator for a specific group.
         
-        Enforces a simple capability token check to prevent unauthorized 
-        operators from joining critical groups.
+        Optional token enforcement for protected deployments:
+        - Disabled by default for local/test workflows
+        - Enabled via ARQONBUS_OPERATOR_AUTH_REQUIRED=true
         """
-        # Simple hardcoded check for the audit fix. 
-        # In production, this would be a proper secret management system.
-        expected_token = "rsi_secret_token_123"
-        
-        if auth_token != expected_token:
-            logger.warning(f"Operator {client_id} failed auth for group {group}")
-            return False
+        if self.operator_auth_required:
+            if not self.operator_auth_token:
+                logger.error(
+                    "Operator auth required but ARQONBUS_OPERATOR_AUTH_TOKEN is unset; rejecting registration"
+                )
+                return False
+            if auth_token != self.operator_auth_token:
+                logger.warning(f"Operator {client_id} failed auth for group {group}")
+                return False
 
         async with self._lock:
             if group not in self.groups:
@@ -55,7 +63,7 @@ class OperatorRegistry:
 
             self.groups[group][client_id] = OperatorInfo(client_id, group)
             self.client_to_group[client_id] = group
-            logger.info(f"Operator {client_id} joined group {group} (Authenticated)")
+            logger.info(f"Operator {client_id} joined group {group}")
             return True
 
     async def unregister_operator(self, client_id: str):

@@ -1,10 +1,9 @@
-# 🛰️ ArqonBus: Enterprise-Grade Message Bus
+# 🛰️ ArqonBus
 
-**ArqonBus** is a lightweight, high-performance WebSocket message bus engineered for enterprise-scale real-time communication. Built with Python 3.11+ and designed for mission-critical applications requiring sub-50ms message routing and 5,000+ concurrent connections.
+**ArqonBus** is a lightweight WebSocket message bus with active vNext development.
 
-![ArqonBus Architecture](https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=for-the-badge)
-![Performance](https://img.shields.io/badge/Performance-5K%2B%20Connections-orange?style=for-the-badge)
-![Latency](https://img.shields.io/badge/Latency-%3C50ms%20p99-red?style=for-the-badge)
+> Current status: **In Progress / Not production-released as vNext**  
+> Source of truth: `docs/ArqonBus/vnext_status.md`
 
 ---
 

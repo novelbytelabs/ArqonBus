@@ -103,7 +103,8 @@ async def run_benchmark():
         future = await dispatcher.dispatch_task(
             task, 
             "synthesis", 
-            strategy=DispatchStrategy.COMPETING
+            strategy=DispatchStrategy.COMPETING,
+            return_selection_future=True,
         )
         task_futures.append(future)
         

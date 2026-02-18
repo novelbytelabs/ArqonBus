@@ -79,7 +79,8 @@ async def run_live_test():
     future = await dispatcher.dispatch_task(
         task, 
         "verification", 
-        strategy=DispatchStrategy.COMPETING
+        strategy=DispatchStrategy.COMPETING,
+        return_selection_future=True,
     )
     
     # 4. Operator Processing (Simulated Event Loop)

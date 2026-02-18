@@ -1,0 +1,12 @@
+[run]
+branch = True
+source =
+    src/arqonbus
+omit =
+    */tests/*
+    */test_*.py
+
+[report]
+skip_covered = True
+show_missing = True
+precision = 2

@@ -298,8 +298,18 @@ class WebSocketBus:
         
         # Store message if storage is enabled
         if self.config.storage.enable_persistence:
-            # TODO: Implement message storage (Phase 3)
-            pass
+            if self.storage:
+                try:
+                    result = await self.storage.store_message(envelope)
+                    if not result.success:
+                        logger.warning(
+                            "Failed to persist message %s from %s: %s",
+                            envelope.id,
+                            client_id,
+                            result.error,
+                        )
+                except Exception as e:
+                    logger.error("Message persistence error for %s: %s", envelope.id, e)
         
         # Broadcast to room/channel
         sent_count = await self.client_registry.broadcast_to_room_channel(
@@ -381,8 +391,28 @@ class WebSocketBus:
             envelope: Telemetry envelope
             client_id: Client who sent the telemetry
         """
-        # TODO: Implement telemetry processing (Phase 5)
-        logger.debug(f"Received telemetry from {client_id}")
+        self._stats["events_emitted"] += 1
+
+        # Persist telemetry when storage is enabled.
+        if self.config.storage.enable_persistence and self.storage:
+            try:
+                await self.storage.store_message(
+                    envelope,
+                    room=envelope.room or "integriguard",
+                    channel=envelope.channel or "telemetry-stream",
+                )
+            except Exception as e:
+                logger.error("Telemetry persistence error for %s: %s", envelope.id, e)
+
+        # Broadcast telemetry only when routing hints are present.
+        if envelope.room and envelope.channel:
+            await self.client_registry.broadcast_to_room_channel(
+                envelope,
+                envelope.room,
+                envelope.channel,
+                exclude_client_id=client_id,
+            )
+        logger.debug(f"Processed telemetry from {client_id}")
 
     async def _handle_operator_join(self, envelope: Envelope, client_id: str):
         """Handle operator registration for a work group."""
@@ -390,13 +420,27 @@ class WebSocketBus:
             logger.error("Operator registry not available")
             return
 
-        group = envelope.payload.get("group")
+        payload = envelope.payload or {}
+        group = payload.get("group")
         if not group:
             logger.warning(f"Operator {client_id} tried to join without group")
             return
         
 
-        await self.routing_coordinator.operator_registry.register_operator(client_id, group)
+        auth_token = payload.get("auth_token", "")
+        registered = await self.routing_coordinator.operator_registry.register_operator(
+            client_id, group, auth_token=auth_token
+        )
+        if not registered:
+            response = Envelope(
+                type="error",
+                request_id=envelope.id,
+                error="Operator registration denied",
+                error_code="OPERATOR_AUTH_FAILED",
+                sender="arqonbus",
+            )
+            await self.send_to_client(client_id, response)
+            return
         
         # Start a dedicated push loop for this operator
         task = asyncio.create_task(self._operator_push_loop(client_id, group))

@@ -5,7 +5,12 @@ from arqonbus.protocol.synthesis_operator import SynthesisOperator
 from arqonbus.routing.dispatcher import TaskDispatcher, ResultCollector, DispatchStrategy
 from arqonbus.routing.operator_registry import OperatorRegistry
 from arqonbus.routing.router import MessageRouter
-from integriguard.governance.rsi.selection_function import select_winning_action
+selection_mod = pytest.importorskip(
+    "integriguard.governance.rsi.selection_function",
+    reason="Integriguard RSI package not installed",
+)
+select_winning_action = selection_mod.select_winning_action
+pytestmark = [pytest.mark.external, pytest.mark.integration]
 
 @pytest.mark.asyncio
 async def test_rsi_parallel_speculation_e2e():
@@ -48,7 +53,8 @@ async def test_rsi_parallel_speculation_e2e():
     selection_future = await dispatcher.dispatch_task(
         task, 
         "synthesis", 
-        strategy=DispatchStrategy.COMPETING
+        strategy=DispatchStrategy.COMPETING,
+        return_selection_future=True,
     )
     
     assert isinstance(selection_future, asyncio.Future)
