@@ -160,6 +160,7 @@ arqon tail --ws-url ws://127.0.0.1:9100 --jwt "$ARQONBUS_AUTH_JWT" --raw --limit
 
 These are available as WebSocket `type: "command"` operations:
 
+- `op.casil.get|reload` - Inspect and hot-reload active CASIL policy on the running gateway.
 - `op.webhook.register|list|unregister` - Route matching room/channel envelopes to HTTP POST webhooks.
 - `op.cron.schedule|list|cancel` - Schedule delayed or recurring envelope broadcasts.
 - `op.store.set|get|list|delete` - Tenant-scoped in-memory KV storage for agent state.

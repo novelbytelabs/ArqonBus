@@ -113,9 +113,27 @@ arqon tail --ws-url ws://127.0.0.1:9100 --jwt "$ARQONBUS_AUTH_JWT" --raw --limit
 
 Command envelopes (send via WebSocket client or `wscat`) supported:
 
+- `op.casil.get|reload` (admin-only reload)
 - `op.webhook.register|list|unregister`
 - `op.cron.schedule|list|cancel`
 - `op.store.set|get|list|delete`
+
+CASIL hot reload example envelope:
+
+```json
+{
+  "id": "arq_...generated...",
+  "type": "command",
+  "timestamp": "2026-02-18T00:00:00+00:00",
+  "version": "1.0",
+  "command": "op.casil.reload",
+  "args": {
+    "mode": "enforce",
+    "block_on_probable_secret": true,
+    "redaction_patterns": ["token", "secret"]
+  }
+}
+```
 
 Hello-world bot smoke:
 

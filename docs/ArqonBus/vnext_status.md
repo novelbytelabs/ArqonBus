@@ -16,12 +16,12 @@ execution has moved into Epoch 2 bootstrap work.
 
 Current implementation scope:
 
-- Epoch 2 CLI/SDK developer experience bootstrap
+- Epoch 2 Factory gate closure (CLI/SDK/operators/policy hot reload)
 - Stability hardening discovered during manual gate validation
 
 Out of scope for this slice:
 
-- Epoch 2 standard operators backlog (`op-webhook`, `op-cron`, `op-store`)
+- Epoch 2 observability dashboard packaging
 - Epoch 3 Tier-Omega / substrate ambitions
 
 ## Program Milestones
@@ -31,7 +31,7 @@ Out of scope for this slice:
 | M0: Baseline and truth alignment | Completed | Canonical status file and doc links aligned. |
 | M1: Core Python stability pass | Completed | Dispatch/auth/http/websocket stabilization merged on branch. |
 | M2: Test/Quality hardening gate | Completed | Unit/integration/e2e/regression + coverage/codecov wired. |
-| M3: Epoch 2 Factory gate | In Progress | CLI + Python SDK + standard operator pack landed; safety policy hot reload remains. |
+| M3: Epoch 2 Factory gate | Completed | CLI + SDK + standard operators + CASIL hot reload checkpoint closed. |
 | M4: Tier-Omega experimental lane | Not Started | Will remain feature-flagged and isolated. |
 
 ## Phase 0 Completion Checklist
@@ -91,7 +91,7 @@ python -m pytest -q -m performance
 - [x] Added top-level docs runbook entrypoint (`docs/runbook.md`)
 - [x] Fixed README/docs index links to canonical architecture/API/runbook docs
 
-## Phase 5: Epoch 2 Factory Bootstrap (In Progress)
+## Phase 5: Epoch 2 Factory Bootstrap (Completed)
 
 - [x] Added first-party `arqon` CLI entrypoint (`status`, `version`, `tail`)
 - [x] Added minimal Python SDK client for JWT-authenticated WebSocket usage
@@ -99,7 +99,7 @@ python -m pytest -q -m performance
 - [x] Added regression coverage for RFC3339 `Z` timestamp envelope parsing
 - [x] Added standard operator starter pack (`op.webhook`, `op.cron`, `op.store`)
 - [x] Added SDK hello-world bot path (`examples/python/hello_world_bot.py`) with e2e validation
-- [ ] Add policy hot-reload path to satisfy Epoch 2 checkpoint item 3.2(2)
+- [x] Added live CASIL policy hot reload command path (`op.casil.reload`) with integration/e2e coverage
 
 ## Epoch 1 Checkpoint 2.2 Progress
 

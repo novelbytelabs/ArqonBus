@@ -1,5 +1,6 @@
 """WebSocket server for ArqonBus real-time messaging."""
 import asyncio
+from copy import deepcopy
 import json
 import logging
 import urllib.error
@@ -264,6 +265,33 @@ class WebSocketBus:
         if value <= 0:
             raise ValueError(f"'{field_name}' must be > 0")
         return value
+
+    @staticmethod
+    def _coerce_bool(raw_value: Any, field_name: str) -> bool:
+        if isinstance(raw_value, bool):
+            return raw_value
+        if isinstance(raw_value, int):
+            return bool(raw_value)
+        if isinstance(raw_value, str):
+            lowered = raw_value.strip().lower()
+            if lowered in {"true", "1", "yes", "on"}:
+                return True
+            if lowered in {"false", "0", "no", "off"}:
+                return False
+        raise ValueError(f"'{field_name}' must be a boolean")
+
+    @staticmethod
+    def _coerce_str_list(raw_value: Any, field_name: str) -> list[str]:
+        if isinstance(raw_value, str):
+            return [raw_value]
+        if isinstance(raw_value, list):
+            converted: list[str] = []
+            for item in raw_value:
+                if not isinstance(item, (str, int, float)):
+                    raise ValueError(f"'{field_name}' items must be scalar values")
+                converted.append(str(item))
+            return converted
+        raise ValueError(f"'{field_name}' must be a string or list")
 
     async def _client_metadata(self, client_id: str) -> Dict[str, Any]:
         client_info = await self.client_registry.get_client(client_id)
@@ -644,6 +672,106 @@ class WebSocketBus:
             keys = sorted(namespace_store.keys())
         return {"namespace": namespace, "count": len(keys), "keys": keys}
 
+    @staticmethod
+    def _casil_snapshot(casil_config: Any) -> Dict[str, Any]:
+        return {
+            "enabled": casil_config.enabled,
+            "mode": casil_config.mode,
+            "default_decision": casil_config.default_decision,
+            "scope_include": list(casil_config.scope.include),
+            "scope_exclude": list(casil_config.scope.exclude),
+            "max_payload_bytes": casil_config.policies.max_payload_bytes,
+            "max_inspect_bytes": casil_config.limits.max_inspect_bytes,
+            "max_patterns": casil_config.limits.max_patterns,
+            "block_on_probable_secret": casil_config.policies.block_on_probable_secret,
+            "redaction_paths": list(casil_config.policies.redaction.paths),
+            "redaction_patterns": list(casil_config.policies.redaction.patterns),
+            "transport_redaction": casil_config.policies.redaction.transport_redaction,
+            "metadata_to_logs": casil_config.metadata.to_logs,
+            "metadata_to_telemetry": casil_config.metadata.to_telemetry,
+            "metadata_to_envelope": casil_config.metadata.to_envelope,
+        }
+
+    async def _reload_casil_policy(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can reload CASIL policy")
+
+        candidate = deepcopy(self.config.casil)
+
+        if "enabled" in args:
+            candidate.enabled = self._coerce_bool(args["enabled"], "enabled")
+        if "mode" in args:
+            candidate.mode = str(args["mode"]).strip().lower()
+        if "default_decision" in args:
+            candidate.default_decision = str(args["default_decision"]).strip().lower()
+        if "scope_include" in args:
+            candidate.scope.include = self._coerce_str_list(args["scope_include"], "scope_include")
+        if "scope_exclude" in args:
+            candidate.scope.exclude = self._coerce_str_list(args["scope_exclude"], "scope_exclude")
+        if "max_payload_bytes" in args:
+            candidate.policies.max_payload_bytes = self._parse_positive_int(
+                args["max_payload_bytes"],
+                "max_payload_bytes",
+            )
+        if "max_inspect_bytes" in args:
+            candidate.limits.max_inspect_bytes = self._parse_positive_int(
+                args["max_inspect_bytes"],
+                "max_inspect_bytes",
+            )
+        if "max_patterns" in args:
+            candidate.limits.max_patterns = self._parse_positive_int(args["max_patterns"], "max_patterns")
+        if "block_on_probable_secret" in args:
+            candidate.policies.block_on_probable_secret = self._coerce_bool(
+                args["block_on_probable_secret"],
+                "block_on_probable_secret",
+            )
+        if "redaction_paths" in args:
+            candidate.policies.redaction.paths = self._coerce_str_list(args["redaction_paths"], "redaction_paths")
+        if "redaction_patterns" in args:
+            candidate.policies.redaction.patterns = self._coerce_str_list(
+                args["redaction_patterns"],
+                "redaction_patterns",
+            )
+        if "transport_redaction" in args:
+            candidate.policies.redaction.transport_redaction = self._coerce_bool(
+                args["transport_redaction"],
+                "transport_redaction",
+            )
+        if "metadata_to_logs" in args:
+            candidate.metadata.to_logs = self._coerce_bool(args["metadata_to_logs"], "metadata_to_logs")
+        if "metadata_to_telemetry" in args:
+            candidate.metadata.to_telemetry = self._coerce_bool(
+                args["metadata_to_telemetry"],
+                "metadata_to_telemetry",
+            )
+        if "metadata_to_envelope" in args:
+            candidate.metadata.to_envelope = self._coerce_bool(
+                args["metadata_to_envelope"],
+                "metadata_to_envelope",
+            )
+
+        errors = []
+        if candidate.mode not in ("monitor", "enforce"):
+            errors.append(f"Invalid CASIL mode: {candidate.mode}")
+        if candidate.default_decision not in ("allow", "block"):
+            errors.append(f"Invalid CASIL default_decision: {candidate.default_decision}")
+        if candidate.limits.max_inspect_bytes < 0:
+            errors.append("CASIL max_inspect_bytes must be non-negative")
+        if candidate.limits.max_patterns < 0:
+            errors.append("CASIL max_patterns must be non-negative")
+        if candidate.policies.max_payload_bytes < 0:
+            errors.append("CASIL max_payload_bytes must be non-negative")
+
+        if errors:
+            raise ValueError("; ".join(errors))
+
+        async with self._ops_lock:
+            self.config.casil = candidate
+            self.casil.config = candidate
+            self.casil.engine.config = candidate
+
+        return self._casil_snapshot(candidate)
+
     async def _handle_connection(self, websocket: Any):
         """Handle new WebSocket connection.
         
@@ -847,6 +975,28 @@ class WebSocketBus:
         args = envelope.args or {}
 
         try:
+            if envelope.command == "op.casil.get":
+                data = self._casil_snapshot(self.config.casil)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="CASIL policy snapshot",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.casil.reload":
+                data = await self._reload_casil_policy(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="CASIL policy reloaded",
+                    data=data,
+                )
+                return
+
             if envelope.command == "op.webhook.register":
                 data = await self._register_webhook_rule(client_id, args)
                 await self._send_command_response(

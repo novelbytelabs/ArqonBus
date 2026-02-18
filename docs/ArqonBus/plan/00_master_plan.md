@@ -78,7 +78,7 @@ We cannot build the "Emergent Intelligence" (Epoch 3) until the "Road" (Epoch 1)
 
 ### 3.2 The Checkpoint (Gate to Epoch 3)
 *   [x] Can a junior dev write a "Hello World" bot in Python in < 5 mins? (SDK bot example + e2e test landed)
-*   [ ] Can we deploy a safety policy without restarting the gateway?
+*   [x] Can we deploy a safety policy without restarting the gateway? (`op.casil.reload` + e2e validation)
 *   [x] Is there a "Tail" (Log stream) visible in the CLI? (`arqon tail` + e2e coverage)
 
 ---
