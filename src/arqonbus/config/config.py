@@ -62,6 +62,8 @@ class TelemetryConfig:
 class SecurityConfig:
     """Security and authentication configuration."""
     enable_authentication: bool = False
+    jwt_secret: Optional[str] = None
+    jwt_algorithm: str = "HS256"
     allowed_commands: List[str] = field(default_factory=lambda: [
         "status", "ping", "history", "list_channels", "channel_info",
         "create_channel", "delete_channel", "join_channel", "leave_channel"
@@ -179,6 +181,8 @@ class ArqonBusConfig:
         
         # Security configuration
         config.security.enable_authentication = os.getenv("ARQONBUS_ENABLE_AUTH", "false").lower() == "true"
+        config.security.jwt_secret = os.getenv("ARQONBUS_AUTH_JWT_SECRET", config.security.jwt_secret)
+        config.security.jwt_algorithm = os.getenv("ARQONBUS_AUTH_JWT_ALGORITHM", config.security.jwt_algorithm).upper()
 
         # CASIL configuration
         config.casil.enabled = os.getenv("ARQONBUS_CASIL_ENABLED", str(config.casil.enabled)).lower() == "true"
@@ -254,6 +258,10 @@ class ArqonBusConfig:
         # Security validation
         if self.security.rate_limit_per_minute < 1:
             errors.append(f"Invalid rate limit: {self.security.rate_limit_per_minute}")
+        if self.security.enable_authentication and not self.security.jwt_secret:
+            errors.append("JWT secret is required when authentication is enabled")
+        if self.security.jwt_algorithm not in ("HS256",):
+            errors.append(f"Unsupported JWT algorithm: {self.security.jwt_algorithm}")
 
         # CASIL validation
         if self.casil.mode not in ("monitor", "enforce"):
@@ -302,6 +310,8 @@ class ArqonBusConfig:
             },
             "security": {
                 "enable_authentication": self.security.enable_authentication,
+                "jwt_algorithm": self.security.jwt_algorithm,
+                "has_jwt_secret": bool(self.security.jwt_secret),
                 "allowed_commands": self.security.allowed_commands,
                 "rate_limit_per_minute": self.security.rate_limit_per_minute
             },

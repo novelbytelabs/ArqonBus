@@ -51,10 +51,10 @@ We cannot build the "Emergent Intelligence" (Epoch 3) until the "Road" (Epoch 1)
     *   Strict message envelopes.
 
 ### 2.2 The Checkpoint (Gate to Epoch 2)
-*   [ ] Can I connect via `wscat`?
-*   [ ] Can I auth with a JWT?
-*   [ ] Can I send a message and see it echoed?
-*   [ ] Does the Wasm Safety Layer block a "bad" message?
+*   [ ] Can I connect via `wscat`? (manual CLI validation still pending in this sandbox)
+*   [x] Can I auth with a JWT?
+*   [x] Can I send a message and see it echoed?
+*   [x] Does the Wasm Safety Layer block a "bad" message? (validated via CASIL enforce policy path)
 
 ### 2.3 Scope Freeze (Phase 0)
 *   [x] Scope is frozen to Epoch 1 deliverables until checkpoint 2.2 is green.

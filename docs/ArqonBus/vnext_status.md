@@ -82,10 +82,18 @@ python -m pytest -q -m performance
 - [x] Optional performance job enforces socket capability
 - [x] Added unit tests for command authorization/admin/http transport behavior
 
-## Phase 4: Monitoring + Deployment Polish (In Progress)
+## Phase 4: Monitoring + Deployment Polish (Current Slice Completed)
 
 - [x] Added HTTP `/version` endpoint
 - [x] Added HTTP request instrumentation wrapper (count, latency, errors)
 - [x] Added unit tests for `/version` and tracked handler metrics/error paths
 - [x] Added top-level docs runbook entrypoint (`docs/runbook.md`)
 - [x] Fixed README/docs index links to canonical architecture/API/runbook docs
+
+## Epoch 1 Checkpoint 2.2 Progress
+
+- [x] WebSocket connect path validated with authenticated test client
+- [x] JWT authentication enforced at edge (missing/invalid/expired rejected)
+- [x] Authenticated room echo validated between two clients
+- [x] Safety policy blocking validated in enforce mode (bad payload not routed)
+- [ ] Manual `wscat` handshake validation in this sandbox (blocked by local EPERM in this environment)

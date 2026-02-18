@@ -26,6 +26,9 @@ export ARQONBUS_SERVER_HOST=0.0.0.0
 export ARQONBUS_SERVER_PORT=9100
 export ARQONBUS_MAX_CONNECTIONS=1000
 export ARQONBUS_ENABLE_TELEMETRY=true
+export ARQONBUS_ENABLE_AUTH=true
+export ARQONBUS_AUTH_JWT_SECRET=replace-with-strong-secret
+export ARQONBUS_AUTH_JWT_ALGORITHM=HS256
 export ARQONBUS_DEBUG=false
 ```
 
@@ -356,6 +359,9 @@ python -m arqonbus.main --storage-backend memory
 | `ARQONBUS_MAX_MESSAGE_SIZE` | 1048576 | Maximum WebSocket message size |
 | `ARQONBUS_COMPRESSION` | true | Enable message compression |
 | `ARQONBUS_ENABLE_TELEMETRY` | true | Enable telemetry events |
+| `ARQONBUS_ENABLE_AUTH` | false | Require JWT auth at WebSocket handshake |
+| `ARQONBUS_AUTH_JWT_SECRET` | None | Shared secret for HS256 JWT verification |
+| `ARQONBUS_AUTH_JWT_ALGORITHM` | HS256 | Supported JWT algorithm (HS256) |
 | `ARQONBUS_LOG_LEVEL` | INFO | Logging level |
 | `ARQONBUS_DEBUG` | false | Enable debug mode |
 

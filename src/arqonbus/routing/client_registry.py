@@ -99,6 +99,30 @@ class ClientRegistry:
             "created_at": datetime.utcnow(),
             "last_activity": datetime.utcnow()
         }
+
+    @staticmethod
+    def _websocket_is_open(websocket) -> bool:
+        """Best-effort compatibility check across websocket implementations."""
+        if websocket is None:
+            return False
+        if hasattr(websocket, "open"):
+            try:
+                return bool(websocket.open)
+            except Exception:
+                return False
+        if hasattr(websocket, "closed"):
+            try:
+                return not bool(websocket.closed)
+            except Exception:
+                return False
+        if hasattr(websocket, "state"):
+            # websockets>=14 uses connection state values; treat OPEN as sendable.
+            state = getattr(websocket, "state", None)
+            if state is None:
+                return False
+            state_name = getattr(state, "name", str(state))
+            return str(state_name).upper() == "OPEN"
+        return True
     
     async def register_client(self, websocket, room: Optional[str] = None, channel: Optional[str] = None, metadata: Optional[Dict] = None) -> str:
         """Register a new client connection.
@@ -322,7 +346,7 @@ class ClientRegistry:
                 continue
             
             try:
-                if hasattr(client_info.websocket, 'send') and client_info.websocket.open:
+                if hasattr(client_info.websocket, 'send') and self._websocket_is_open(client_info.websocket):
                     await client_info.websocket.send(message_json)
                     sent_count += 1
             except Exception as e:
@@ -386,7 +410,7 @@ class ClientRegistry:
             
             for client_id, client_info in self._clients.items():
                 # Check if WebSocket is still open
-                if not hasattr(client_info.websocket, 'open') or not client_info.websocket.open:
+                if not self._websocket_is_open(client_info.websocket):
                     disconnected.append(client_id)
             
             # Remove disconnected clients

@@ -209,7 +209,7 @@ class MessageRouter:
             if client_info.client_id == sender_client_id:
                 continue
             
-            if client_info.websocket and client_info.websocket.open:
+            if client_info.websocket and self.client_registry._websocket_is_open(client_info.websocket):
                 try:
                     await client_info.websocket.send(envelope.to_json())
                     sent_count += 1
@@ -238,7 +238,7 @@ class MessageRouter:
         try:
             # Get target client
             target_client = await self.client_registry.get_client(target_client_id)
-            if not target_client or not target_client.websocket.open:
+            if not target_client or not self.client_registry._websocket_is_open(target_client.websocket):
                 raise RoutingError(f"Target client {target_client_id} is not available")
             
             # Add sender info to envelope

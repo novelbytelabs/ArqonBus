@@ -2,8 +2,10 @@
 import asyncio
 import logging
 from typing import Dict, Optional, Set, Callable, Any
-from websockets import serve
+from urllib.parse import parse_qs, urlsplit
+from websockets import Response, serve
 from websockets.exceptions import ConnectionClosed
+from websockets.datastructures import Headers
 
 from ..protocol.envelope import Envelope
 from ..protocol.validator import EnvelopeValidator
@@ -11,6 +13,7 @@ from ..routing.client_registry import ClientRegistry
 from ..config.config import get_config
 from ..casil.integration import CasilIntegration
 from ..casil.outcome import CASILDecision
+from ..security.jwt_auth import JWTAuthError, validate_jwt
 
 
 logger = logging.getLogger(__name__)
@@ -92,6 +95,7 @@ class WebSocketBus:
                 host,
                 port,
                 max_size=self.config.websocket.max_message_size,
+                process_request=self._process_request,
                 compression=compression,
                 ping_interval=self.config.server.ping_interval,
                 ping_timeout=self.config.server.ping_timeout,
@@ -146,6 +150,61 @@ class WebSocketBus:
         
         logger.info("ArqonBus WebSocket server stopped")
     
+    async def _process_request(self, connection: Any, request: Any) -> Optional[Response]:
+        """Process incoming handshake request for edge authentication."""
+        if not self.config.security.enable_authentication:
+            return None
+
+        token = self._extract_auth_token(request)
+        if not token:
+            return self._unauthorized_response("Missing bearer token")
+
+        try:
+            claims = validate_jwt(
+                token,
+                self.config.security.jwt_secret or "",
+                allowed_algorithms=[self.config.security.jwt_algorithm],
+            )
+        except JWTAuthError as exc:
+            logger.warning("WebSocket auth rejected: %s", exc)
+            return self._unauthorized_response("Invalid token")
+
+        # Persist claims on the connection for later client metadata binding.
+        setattr(connection, "_arqon_auth_claims", claims)
+        return None
+
+    @staticmethod
+    def _unauthorized_response(details: str) -> Response:
+        body = (
+            '{"error":"Unauthorized","details":"' + details.replace('"', "'") + '"}'
+        ).encode("utf-8")
+        headers = Headers()
+        headers["Content-Type"] = "application/json"
+        headers["WWW-Authenticate"] = 'Bearer realm="arqonbus"'
+        return Response(401, "Unauthorized", headers, body)
+
+    @staticmethod
+    def _extract_auth_token(request: Any) -> Optional[str]:
+        headers = getattr(request, "headers", None)
+        auth_header = None
+        if headers is not None:
+            auth_header = headers.get("Authorization") or headers.get("authorization")
+
+        if auth_header:
+            parts = auth_header.strip().split(" ", 1)
+            if len(parts) == 2 and parts[0].lower() == "bearer" and parts[1].strip():
+                return parts[1].strip()
+
+        raw_path = getattr(request, "path", "")
+        if raw_path:
+            query = parse_qs(urlsplit(raw_path).query)
+            for key in ("token", "access_token", "auth_token"):
+                values = query.get(key)
+                if values and values[0]:
+                    return values[0]
+
+        return None
+
     async def _handle_connection(self, websocket: Any):
         """Handle new WebSocket connection.
         
@@ -156,8 +215,27 @@ class WebSocketBus:
         client_id = None
         
         try:
+            claims = getattr(websocket, "_arqon_auth_claims", None)
+            metadata = {}
+            if isinstance(claims, dict):
+                role = claims.get("role")
+                tenant_id = claims.get("tenant_id")
+                subject = claims.get("sub")
+                if role:
+                    metadata["role"] = role
+                elif self.config.security.enable_authentication:
+                    metadata["role"] = "user"
+                if tenant_id:
+                    metadata["tenant_id"] = tenant_id
+                if subject:
+                    metadata["subject"] = subject
+            elif self.config.security.enable_authentication:
+                metadata["role"] = "user"
+
             # Register new client
-            client_id = await self.client_registry.register_client(websocket)
+            client_id = await self.client_registry.register_client(
+                websocket, metadata=metadata or None
+            )
             self._stats["total_connections"] += 1
             self._stats["active_connections"] += 1
             self._stats["last_activity"] = asyncio.get_event_loop().time()
