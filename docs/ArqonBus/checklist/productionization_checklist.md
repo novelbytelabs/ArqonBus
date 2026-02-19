@@ -17,10 +17,10 @@ Source plans:
 
 ## Phase 1: Security Hardening
 
-- [ ] Remove default JWT secret fallback from Shield production path.
-- [ ] Disable skip-validation outside test profile.
-- [ ] Add regression tests for fail-closed auth startup and token checks.
-- [ ] Re-run `cargo check -p shield` and `cargo test -p shield --tests`.
+- [x] Remove default JWT secret fallback from Shield production path.
+- [x] Disable skip-validation outside test profile.
+- [x] Add regression tests for fail-closed auth startup and token checks.
+- [x] Re-run `cargo check -p shield` and `cargo test -p shield --tests`.
 
 ## Phase 2: Storage Durability Hardening
 

@@ -16,8 +16,16 @@ use tokio_tungstenite::{
     tungstenite::{client::ClientRequestBuilder, http::Uri, Message},
 };
 
+fn jwt_secret_for_tests() -> String {
+    std::env::var("JWT_SECRET").unwrap_or_else(|_| {
+        let secret = "arqon-shield-test-secret".to_string();
+        std::env::set_var("JWT_SECRET", &secret);
+        secret
+    })
+}
+
 fn issue_token(tenant_id: &str) -> String {
-    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "arqon-dev-secret".to_string());
+    let secret = jwt_secret_for_tests();
     let claims = Claims {
         sub: "e2e-user".to_string(),
         tenant_id: tenant_id.to_string(),

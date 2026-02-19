@@ -29,28 +29,43 @@ pub struct JwtConfig {
 impl Default for JwtConfig {
     fn default() -> Self {
         Self {
-            secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "arqon-dev-secret".to_string()),
-            skip_validation: std::env::var("JWT_SKIP_VALIDATION").is_ok(),
+            secret: std::env::var("JWT_SECRET").unwrap_or_default(),
+            // Skip-validation is test-only and never enabled from runtime env vars.
+            skip_validation: false,
         }
     }
 }
 
 /// Decode and validate a JWT token.
 pub fn decode_token(token: &str, config: &JwtConfig) -> Result<Claims> {
+    if config.secret.trim().is_empty() {
+        return Err(anyhow!("JWT secret is not configured"));
+    }
+
     if config.skip_validation {
-        // Dev mode: decode without validation
-        let parts: Vec<&str> = token.split('.').collect();
-        if parts.len() != 3 {
-            return Err(anyhow!("Invalid JWT format"));
+        #[cfg(not(test))]
+        {
+            return Err(anyhow!(
+                "JWT skip-validation is not allowed outside test builds"
+            ));
         }
 
-        use base64::Engine;
-        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(parts[1])
-            .map_err(|e| anyhow!("Failed to decode JWT payload: {}", e))?;
-        let claims: Claims = serde_json::from_slice(&payload)
-            .map_err(|e| anyhow!("Failed to parse JWT claims: {}", e))?;
-        return Ok(claims);
+        #[cfg(test)]
+        // Dev mode: decode without validation
+        {
+            let parts: Vec<&str> = token.split('.').collect();
+            if parts.len() != 3 {
+                return Err(anyhow!("Invalid JWT format"));
+            }
+
+            use base64::Engine;
+            let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(parts[1])
+                .map_err(|e| anyhow!("Failed to decode JWT payload: {}", e))?;
+            let claims: Claims = serde_json::from_slice(&payload)
+                .map_err(|e| anyhow!("Failed to parse JWT claims: {}", e))?;
+            return Ok(claims);
+        }
     }
 
     let key = DecodingKey::from_secret(config.secret.as_bytes());
@@ -117,6 +132,16 @@ mod tests {
             skip_validation: false,
         };
 
+        let result = decode_token("invalid.token.here", &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_missing_secret_fails_closed() {
+        let config = JwtConfig {
+            secret: String::new(),
+            skip_validation: false,
+        };
         let result = decode_token("invalid.token.here", &config);
         assert!(result.is_err());
     }

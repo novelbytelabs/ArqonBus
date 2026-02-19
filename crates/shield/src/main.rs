@@ -11,6 +11,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     telemetry::init_metrics();
     info!("Shield Reactor booting...");
+    enforce_auth_preflight()?;
 
     // 2. Connect to NATS
     let nats_url =
@@ -51,4 +52,17 @@ fn schema_strict_mode() -> bool {
     std::env::var("ARQON_SCHEMA_STRICT")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(true)
+}
+
+fn enforce_auth_preflight() -> anyhow::Result<()> {
+    let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_default();
+    if jwt_secret.trim().is_empty() {
+        anyhow::bail!("JWT_SECRET must be configured for Shield startup");
+    }
+
+    if std::env::var("JWT_SKIP_VALIDATION").is_ok() {
+        anyhow::bail!("JWT_SKIP_VALIDATION is not allowed in Shield runtime");
+    }
+
+    Ok(())
 }
