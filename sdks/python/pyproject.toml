@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arqon"
+version = "0.1.0"
+description = "Official Python SDK for ArqonBus"
+authors = [
+  { name = "NovelByte Labs", email = "eng@novelbyte.com" },
+]
+dependencies = [
+  "nats-py>=2.6.0",
+]
+requires-python = ">=3.10"

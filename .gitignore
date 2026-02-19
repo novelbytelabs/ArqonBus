@@ -13,6 +13,8 @@ simulation_results/
 string_data/
 benchmark_outputs/
 node_modules/
+crates/
+target/
 
 # Manually added
 .codex/

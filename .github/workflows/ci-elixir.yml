@@ -1,0 +1,52 @@
+name: Elixir CI
+
+on:
+  push:
+    branches: ["main", "003-core-spine"]
+    paths:
+      - "lib/**"
+      - ".github/workflows/ci-elixir.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "lib/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        otp: ["26.0"]
+        elixir: ["1.15"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.otp}}
+          elixir-version: ${{matrix.elixir}}
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v3
+        with:
+          path: lib/brain/deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('lib/brain/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+        working-directory: lib/brain
+
+      - name: Compile
+        run: mix compile --warnings-as-errors
+        working-directory: lib/brain
+
+      - name: Run Tests
+        run: mix test
+        working-directory: lib/brain
