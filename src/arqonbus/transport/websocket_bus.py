@@ -583,7 +583,7 @@ class WebSocketBus:
             try:
                 await task
             except asyncio.CancelledError:
-                pass
+                logger.debug("Cron job %s cancelled", job_id)
         return True
 
     async def _list_cron_jobs(self, client_id: str) -> Dict[str, Any]:
@@ -639,9 +639,9 @@ class WebSocketBus:
             try:
                 await task
             except asyncio.CancelledError:
-                pass
-            except Exception:
-                pass
+                logger.debug("Cron task cancelled during shutdown")
+            except Exception as exc:
+                logger.warning("Cron task cleanup failed during shutdown: %s", exc)
 
     async def _store_set(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
         key = str(args.get("key", "")).strip()
@@ -1141,8 +1141,12 @@ class WebSocketBus:
             )
             try:
                 await websocket.send(error_msg.to_json())
-            except Exception:
-                pass  # Client may already be disconnected
+            except Exception as exc:
+                logger.warning(
+                    "Failed to send error envelope to client %s: %s",
+                    client_id,
+                    exc,
+                )
     
     async def _handle_message(self, envelope: Envelope, client_id: str):
         """Handle regular message routing.
@@ -1652,7 +1656,7 @@ class WebSocketBus:
                 try:
                     await task
                 except asyncio.CancelledError:
-                    pass
+                    logger.debug("Operator task for %s cancelled", client_id)
             
             # Unregister from operator registry
             if self.routing_coordinator and self.routing_coordinator.operator_registry:

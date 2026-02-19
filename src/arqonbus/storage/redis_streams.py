@@ -576,8 +576,12 @@ class RedisStreamsStorage(StorageBackend):
                     if isinstance(v_str, str) and (v_str.startswith("{") or v_str.startswith("[")):
                         try:
                             v_str = json.loads(v_str)
-                        except:
-                            pass
+                        except json.JSONDecodeError as exc:
+                            logger.debug(
+                                "Failed to decode Redis stream field '%s' as JSON: %s",
+                                k_str,
+                                exc,
+                            )
                     decoded_data[k_str] = v_str
                 
                 decoded_messages.append((msg_id, decoded_data))

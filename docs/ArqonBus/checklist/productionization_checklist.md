@@ -31,9 +31,9 @@ Source plans:
 
 ## Phase 3: Runtime Integrity
 
-- [ ] Remove or hard-gate prototype operator logic from production paths.
-- [ ] Replace silent exception swallows in hot loops with structured handling.
-- [ ] Add regression tests for no-silent-failure guarantees.
+- [x] Remove or hard-gate prototype operator logic from production paths.
+- [x] Replace silent exception swallows in hot loops with structured handling.
+- [x] Add regression tests for no-silent-failure guarantees.
 
 ## Phase 4: Deployment Hardening
 
