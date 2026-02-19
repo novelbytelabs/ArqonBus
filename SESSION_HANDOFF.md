@@ -11,7 +11,7 @@ Productionization phases completed through Phase 5. Release Gate items remain.
 - Phase 2: `b26b7c6` - `phase-2: enforce strict redis mode and explicit degraded storage semantics`
 - Phase 3: `54c5e87` - `phase-3: harden runtime integrity and no-silent-failure paths`
 - Phase 4: `084a32f` - `phase-4: enforce profile contract and startup preflight`
-- Phase 5: `<pending commit>` - `phase-5: run full validation matrix and CI-equivalent gates`
+- Phase 5: `afc9f05` - `phase-5: run full validation matrix and gate checks`
 
 ## Key changes shipped
 - Startup preflight and dependency cleanup (Python side)
