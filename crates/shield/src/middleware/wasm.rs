@@ -46,3 +46,83 @@ fn response_for_status(status: StatusCode) -> Response {
         .body(Body::empty())
         .expect("building middleware response must not fail")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        build_state, default_mirror_config, middleware::schema::SchemaValidator,
+        policy::engine::PolicyEngine, router::nats_bridge::NatsBridge,
+    };
+    use axum::{routing::post, Router};
+    use std::sync::Arc;
+    use tower::ServiceExt;
+
+    async fn app_with_policy(policy: PolicyEngine) -> Router {
+        let state = build_state(
+            NatsBridge::disconnected(),
+            policy,
+            default_mirror_config(),
+            SchemaValidator::new("/tmp/missing.desc", "arqon.v1.Envelope", false),
+        );
+        Router::new()
+            .route("/inspect", post(|| async { StatusCode::OK }))
+            .layer(axum::middleware::from_fn_with_state(
+                Arc::new(state.clone()),
+                wasm_middleware,
+            ))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn test_wasm_middleware_allows_non_empty_when_policy_allows() {
+        let mut policy = PolicyEngine::new().expect("policy engine");
+        let module_path = format!("{}/policies/block_empty.wasm", env!("CARGO_MANIFEST_DIR"));
+        policy.load_module(module_path).expect("policy load");
+        let app = app_with_policy(policy).await;
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/inspect")
+            .body(Body::from(vec![1_u8, 2, 3]))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_wasm_middleware_denies_empty_payload_when_policy_denies() {
+        let mut policy = PolicyEngine::new().expect("policy engine");
+        let module_path = format!("{}/policies/block_empty.wasm", env!("CARGO_MANIFEST_DIR"));
+        policy.load_module(module_path).expect("policy load");
+        let app = app_with_policy(policy).await;
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/inspect")
+            .body(Body::empty())
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn test_wasm_middleware_fail_closed_on_policy_error() {
+        let mut policy = PolicyEngine::new().expect("policy engine");
+        let module_path = format!("{}/policies/block_empty.wasm", env!("CARGO_MANIFEST_DIR"));
+        policy.load_module(module_path).expect("policy load");
+        let app = app_with_policy(policy).await;
+
+        // >64KiB will exceed block_empty.wasm exported memory and trigger policy error.
+        let req = Request::builder()
+            .method("POST")
+            .uri("/inspect")
+            .body(Body::from(vec![1_u8; 70_000]))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

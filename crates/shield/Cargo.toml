@@ -16,7 +16,7 @@ bytes = "1.5"
 anyhow = "1.0"
 thiserror = "1.0"
 headers = "0.4"
-tower = "0.4"
+tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 flate2 = "1.0"
 uuid = { version = "1.0", features = ["v4"] }
@@ -26,7 +26,13 @@ chrono = "0.4"
 metrics = "0.21"
 metrics-exporter-prometheus = "0.12"
 prost-reflect = "0.12"
+prost = "0.12"
+prost-types = "0.12"
 
 # Internal
 proto = { path = "../proto" }
 voltron-core = { path = "../voltron-core" }
+
+[dev-dependencies]
+futures-util = "0.3"
+tokio-tungstenite = "0.24"

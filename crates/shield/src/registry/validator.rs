@@ -3,6 +3,9 @@
 //! Validates message payloads against Protobuf FileDescriptorSet schemas.
 
 use anyhow::Result;
+use prost::Message;
+use prost_reflect::{DescriptorPool, DynamicMessage};
+use prost_types::FileDescriptorSet;
 
 /// Validation result containing error details.
 #[derive(Debug, Clone)]
@@ -19,10 +22,16 @@ impl std::fmt::Display for ValidationError {
 
 /// Validate a payload against a Protobuf FileDescriptorSet.
 ///
-/// For now, this is a stub that checks if the payload is valid Protobuf wire format.
-/// Full schema validation requires parsing the FileDescriptorSet and matching message types.
 pub fn validate_payload(schema_bytes: &[u8], payload: &[u8]) -> Result<(), Vec<ValidationError>> {
-    // Basic validation: check if payload is non-empty
+    let message_name = infer_first_message_name(schema_bytes).map_err(|e| vec![e])?;
+    validate_payload_for_message(schema_bytes, payload, &message_name)
+}
+
+pub fn validate_payload_for_message(
+    schema_bytes: &[u8],
+    payload: &[u8],
+    message_name: &str,
+) -> Result<(), Vec<ValidationError>> {
     if payload.is_empty() {
         return Err(vec![ValidationError {
             field: "payload".to_string(),
@@ -38,24 +47,26 @@ pub fn validate_payload(schema_bytes: &[u8], payload: &[u8]) -> Result<(), Vec<V
         }]);
     }
 
-    // TODO: Full Protobuf validation would require:
-    // 1. Parse FileDescriptorSet from schema_bytes using prost-reflect
-    // 2. Identify expected message type from subject mapping
-    // 3. Decode payload using dynamic message
-    // 4. Validate required fields are present
+    let pool = DescriptorPool::decode(schema_bytes).map_err(|e| {
+        vec![ValidationError {
+            field: "schema".to_string(),
+            message: format!("Invalid descriptor set: {}", e),
+        }]
+    })?;
 
-    // For MVP, we just check basic wire format (first byte should be valid field tag)
-    // Protobuf field tags use varint encoding, first byte should have bits set
-    let first_byte = payload[0];
-    let wire_type = first_byte & 0x07;
+    let descriptor = pool.get_message_by_name(message_name).ok_or_else(|| {
+        vec![ValidationError {
+            field: "schema".to_string(),
+            message: format!("Message '{}' not found in schema", message_name),
+        }]
+    })?;
 
-    // Wire types 0-5 are valid, 6 and 7 are reserved/deprecated
-    if wire_type > 5 {
-        return Err(vec![ValidationError {
+    DynamicMessage::decode(descriptor, payload).map_err(|e| {
+        vec![ValidationError {
             field: "payload".to_string(),
-            message: format!("Invalid wire type: {}", wire_type),
-        }]);
-    }
+            message: format!("Schema decode failed: {}", e),
+        }]
+    })?;
 
     Ok(())
 }
@@ -77,35 +88,103 @@ pub fn get_schema_id(subject: &str, mappings: &[SubjectSchemaMapping]) -> Option
     None
 }
 
+fn infer_first_message_name(schema_bytes: &[u8]) -> Result<String, ValidationError> {
+    let fds = FileDescriptorSet::decode(schema_bytes).map_err(|e| ValidationError {
+        field: "schema".to_string(),
+        message: format!("Invalid descriptor set: {}", e),
+    })?;
+
+    let file = fds.file.first().ok_or_else(|| ValidationError {
+        field: "schema".to_string(),
+        message: "Descriptor set contains no files".to_string(),
+    })?;
+
+    let msg = file.message_type.first().ok_or_else(|| ValidationError {
+        field: "schema".to_string(),
+        message: "Descriptor file contains no top-level messages".to_string(),
+    })?;
+
+    let msg_name = msg.name.clone().ok_or_else(|| ValidationError {
+        field: "schema".to_string(),
+        message: "Message has no name".to_string(),
+    })?;
+
+    let package = file.package.clone().unwrap_or_default();
+    if package.is_empty() {
+        Ok(msg_name)
+    } else {
+        Ok(format!("{}.{}", package, msg_name))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prost_types::{
+        field_descriptor_proto::{Label, Type},
+        DescriptorProto, FieldDescriptorProto, FileDescriptorProto,
+    };
+
+    fn build_test_descriptor_set() -> Vec<u8> {
+        let field = FieldDescriptorProto {
+            name: Some("id".to_string()),
+            number: Some(1),
+            label: Some(Label::Optional as i32),
+            r#type: Some(Type::String as i32),
+            ..Default::default()
+        };
+
+        let message = DescriptorProto {
+            name: Some("TestEnvelope".to_string()),
+            field: vec![field],
+            ..Default::default()
+        };
+
+        let file = FileDescriptorProto {
+            name: Some("test_envelope.proto".to_string()),
+            package: Some("arqon.test".to_string()),
+            syntax: Some("proto3".to_string()),
+            message_type: vec![message],
+            ..Default::default()
+        };
+
+        let fds = FileDescriptorSet { file: vec![file] };
+        fds.encode_to_vec()
+    }
 
     #[test]
     fn test_validation_pass() {
-        // Valid Protobuf-like payload (field 1, wire type 0 = varint)
-        let schema = b"mock schema";
-        let payload = vec![0x08, 0x96, 0x01]; // field 1, varint 150
-        let result = validate_payload(schema, &payload);
+        let schema = build_test_descriptor_set();
+        // field #1 (string), len=3, "abc"
+        let payload = vec![0x0A, 0x03, b'a', b'b', b'c'];
+        let result = validate_payload(&schema, &payload);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validation_fail_empty_payload() {
-        let schema = b"mock schema";
+        let schema = build_test_descriptor_set();
         let payload: Vec<u8> = vec![];
-        let result = validate_payload(schema, &payload);
+        let result = validate_payload(&schema, &payload);
         assert!(result.is_err());
         let errors = result.unwrap_err();
         assert_eq!(errors[0].field, "payload");
     }
 
     #[test]
-    fn test_validation_fail_invalid_wire_type() {
-        let schema = b"mock schema";
-        // Wire type 7 is invalid
-        let payload = vec![0x07];
-        let result = validate_payload(schema, &payload);
+    fn test_validation_fail_invalid_payload_for_schema() {
+        let schema = build_test_descriptor_set();
+        // Invalid tag/wire payload for our test schema.
+        let payload = vec![0xFF, 0xFF, 0xFF];
+        let result = validate_payload(&schema, &payload);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validation_fail_message_not_found() {
+        let schema = build_test_descriptor_set();
+        let payload = vec![0x0A, 0x03, b'a', b'b', b'c'];
+        let result = validate_payload_for_message(&schema, &payload, "arqon.test.DoesNotExist");
         assert!(result.is_err());
     }
 

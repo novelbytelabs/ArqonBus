@@ -78,7 +78,7 @@ impl ConnectionActor {
                     }
 
                     // Zero-Copy Hot Path: Forward to NATS
-                    let subject = format!("in.t.{}.raw", self.claims.tenant_id);
+                    let subject = inbound_subject_for_tenant(&self.claims.tenant_id);
                     let payload_bytes = bytes::Bytes::from(payload.clone());
 
                     if let Err(e) = self.nats.publish(&subject, payload_bytes.clone()).await {
@@ -119,6 +119,20 @@ impl ConnectionActor {
             }
         }
     }
+}
+
+pub fn inbound_subject_for_tenant(tenant_id: &str) -> String {
+    let normalized: String = tenant_id
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    format!("in.t.{}.raw", normalized)
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -240,5 +254,14 @@ mod tests {
         let claims = claims_from_headers(&headers, &test_config()).unwrap();
         assert_eq!(claims.sub, "user-1");
         assert_eq!(claims.tenant_id, "tenant-a");
+    }
+
+    #[test]
+    fn test_inbound_subject_for_tenant_normalizes_tokens() {
+        assert_eq!(inbound_subject_for_tenant("tenant-a"), "in.t.tenant-a.raw");
+        assert_eq!(
+            inbound_subject_for_tenant("tenant.with spaces"),
+            "in.t.tenant_with_spaces.raw"
+        );
     }
 }

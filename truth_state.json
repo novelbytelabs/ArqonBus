@@ -1,0 +1,180 @@
+{
+  "entities": {
+    "arqon studio": 1,
+    "recursive truth scanner": 2,
+    "scanner": 3,
+    "documents": 4,
+    "document": 5,
+    "test folder": 6,
+    "arqonstudio docs": 7,
+    "arqon_studio": 8,
+    "recursive_truth_scanner": 9,
+    "a": 10,
+    "alice": 11,
+    "manager": 12,
+    "bob": 13
+  },
+  "id_to_name": {
+    "1": "arqon studio",
+    "2": "recursive truth scanner",
+    "3": "scanner",
+    "4": "documents",
+    "5": "document",
+    "6": "test folder",
+    "7": "arqonstudio docs",
+    "8": "arqon_studio",
+    "9": "recursive_truth_scanner",
+    "10": "a",
+    "11": "alice",
+    "12": "manager",
+    "13": "bob"
+  },
+  "next_entity_id": 14,
+  "assertions": [
+    [
+      1,
+      2,
+      0
+    ],
+    [
+      3,
+      4,
+      0
+    ],
+    [
+      5,
+      6,
+      0
+    ],
+    [
+      6,
+      7,
+      0
+    ],
+    [
+      8,
+      9,
+      0
+    ],
+    [
+      10,
+      10,
+      0
+    ],
+    [
+      11,
+      12,
+      0
+    ],
+    [
+      13,
+      12,
+      1
+    ],
+    [
+      10,
+      10,
+      0
+    ],
+    [
+      11,
+      12,
+      0
+    ],
+    [
+      13,
+      12,
+      1
+    ],
+    [
+      10,
+      10,
+      0
+    ],
+    [
+      11,
+      12,
+      0
+    ],
+    [
+      13,
+      12,
+      1
+    ],
+    [
+      10,
+      10,
+      0
+    ],
+    [
+      11,
+      12,
+      0
+    ],
+    [
+      13,
+      12,
+      1
+    ],
+    [
+      10,
+      10,
+      0
+    ],
+    [
+      11,
+      12,
+      0
+    ],
+    [
+      13,
+      12,
+      1
+    ],
+    [
+      10,
+      10,
+      0
+    ],
+    [
+      11,
+      12,
+      0
+    ],
+    [
+      13,
+      12,
+      1
+    ],
+    [
+      10,
+      10,
+      0
+    ],
+    [
+      11,
+      12,
+      0
+    ],
+    [
+      13,
+      12,
+      1
+    ],
+    [
+      10,
+      10,
+      0
+    ],
+    [
+      11,
+      12,
+      0
+    ],
+    [
+      13,
+      12,
+      1
+    ]
+  ]
+}
