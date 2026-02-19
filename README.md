@@ -1,8 +1,11 @@
 # ArqonBus
 
+![ArqonBus Logo](./docs/assets/large-logo.png)
+
 **ArqonBus** is a lightweight, structured WebSocket message bus with rooms, channels, and a simple command protocol. It's designed to be the real-time backbone for applications, services, and agents that need organized, multi-channel communication.
 
-> Status: **experimental / WIP**
+> Status: **experimental (Phase0/Phase1 branch slice complete; broader vNext ongoing)**  
+> Canonical vNext status: `docs/ArqonBus/vnext_status.md`
 
 ---
 
@@ -89,6 +92,23 @@ Built-in commands (via `type: "command"`):
 
 ---
 
+## 🛡️ CASIL Safety Layer (Content-Aware Safety & Inspection)
+- Optional but production-focused message inspection with **monitor** (no blocking) and **enforce** (blocking/redaction) modes.
+- Scope-aware: target only certain rooms/channels via `ARQONBUS_CASIL_SCOPE_INCLUDE`/`EXCLUDE`.
+- Policies: payload size limits, probable-secret detection (regex + classifier flags), configurable redaction paths/patterns, and transport vs observability redaction.
+- Bounded, deterministic processing with configurable inspect limits to keep overhead low; falls back safely with default decisions.
+- Rich telemetry and metadata: emits CASIL decision events, attaches classification flags to envelopes (when enabled), and logs redaction/block decisions.
+- Quick start:
+  ```bash
+  ARQONBUS_CASIL_ENABLED=true \
+  ARQONBUS_CASIL_MODE=monitor \
+  ARQONBUS_CASIL_SCOPE_INCLUDE="secure-*,pii-*" \
+  python websocket_bus.py --host localhost --port 9100 --telemetry-port 9101
+  ```
+- Full manual: see `docs/casil/index.md` for configuration, redaction, and API details.
+
+---
+
 ## 📚 Documentation & Specifications
 
 ### Core Specifications
@@ -108,9 +128,10 @@ Built-in commands (via `type: "command"`):
 - **[HTTP Endpoints](specs/001-core-message-bus/contracts/http-endpoints.md)** - Health, metrics, and monitoring APIs
 
 ### Additional Documentation
-- **[Architecture Guide](docs/architecture.md)** - Detailed system architecture and component descriptions
-- **[API Documentation](docs/api.md)** - Complete API reference and usage examples
-- **[ArqonTech Ecosystem](docs/arqon_ecosystem.md)** - Product positioning and roadmap
+- **[Architecture Guide](docs/ArqonBus/plan/architecture.md)** - Detailed system architecture and component descriptions
+- **[API Documentation](docs/ArqonBus/spec/api.md)** - Complete API reference and usage examples
+- **[Operations Runbook](docs/runbook.md)** - Deployment and operational troubleshooting
+- **[ArqonTech Ecosystem](docs/projects/arqon_ecosystem.md)** - Product positioning and roadmap
 - **[ArqonBus v1.0 Scope](docs/arqonbus_v1_scope.md)** - Product evolution plan and gap analysis
 
 ---
@@ -118,4 +139,61 @@ Built-in commands (via `type: "command"`):
 ## Getting Started (Very Rough)
 
 ```bash
-python websocket_bus.py --host localhost --port 8765 --telemetry-port 8766
+python -m arqonbus.transport.websocket_bus
+```
+
+### Epoch 2 CLI Bootstrap
+
+```bash
+# Install in editable mode once
+pip install -e .
+
+# HTTP snapshots
+arqon version --http-url http://127.0.0.1:8080
+arqon status --http-url http://127.0.0.1:8080
+
+# WebSocket tail (JWT required only when auth is enabled)
+arqon tail --ws-url ws://127.0.0.1:9100 --jwt "$ARQONBUS_AUTH_JWT" --raw --limit 1
+```
+
+### Standard Operators (Epoch 2)
+
+These are available as WebSocket `type: "command"` operations:
+
+- `op.casil.get|reload` - Inspect and hot-reload active CASIL policy on the running gateway.
+- `op.webhook.register|list|unregister` - Route matching room/channel envelopes to HTTP POST webhooks.
+- `op.cron.schedule|list|cancel` - Schedule delayed or recurring envelope broadcasts.
+- `op.store.set|get|list|delete` - Tenant-scoped in-memory KV storage for agent state.
+- `op.omega.status|register_substrate|list_substrates|unregister_substrate|emit_event|list_events|clear_events` - Feature-flagged Tier-Omega experimental lane (admin-only mutations).
+
+Tier-Omega lane environment flags:
+
+```bash
+ARQONBUS_OMEGA_ENABLED=false
+ARQONBUS_OMEGA_LAB_ROOM=omega-lab
+ARQONBUS_OMEGA_LAB_CHANNEL=signals
+ARQONBUS_OMEGA_MAX_EVENTS=1000
+ARQONBUS_OMEGA_MAX_SUBSTRATES=128
+```
+
+### Minimal Python SDK Usage
+
+```python
+import asyncio
+from arqonbus.sdk import ArqonBusClient
+
+
+async def main():
+    async with ArqonBusClient("ws://127.0.0.1:9100") as client:
+        message = await client.recv_json(timeout=2.0)
+        print(message["type"], message.get("payload", {}))
+
+
+asyncio.run(main())
+```
+
+### Hello-World Bot (< 5 min path)
+
+```bash
+ARQONBUS_WS_URL=ws://127.0.0.1:9100 python examples/python/hello_world_bot.py
+```

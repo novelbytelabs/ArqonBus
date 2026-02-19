@@ -167,9 +167,24 @@ class CommandContext:
         Returns:
             True if client has permission
         """
-        # For now, allow all commands
-        # TODO: Implement proper authorization in T031
-        return True
+        client_info = await self.client_registry.get_client(self.client_id)
+        if not client_info:
+            return False
+
+        metadata = client_info.metadata or {}
+        role = str(metadata.get("role", "user")).lower()
+        if role == "admin":
+            return True
+
+        # Backward-compatible default: if no explicit permissions are provided,
+        # preserve existing permissive behavior for legacy clients.
+        explicit_permissions = metadata.get("permissions")
+        if explicit_permissions is None:
+            return True
+
+        if not isinstance(explicit_permissions, list):
+            return False
+        return permission in explicit_permissions
     
     async def require_permission(self, permission: str):
         """Require specific permission, raise error if not available.

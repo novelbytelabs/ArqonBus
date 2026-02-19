@@ -1,0 +1,310 @@
+name: ArqonBus CI/CD
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  MIX_ENV: test
+  RUST_BACKTRACE: full
+
+jobs:
+
+  ###########################################################################
+  # 0. SPEC VALIDATION — SDD enforcement
+  ###########################################################################
+  spec-validation:
+    name: Spec Validation (SDD)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate presence of spec file
+        run: |
+          if ! ls specs/*.md >/dev/null 2>&1; then
+            echo "::error::No spec found in /specs. All changes require SDD specs."
+            exit 1
+          fi
+
+      - name: Validate acceptance criteria format
+        run: |
+          # Basic check: enforce at least one "Given/When/Then" or "Acceptance Criteria" section
+          if ! grep -RqiE "Given|Acceptance Criteria" specs/*.md; then
+            echo "::error::Missing acceptance criteria in spec."
+            exit 1
+          fi
+
+  ###########################################################################
+  # 1. SCHEMA & STATE MACHINE VALIDATION — Protobuf + State Machines
+  ###########################################################################
+  schema-validation:
+    name: Protobuf & State Machine Validation
+    runs-on: ubuntu-latest
+    needs: [spec-validation]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install buf
+        uses: bufbuild/buf-setup-action@v1
+
+      - name: Lint Protobuf definitions
+        run: buf lint proto
+
+      - name: Check breaking changes
+        run: buf breaking proto --against ".git#branch=main"
+
+      - name: Validate state machine definitions
+        run: |
+          # Placeholder — replace with your SM validator
+          if ! ./tools/validate_state_machines; then
+            echo "::error::State machine validation failed."
+            exit 1
+          fi
+
+  ###########################################################################
+  # 2. STATIC ANALYSIS & CODE QUALITY — Rust + Elixir + debt scanner
+  ###########################################################################
+  static-analysis:
+    name: Static Analysis & Code Quality
+    runs-on: ubuntu-latest
+    needs: [schema-validation]
+    steps:
+      - uses: actions/checkout@v4
+
+      #### Rust ####
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rustfmt
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (pedantic + nursery)
+        run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic -W clippy::nursery
+
+      - name: Cargo Deny (security & license)
+        uses: EmbarkStudios/cargo-deny-action@v1
+
+      #### Elixir ####
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+
+      - name: Install Elixir deps
+        run: mix deps.get
+
+      - name: Format Elixir
+        run: mix format --check-formatted
+
+      - name: Credo Strict
+        run: mix credo --strict
+
+      - name: Sobelow Security Scan
+        run: mix sobelow --config
+
+      #### Technical Debt Scanner ####
+      - name: Run Technical Debt Scanner
+        run: |
+          if ! ./tools/technical_debt_scan; then
+            echo "::error::Technical debt scan failed."
+            exit 1
+          fi
+
+  ###########################################################################
+  # 3. BUILD & ARTIFACT CONSISTENCY — Deterministic builds
+  ###########################################################################
+  build-artifacts:
+    name: Build & Artifact Consistency
+    runs-on: ubuntu-latest
+    needs: [static-analysis]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Rust artifacts
+        run: cargo build --release
+
+      - name: Build Elixir release
+        run: mix release
+
+      - name: Check reproducibility
+        run: |
+          ./tools/check_reproducibility || {
+            echo "::error::Non-deterministic build artifacts detected."
+            exit 1
+          }
+
+  ###########################################################################
+  # 4. UNIT TESTS
+  ###########################################################################
+  unit-tests:
+    name: Unit Tests (Rust + Elixir)
+    runs-on: ubuntu-latest
+    needs: [build-artifacts]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust Unit Tests
+        run: cargo test --all --lib
+
+      - name: Elixir Unit Tests
+        run: mix test --exclude integration
+
+      - name: Verify Coverage Thresholds
+        run: ./tools/check_coverage_thresholds
+
+  ###########################################################################
+  # 5. INTEGRATION TESTS — Multi-node NATS/Valkey/Postgres topology
+  ###########################################################################
+  integration-tests:
+    name: Integration Tests (Topology)
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    services:
+      nats:
+        image: nats:2.10
+        ports: [4222:4222]
+      valkey:
+        image: valkey/valkey:latest
+        ports: [6379:6379]
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: [5432:5432]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for DB
+        run: |
+          until pg_isready -h localhost -p 5432; do sleep 1; done
+
+      - name: Run integration tests
+        run: mix test --only integration
+
+  ###########################################################################
+  # 6. SECURITY VERIFICATION — dependency scanning, secret scanning
+  ###########################################################################
+  security-verification:
+    name: Security Verification
+    needs: [integration-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: trufflesecurity/trufflehog@v3
+        with:
+          path: .
+
+      - name: Cargo Audit
+        run: cargo audit
+
+      - name: Mix Audit
+        run: mix deps.audit
+
+  ###########################################################################
+  # 7. PERFORMANCE REGRESSION TESTS
+  ###########################################################################
+  performance-tests:
+    name: Performance Regression Tests
+    needs: [security-verification]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run benchmarks
+        run: cargo bench --all
+
+      - name: Compare against baseline
+        run: ./tools/compare_benchmarks baseline/main.json results/current.json
+
+  ###########################################################################
+  # 8. CHAOS & ADVERSARIAL TESTING — fuzz + flood + failure injection
+  ###########################################################################
+  chaos-tests:
+    name: Chaos & Adversarial Tests
+    needs: [performance-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fuzz parsers and handlers
+        run: cargo fuzz run envelope_parser
+
+      - name: Flood test simulation
+        run: ./tools/flood_test --duration 30s --connections 5000
+
+      - name: Failure injection suite
+        run: ./tools/failure_injection_test
+
+  ###########################################################################
+  # 9. OBSERVABILITY CHECKS — metrics/logs/traces
+  ###########################################################################
+  observability-checks:
+    name: Observability Verification
+    needs: [chaos-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify metrics presence
+        run: ./tools/verify_metrics
+
+      - name: Verify trace spans
+        run: ./tools/verify_traces
+
+      - name: Verify structured logs
+        run: ./tools/verify_logs
+
+  ###########################################################################
+  # 10. BACKWARD COMPATIBILITY & API STABILITY TESTS
+  ###########################################################################
+  compatibility-tests:
+    name: Backward Compatibility Tests
+    needs: [observability-checks]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Old client → new server
+        run: ./tools/bc_test old_client new_server
+
+      - name: New client → old server
+        run: ./tools/bc_test new_client old_server
+
+      - name: Mixed-version cluster test
+        run: ./tools/rolling_upgrade_test
+
+  ###########################################################################
+  # 11. DEPLOYMENT SIMULATION — canary & rollback
+  ###########################################################################
+  deployment-sim:
+    name: Canary + Rollback Simulation
+    needs: [compatibility-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Canary rollout simulation
+        run: ./tools/sim_canary
+
+      - name: Shadow traffic replay
+        run: ./tools/shadow_replay
+
+      - name: Rollback test
+        run: ./tools/test_rollback
+
+  ###########################################################################
+  # 12. SUCCESS INDICATOR
+  ###########################################################################
+  success:
+    name: CI Pipeline Passed
+    needs: [deployment-sim]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All ACES checks passed. Ready to merge."

@@ -2,6 +2,20 @@
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from .ids import generate_message_id
+
+
+def _parse_iso8601_timestamp(raw_timestamp: Any) -> datetime:
+    """Parse ISO 8601 timestamps, including RFC3339 'Z' suffix."""
+    if isinstance(raw_timestamp, datetime):
+        return raw_timestamp
+    if not isinstance(raw_timestamp, str):
+        raise TypeError(f"timestamp must be datetime or str, got {type(raw_timestamp).__name__}")
+
+    normalized = raw_timestamp.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    return datetime.fromisoformat(normalized)
 
 
 @dataclass
@@ -13,7 +27,7 @@ class Envelope:
     """
     
     # Required fields - all messages must have these
-    id: str = field(default_factory=lambda: f"arq_{int(datetime.now().timestamp() * 1000000)}")
+    id: str = field(default_factory=generate_message_id)
     timestamp: datetime = field(default_factory=datetime.utcnow)
     type: str = ""  # message, command, response, error, telemetry
     version: str = "1.0"
@@ -22,6 +36,9 @@ class Envelope:
     room: Optional[str] = None  # Target room for routing
     channel: Optional[str] = None  # Target channel within room
     sender: Optional[str] = None  # Client ID who sent this message
+    # Legacy aliases for backwards compatibility
+    from_client: Optional[str] = None
+    to_client: Optional[str] = None
     
     # Message content
     payload: Dict[str, Any] = field(default_factory=dict)  # Message data
@@ -60,6 +77,10 @@ class Envelope:
             data["channel"] = self.channel
         if self.sender is not None:
             data["sender"] = self.sender
+        if self.from_client is not None:
+            data["from_client"] = self.from_client
+        if self.to_client is not None:
+            data["to_client"] = self.to_client
         if self.command is not None:
             data["command"] = self.command
         if self.request_id is not None:
@@ -76,9 +97,28 @@ class Envelope:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Envelope":
         """Create envelope from dictionary (e.g., from JSON deserialization)."""
+        data = dict(data)
+
         # Handle datetime parsing
         if "timestamp" in data:
-            data["timestamp"] = datetime.fromisoformat(data["timestamp"])
+            data["timestamp"] = _parse_iso8601_timestamp(data["timestamp"])
+
+        # Legacy command shape: command details nested under payload
+        if data.get("type") == "command" and "command" not in data:
+            payload = data.get("payload") or {}
+            if "command" in payload:
+                data["command"] = payload.get("command")
+            if "args" not in data and "parameters" in payload:
+                data["args"] = payload.get("parameters") or {}
+
+        # Map legacy fields
+        if "from_client" in data and "sender" not in data:
+            data["sender"] = data.get("from_client")
+        if "to_client" in data and "metadata" not in data:
+            # Store as metadata for backwards compatibility
+            metadata = data.get("metadata", {}) or {}
+            metadata["to_client"] = data.get("to_client")
+            data["metadata"] = metadata
         
         return cls(**data)
     

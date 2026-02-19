@@ -31,7 +31,7 @@ Client B → science:explore → Client A (if subscribed)
 **Code Example** (JavaScript):
 ```javascript
 // Connect to ArqonBus
-const ws = new WebSocket('ws://localhost:8765');
+const ws = new WebSocket('ws://localhost:9100');
 
 // Subscribe to default channel
 const subscription = {

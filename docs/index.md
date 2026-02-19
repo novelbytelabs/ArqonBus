@@ -1,10 +1,9 @@
-# 🛰️ ArqonBus: Enterprise-Grade Message Bus
+# 🛰️ ArqonBus
 
-**ArqonBus** is a lightweight, high-performance WebSocket message bus engineered for enterprise-scale real-time communication. Built with Python 3.11+ and designed for mission-critical applications requiring sub-50ms message routing and 5,000+ concurrent connections.
+**ArqonBus** is a lightweight WebSocket message bus with active vNext development.
 
-![ArqonBus Architecture](https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=for-the-badge)
-![Performance](https://img.shields.io/badge/Performance-5K%2B%20Connections-orange?style=for-the-badge)
-![Latency](https://img.shields.io/badge/Latency-%3C50ms%20p99-red?style=for-the-badge)
+> Current status: **In Progress / Not production-released as vNext**  
+> Source of truth: `docs/ArqonBus/vnext_status.md`
 
 ---
 
@@ -84,14 +83,14 @@ pip install arqonbus
 # Start the message bus
 python -m arqonbus.server \
   --host 0.0.0.0 \
-  --port 8765 \
-  --telemetry-port 8766
+  --port 9100 \
+  --telemetry-port 9101
 ```
 
 ### Connect Your First Client
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8765');
+const ws = new WebSocket('ws://localhost:9100');
 
 // Join a channel
 ws.send({
@@ -187,8 +186,9 @@ Create engaging multiplayer experiences with:
 
 Transform your real-time communication architecture with **ArqonBus** - where enterprise performance meets developer simplicity.
 
-[![Get Started](https://img.shields.io/badge/📚-View_Documentation-blue?style=for-the-badge)](./api.md)
-[![Quick Start](https://img.shields.io/badge/⚡-Quick_Start-green?style=for-the-badge)](./architecture.md)
+[![Get Started](https://img.shields.io/badge/📚-View_Documentation-blue?style=for-the-badge)](./ArqonBus/spec/api.md)
+[![Quick Start](https://img.shields.io/badge/⚡-Quick_Start-green?style=for-the-badge)](./quickstart.md)
+[![Runbook](https://img.shields.io/badge/🛠-Runbook-purple?style=for-the-badge)](./runbook.md)
 [![Examples](https://img.shields.io/badge="💡"-Examples-orange?style=for-the-badge)](../examples/)
 
 ---

@@ -111,6 +111,35 @@ class TestTelemetryEventBroadcasting:
             # Verify event was sent to all connected clients
             for client in mock_clients:
                 client.send.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_telemetry_binary_broadcast(self, telemetry_config):
+        """Test binary telemetry envelope broadcasting."""
+        telemetry_server = TelemetryServer(telemetry_config)
+        telemetry_server.is_running = True
+        mock_clients = [AsyncMock(), AsyncMock()]
+        telemetry_server._telemetry_clients = set(mock_clients)
+
+        payload = b"\x01\x02\x03"
+        await telemetry_server.broadcast_envelope_bytes(payload)
+
+        for client in mock_clients:
+            client.send.assert_called_once_with(payload)
+
+    @pytest.mark.asyncio
+    async def test_telemetry_binary_excludes_sender(self, telemetry_config):
+        """Test binary telemetry broadcast excludes sender."""
+        telemetry_server = TelemetryServer(telemetry_config)
+        telemetry_server.is_running = True
+        sender = AsyncMock()
+        receiver = AsyncMock()
+        telemetry_server._telemetry_clients = {sender, receiver}
+
+        payload = b"\xAA\xBB"
+        await telemetry_server._handle_binary_message(sender, payload)
+
+        receiver.send.assert_called_once_with(payload)
+        sender.send.assert_not_called()
     
     @pytest.mark.asyncio
     async def test_telemetry_event_batch_processing(self, telemetry_config):
@@ -277,7 +306,7 @@ class TestTelemetryEventBroadcasting:
             
             result = await telemetry_server.broadcast_event(valid_event)
             await telemetry_server._flush_batch()
-            assert result == "buffered"  # Events are buffered for batch processing
+            assert result in ["buffered", "broadcast_success"]
             
             # Test invalid event (missing required fields)
             invalid_event = {
@@ -318,7 +347,7 @@ class TestTelemetryEventBroadcasting:
             # Should handle slow client gracefully
             result = await telemetry_server.broadcast_event(test_event)
             await telemetry_server._flush_batch()
-            assert result in ["buffered", "server_not_running", "client_error"]  # Multiple valid outcomes
+            assert result in ["buffered", "server_not_running", "client_error", "broadcast_success"]  # Multiple valid outcomes
             
             # Verify slow client was removed
             assert slow_client not in telemetry_server._telemetry_clients

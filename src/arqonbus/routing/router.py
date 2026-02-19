@@ -1,13 +1,14 @@
-"""Message routing logic for ArqonBus."""
-import asyncio
 import logging
-from typing import Dict, Optional, List, Tuple
+import asyncio
+from typing import Dict, Any, Optional, List, Tuple, cast
 from datetime import datetime
 
 from ..protocol.envelope import Envelope
 from .client_registry import ClientRegistry
 from .rooms import RoomManager
 from .channels import ChannelManager
+from .operator_registry import OperatorRegistry
+from .dispatcher import TaskDispatcher, ResultCollector
 
 
 logger = logging.getLogger(__name__)
@@ -132,10 +133,13 @@ class MessageRouter:
         if channel.room and channel.room.room_id != room_id:
             raise RoutingError(f"Channel {channel_id} does not belong to room {room_id}")
         
-        # Route to channel
-        sent_count = await self.channel_manager.broadcast_to_channel(
-            envelope, channel_id, exclude_client_id=sender_client_id
+        # Route to channel via client registry (actually sends messages)
+        sent_count = await self.client_registry.broadcast_to_room_channel(
+            envelope, room_id, channel_id, exclude_client_id=sender_client_id
         )
+        
+        # Update channel stats (previously handled by broadcast_to_channel)
+        channel.update_activity()
         
         logger.debug(f"Routed message to room '{room_id}', channel '{channel_id}': {sent_count} clients")
         
@@ -205,7 +209,7 @@ class MessageRouter:
             if client_info.client_id == sender_client_id:
                 continue
             
-            if client_info.websocket and client_info.websocket.open:
+            if client_info.websocket and self.client_registry._websocket_is_open(client_info.websocket):
                 try:
                     await client_info.websocket.send(envelope.to_json())
                     sent_count += 1
@@ -234,7 +238,7 @@ class MessageRouter:
         try:
             # Get target client
             target_client = await self.client_registry.get_client(target_client_id)
-            if not target_client or not target_client.websocket.open:
+            if not target_client or not self.client_registry._websocket_is_open(target_client.websocket):
                 raise RoutingError(f"Target client {target_client_id} is not available")
             
             # Add sender info to envelope
@@ -407,14 +411,19 @@ class MessageRouter:
             
             health = {
                 "status": "healthy",
-                "total_messages_routed": self._stats["total_messages_routed"],
-                "routing_errors": self._stats["routing_errors"],
-                "error_rate": self._stats["routing_errors"] / max(1, self._stats["total_messages_routed"]),
+                "router": {
+                    "total_messages_routed": int(self._stats.get("total_messages_routed", 0)),
+                    "routing_errors": int(self._stats.get("routing_errors", 0)),
+                    "error_rate": float(self._stats.get("routing_errors", 0)) / max(1, int(self._stats.get("total_messages_routed", 0))),
+                    "messages_by_type": self._stats.get("messages_by_type", {}),
+                    "messages_by_destination": self._stats.get("messages_by_destination", {}),
+                    "last_activity": self._stats.get("last_activity")
+                },
                 "checks": []
             }
             
             # Check for potential issues
-            if health["error_rate"] > 0.05:  # 5% error rate
+            if health["router"]["error_rate"] > 0.05:  # 5% error rate
                 health["checks"].append({"type": "error", "message": "High routing error rate"})
             
             # Check component health
@@ -453,10 +462,17 @@ class RoutingCoordinator:
         self._client_registry = ClientRegistry()
         self._room_manager = RoomManager()
         self._channel_manager = ChannelManager()
+        self._operator_registry = OperatorRegistry()
         self._router = MessageRouter(
             self._client_registry,
             self._room_manager,
             self._channel_manager
+        )
+        self._collector = ResultCollector()
+        self._dispatcher = TaskDispatcher(
+            self._operator_registry,
+            self._router,
+            self._collector
         )
     
     async def initialize(self):
@@ -497,16 +513,51 @@ class RoutingCoordinator:
         return self._router
     
     @property
+    def router(self) -> MessageRouter:
+        """Alias for message_router used by some callers."""
+        return self._router
+    
+    @property
     def client_registry(self) -> ClientRegistry:
         """Get the client registry."""
         return self._client_registry
+
+    @client_registry.setter
+    def client_registry(self, value: ClientRegistry):
+        """Set the client registry (used for testing/integration)."""
+        self._client_registry = value
     
     @property
     def room_manager(self) -> RoomManager:
         """Get the room manager."""
         return self._room_manager
+
+    @room_manager.setter
+    def room_manager(self, value: RoomManager):
+        """Set the room manager (used for testing/integration)."""
+        self._room_manager = value
     
     @property
     def channel_manager(self) -> ChannelManager:
         """Get the channel manager."""
         return self._channel_manager
+
+    @channel_manager.setter
+    def channel_manager(self, value: ChannelManager):
+        """Set the channel manager (used for testing/integration)."""
+        self._channel_manager = value
+
+    @property
+    def operator_registry(self) -> OperatorRegistry:
+        """Get the operator registry."""
+        return self._operator_registry
+
+    @property
+    def dispatcher(self) -> TaskDispatcher:
+        """Get the task dispatcher."""
+        return self._dispatcher
+
+    @property
+    def collector(self) -> ResultCollector:
+        """Get the result collector."""
+        return self._collector

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ServerConfig:
     """Server configuration settings."""
     host: str = "127.0.0.1"
-    port: int = 8765
+    port: int = 9100
     max_connections: int = 1000
     connection_timeout: float = 30.0
     ping_interval: float = 20.0
@@ -62,11 +62,74 @@ class TelemetryConfig:
 class SecurityConfig:
     """Security and authentication configuration."""
     enable_authentication: bool = False
+    jwt_secret: Optional[str] = None
+    jwt_algorithm: str = "HS256"
     allowed_commands: List[str] = field(default_factory=lambda: [
         "status", "ping", "history", "list_channels", "channel_info",
         "create_channel", "delete_channel", "join_channel", "leave_channel"
     ])
     rate_limit_per_minute: int = 60
+
+
+@dataclass
+class CASILLimits:
+    """Boundaries for CASIL inspection."""
+    max_inspect_bytes: int = 65536
+    max_patterns: int = 32
+
+
+@dataclass
+class CASILScope:
+    """Scope selection for CASIL inspection."""
+    include: List[str] = field(default_factory=list)
+    exclude: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CASILRedactionConfig:
+    """Redaction settings for CASIL."""
+    paths: List[str] = field(default_factory=lambda: ["password", "token", "secret"])
+    patterns: List[str] = field(default_factory=list)
+    transport_redaction: bool = False
+    never_log_payload_for: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CASILMetadataExposure:
+    """Where CASIL metadata can appear."""
+    to_logs: bool = True
+    to_telemetry: bool = True
+    to_envelope: bool = False
+
+
+@dataclass
+class CASILPolicies:
+    """Policy definitions for CASIL."""
+    max_payload_bytes: int = 262144
+    block_on_probable_secret: bool = False
+    redaction: CASILRedactionConfig = field(default_factory=CASILRedactionConfig)
+
+
+@dataclass
+class CASILConfig:
+    """Main CASIL configuration."""
+    enabled: bool = False
+    mode: str = "monitor"  # monitor|enforce
+    default_decision: str = "allow"  # allow|block
+    scope: CASILScope = field(default_factory=CASILScope)
+    limits: CASILLimits = field(default_factory=CASILLimits)
+    policies: CASILPolicies = field(default_factory=CASILPolicies)
+    metadata: CASILMetadataExposure = field(default_factory=CASILMetadataExposure)
+
+
+@dataclass
+class TierOmegaConfig:
+    """Experimental Tier-Omega lane configuration."""
+    enabled: bool = False
+    lab_room: str = "omega-lab"
+    lab_channel: str = "signals"
+    max_events: int = 1000
+    max_substrates: int = 128
 
 
 @dataclass
@@ -78,6 +141,11 @@ class ArqonBusConfig:
     storage: StorageConfig = field(default_factory=StorageConfig)
     telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
+    casil: CASILConfig = field(default_factory=CASILConfig)
+    tier_omega: TierOmegaConfig = field(default_factory=TierOmegaConfig)
+    
+    # Feature Flags
+    holonomy_enabled: bool = False
     
     # Environment-specific overrides
     environment: str = "development"
@@ -124,6 +192,59 @@ class ArqonBusConfig:
         
         # Security configuration
         config.security.enable_authentication = os.getenv("ARQONBUS_ENABLE_AUTH", "false").lower() == "true"
+        config.security.jwt_secret = os.getenv("ARQONBUS_AUTH_JWT_SECRET", config.security.jwt_secret)
+        config.security.jwt_algorithm = os.getenv("ARQONBUS_AUTH_JWT_ALGORITHM", config.security.jwt_algorithm).upper()
+
+        # CASIL configuration
+        config.casil.enabled = os.getenv("ARQONBUS_CASIL_ENABLED", str(config.casil.enabled)).lower() == "true"
+        config.casil.mode = os.getenv("ARQONBUS_CASIL_MODE", config.casil.mode)
+        config.casil.default_decision = os.getenv("ARQONBUS_CASIL_DEFAULT_DECISION", config.casil.default_decision)
+        include_scope = os.getenv("ARQONBUS_CASIL_SCOPE_INCLUDE")
+        if include_scope:
+            config.casil.scope.include = [s.strip() for s in include_scope.split(",") if s.strip()]
+        exclude_scope = os.getenv("ARQONBUS_CASIL_SCOPE_EXCLUDE")
+        if exclude_scope:
+            config.casil.scope.exclude = [s.strip() for s in exclude_scope.split(",") if s.strip()]
+        config.casil.limits.max_inspect_bytes = int(os.getenv("ARQONBUS_CASIL_MAX_INSPECT_BYTES", config.casil.limits.max_inspect_bytes))
+        config.casil.limits.max_patterns = int(os.getenv("ARQONBUS_CASIL_MAX_PATTERNS", config.casil.limits.max_patterns))
+        config.casil.policies.max_payload_bytes = int(os.getenv("ARQONBUS_CASIL_MAX_PAYLOAD_BYTES", config.casil.policies.max_payload_bytes))
+        config.casil.policies.block_on_probable_secret = os.getenv("ARQONBUS_CASIL_BLOCK_ON_PROBABLE_SECRET", str(config.casil.policies.block_on_probable_secret)).lower() == "true"
+        redaction_paths = os.getenv("ARQONBUS_CASIL_REDACTION_PATHS")
+        if redaction_paths:
+            config.casil.policies.redaction.paths = [p.strip() for p in redaction_paths.split(",") if p.strip()]
+        redaction_patterns = os.getenv("ARQONBUS_CASIL_REDACTION_PATTERNS")
+        if redaction_patterns:
+            config.casil.policies.redaction.patterns = [p.strip() for p in redaction_patterns.split(",") if p.strip()]
+        config.casil.policies.redaction.transport_redaction = os.getenv("ARQONBUS_CASIL_TRANSPORT_REDACTION", str(config.casil.policies.redaction.transport_redaction)).lower() == "true"
+        never_log_payload_for = os.getenv("ARQONBUS_CASIL_NEVER_LOG_PAYLOAD_FOR")
+        if never_log_payload_for:
+            config.casil.policies.redaction.never_log_payload_for = [p.strip() for p in never_log_payload_for.split(",") if p.strip()]
+        config.casil.metadata.to_logs = os.getenv("ARQONBUS_CASIL_METADATA_TO_LOGS", str(config.casil.metadata.to_logs)).lower() == "true"
+        config.casil.metadata.to_telemetry = os.getenv("ARQONBUS_CASIL_METADATA_TO_TELEMETRY", str(config.casil.metadata.to_telemetry)).lower() == "true"
+        config.casil.metadata.to_envelope = os.getenv("ARQONBUS_CASIL_METADATA_TO_ENVELOPE", str(config.casil.metadata.to_envelope)).lower() == "true"
+
+        # Tier-Omega experimental lane
+        config.tier_omega.enabled = os.getenv(
+            "ARQONBUS_OMEGA_ENABLED",
+            str(config.tier_omega.enabled),
+        ).lower() == "true"
+        config.tier_omega.lab_room = os.getenv(
+            "ARQONBUS_OMEGA_LAB_ROOM",
+            config.tier_omega.lab_room,
+        )
+        config.tier_omega.lab_channel = os.getenv(
+            "ARQONBUS_OMEGA_LAB_CHANNEL",
+            config.tier_omega.lab_channel,
+        )
+        config.tier_omega.max_events = int(
+            os.getenv("ARQONBUS_OMEGA_MAX_EVENTS", config.tier_omega.max_events)
+        )
+        config.tier_omega.max_substrates = int(
+            os.getenv("ARQONBUS_OMEGA_MAX_SUBSTRATES", config.tier_omega.max_substrates)
+        )
+        
+        # Feature Flags
+        config.holonomy_enabled = os.getenv("ARQONBUS_HOLONOMY_ENABLED", "false").lower() == "true"
         
         # Global configuration
         config.environment = os.getenv("ARQONBUS_ENVIRONMENT", config.environment)
@@ -168,6 +289,32 @@ class ArqonBusConfig:
         # Security validation
         if self.security.rate_limit_per_minute < 1:
             errors.append(f"Invalid rate limit: {self.security.rate_limit_per_minute}")
+        if self.security.enable_authentication and not self.security.jwt_secret:
+            errors.append("JWT secret is required when authentication is enabled")
+        if self.security.jwt_algorithm not in ("HS256",):
+            errors.append(f"Unsupported JWT algorithm: {self.security.jwt_algorithm}")
+
+        # CASIL validation
+        if self.casil.mode not in ("monitor", "enforce"):
+            errors.append(f"Invalid CASIL mode: {self.casil.mode}")
+        if self.casil.default_decision not in ("allow", "block"):
+            errors.append(f"Invalid CASIL default_decision: {self.casil.default_decision}")
+        if self.casil.limits.max_inspect_bytes < 0:
+            errors.append("CASIL max_inspect_bytes must be non-negative")
+        if self.casil.limits.max_patterns < 0:
+            errors.append("CASIL max_patterns must be non-negative")
+        if self.casil.policies.max_payload_bytes < 0:
+            errors.append("CASIL max_payload_bytes must be non-negative")
+
+        # Tier-Omega validation
+        if not self.tier_omega.lab_room:
+            errors.append("Tier-Omega lab_room must be non-empty")
+        if not self.tier_omega.lab_channel:
+            errors.append("Tier-Omega lab_channel must be non-empty")
+        if self.tier_omega.max_events < 1:
+            errors.append("Tier-Omega max_events must be >= 1")
+        if self.tier_omega.max_substrates < 1:
+            errors.append("Tier-Omega max_substrates must be >= 1")
             
         return errors
     
@@ -204,8 +351,45 @@ class ArqonBusConfig:
             },
             "security": {
                 "enable_authentication": self.security.enable_authentication,
+                "jwt_algorithm": self.security.jwt_algorithm,
+                "has_jwt_secret": bool(self.security.jwt_secret),
                 "allowed_commands": self.security.allowed_commands,
                 "rate_limit_per_minute": self.security.rate_limit_per_minute
+            },
+            "casil": {
+                "enabled": self.casil.enabled,
+                "mode": self.casil.mode,
+                "default_decision": self.casil.default_decision,
+                "scope": {
+                    "include": self.casil.scope.include,
+                    "exclude": self.casil.scope.exclude,
+                },
+                "limits": {
+                    "max_inspect_bytes": self.casil.limits.max_inspect_bytes,
+                    "max_patterns": self.casil.limits.max_patterns,
+                },
+                "policies": {
+                    "max_payload_bytes": self.casil.policies.max_payload_bytes,
+                    "block_on_probable_secret": self.casil.policies.block_on_probable_secret,
+                    "redaction": {
+                        "paths": self.casil.policies.redaction.paths,
+                        "patterns": self.casil.policies.redaction.patterns,
+                        "transport_redaction": self.casil.policies.redaction.transport_redaction,
+                        "never_log_payload_for": self.casil.policies.redaction.never_log_payload_for,
+                    },
+                },
+                "metadata": {
+                    "to_logs": self.casil.metadata.to_logs,
+                    "to_telemetry": self.casil.metadata.to_telemetry,
+                    "to_envelope": self.casil.metadata.to_envelope,
+                },
+            },
+            "tier_omega": {
+                "enabled": self.tier_omega.enabled,
+                "lab_room": self.tier_omega.lab_room,
+                "lab_channel": self.tier_omega.lab_channel,
+                "max_events": self.tier_omega.max_events,
+                "max_substrates": self.tier_omega.max_substrates,
             },
             "environment": self.environment,
             "debug": self.debug
@@ -276,3 +460,6 @@ def validate_config() -> List[str]:
     """
     config = get_config()
     return config.validate()
+
+# Backward compatibility alias for older tests/config consumers
+Config = ArqonBusConfig

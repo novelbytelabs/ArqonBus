@@ -17,22 +17,27 @@ The ArqonBus data model consists of five core entities that represent the struct
 **Validation**: Required - strict envelope schema validation  
 
 **Fields**:
-- `version` (string, required): Protocol version identifier (always "1.0")
+- `version` (string, required): Protocol version identifier (currently "1.0")
 - `id` (string, required): Unique message identifier prefixed with "arq_"
-- `type` (string, required): Message classification (event, system, command, private, command_response, telemetry)
-- `room` (string, required): Target room namespace for routing
-- `channel` (string, required): Target channel within room for precise routing
-- `from` (string, required): Sender client_id for message attribution
+- `type` (string, required): Message classification (message, command, response, error, telemetry)
 - `timestamp` (ISO8601 string, required): Server-generated message timestamp
-- `payload` (object, required): Message content data
-- `metadata` (object, optional): Additional message metadata
+- `payload` (object, required for `type="message"`): Message content data
+- `command` (string, required for `type="command"`): Command name
+- `request_id` (string, required for `type="response"`/`"error"`): Correlates responses/errors to originating request
+- `room` (string, optional): Target room namespace for routing when room-scoped delivery is required
+- `channel` (string, optional): Target channel within room for precise routing
+- `sender` (string, optional): Sender client_id for message attribution (legacy alias `from_client` still supported)
+- `metadata` (object, optional): Additional message metadata or legacy routing hints
+- `args` (object, optional): Command arguments
+- `status`/`error_code` (string, optional): Response/error status metadata
 
 **Validation Rules**:
-- All required fields must be present and non-null
+- Core fields (`id`, `type`, `version`, `timestamp`) must be present and non-null
 - ID must start with "arq_" prefix
 - Version must be "1.0" for protocol compliance
 - Timestamp must be valid ISO8601 format
-- Room and channel must follow naming conventions
+- Room and channel must follow naming conventions when provided
+- Routing fields remain optional for system/command messages that do not target a specific room/channel
 
 **State Transitions**:
 - Created → Validated → Routed → Delivered/Expired

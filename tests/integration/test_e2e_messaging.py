@@ -7,9 +7,12 @@ storage, telemetry, and command execution.
 import pytest
 import asyncio
 import json
+import itertools
 from unittest.mock import AsyncMock, patch
 from datetime import datetime, timezone
 import websockets
+
+from arqonbus.config.config import load_config
 
 from arqonbus.server import ArqonBusServer
 from arqonbus.protocol.envelope import Envelope
@@ -17,29 +20,51 @@ from arqonbus.protocol.ids import generate_message_id
 from arqonbus.config.config import Config
 
 
+_port_sequence = itertools.count(39000)
+
+
+def _next_port() -> int:
+    return next(_port_sequence)
+
+
+def _ws_uri(config: dict) -> str:
+    """Build WebSocket URI from test configuration."""
+    host = config["server"]["host"]
+    port = config["server"]["port"]
+    return f"ws://{host}:{port}"
+
+
 class TestEndToEndMessaging:
     """End-to-end integration tests for ArqonBus."""
+    pytestmark = [pytest.mark.e2e, pytest.mark.socket]
     
     @pytest.fixture
     def server_config(self):
         """Server configuration for testing."""
-        return {
-            "server": {"host": "localhost", "port": 8765},
-            "websocket": {"host": "localhost", "port": 8765},
+        ws_port = _next_port()
+        telemetry_port = _next_port()
+        http_port = _next_port()
+        config = {
+            "server": {"host": "127.0.0.1", "port": ws_port},
+            "websocket": {"host": "127.0.0.1", "port": ws_port},
             "storage": {"backend": "memory", "max_history_size": 1000},
             "telemetry": {
                 "enabled": True,
-                "host": "localhost",
-                "port": 8081,
+                "host": "127.0.0.1",
+                "port": telemetry_port,
                 "log_level": "INFO"
             },
             "http": {
                 "enabled": True,
-                "host": "localhost", 
-                "port": 8080
+                "host": "127.0.0.1",
+                "port": http_port
             },
             "commands": {"enabled": True}
         }
+        try:
+            yield config
+        finally:
+            load_config()
     
     @pytest.fixture
     def test_client_envelope(self):
@@ -58,12 +83,12 @@ class TestEndToEndMessaging:
     async def test_full_message_flow_with_telemetry(self, server_config, test_client_envelope):
         """Test complete message flow with telemetry integration."""
         # Start server
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=server_config)
         await server.start()
         
         try:
             # Connect WebSocket client
-            uri = f"ws://localhost:8765"
+            uri = _ws_uri(server_config)
             async with websockets.connect(uri) as websocket:
                 # First, receive welcome message
                 welcome_response = await websocket.recv()
@@ -90,7 +115,7 @@ class TestEndToEndMessaging:
     async def test_room_based_routing_e2e(self, server_config):
         """Test end-to-end room-based message routing."""
         # Start server
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=server_config)
         await server.start()
         
         try:
@@ -119,7 +144,7 @@ class TestEndToEndMessaging:
             }
             
             # Connect WebSocket clients
-            uri = f"ws://localhost:8765"
+            uri = _ws_uri(server_config)
             
             # Client 1: Join room and send message
             async with websockets.connect(uri) as client1_ws:
@@ -147,12 +172,12 @@ class TestEndToEndMessaging:
     async def test_command_execution_e2e(self, server_config):
         """Test end-to-end command execution."""
         # Start server
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=server_config)
         await server.start()
         
         try:
             # Connect WebSocket client
-            uri = f"ws://localhost:8765"
+            uri = _ws_uri(server_config)
             async with websockets.connect(uri) as websocket:
                 # Send status command
                 command_msg = {
@@ -191,12 +216,12 @@ class TestEndToEndMessaging:
     async def test_storage_integration_e2e(self, server_config):
         """Test end-to-end storage integration."""
         # Start server with memory storage
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=server_config)
         await server.start()
         
         try:
             # Connect WebSocket client
-            uri = f"ws://localhost:8765"
+            uri = _ws_uri(server_config)
             async with websockets.connect(uri) as websocket:
                 # Send message that should be stored
                 message = {
@@ -215,7 +240,8 @@ class TestEndToEndMessaging:
                 if server.storage:
                     # Check storage stats
                     storage_stats = await server.storage.get_storage_stats()
-                    assert "backend_type" in storage_stats  # Fixed field name
+                    backend_name = storage_stats.get("backend_type") or storage_stats.get("storage_backend")
+                    assert backend_name in {"memory", "redis", "redis_streams"}
                     
                     # Test history retrieval
                     history = await server.storage.get_global_history(limit=10)
@@ -232,12 +258,12 @@ class TestEndToEndMessaging:
         server_config["storage"]["backend"] = "redis_streams"
         server_config["storage"]["redis_url"] = "redis://localhost:9999"  # Invalid port
         
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=server_config)
         await server.start()
         
         try:
             # Connect WebSocket client
-            uri = f"ws://localhost:8765"
+            uri = _ws_uri(server_config)
             async with websockets.connect(uri) as websocket:
                 # Send message
                 message = {
@@ -273,11 +299,11 @@ class TestEndToEndMessaging:
     async def test_concurrent_clients_e2e(self, server_config):
         """Test end-to-end with multiple concurrent clients."""
         # Start server
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=server_config)
         await server.start()
         
         try:
-            uri = f"ws://localhost:8765"
+            uri = _ws_uri(server_config)
             
             # Create multiple concurrent clients
             clients = []
@@ -335,7 +361,7 @@ class TestEndToEndMessaging:
     async def test_server_lifecycle_e2e(self, server_config):
         """Test complete server startup and shutdown lifecycle."""
         # Test server startup
-        server = ArqonBusServer()
+        server = ArqonBusServer(config_override=server_config)
         assert not server.is_running()
         
         # Start server
@@ -348,7 +374,7 @@ class TestEndToEndMessaging:
             assert server.storage is not None
             
             # Connect a client to verify functionality
-            uri = f"ws://localhost:8765"
+            uri = _ws_uri(server_config)
             async with websockets.connect(uri) as websocket:
                 # Send a simple ping or status command
                 command = {

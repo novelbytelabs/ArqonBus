@@ -1,0 +1,263 @@
+version: 1.0.0
+description: |
+  Sentinel—the ArqonBus CI Guardian Bot—enforces the ArqonBus Engineering
+  Constitution, SOTA Engineering Doctrine, and ACES CI/CD Enforcement Spec.
+  This file defines the executable policy rules.
+
+################################################################################
+# 0. GLOBAL BOT BEHAVIOR
+################################################################################
+bot:
+  strict_mode: true              # No soft failures on critical rules
+  require_pr_template: true      # Must use PR template
+  post_inline_comments: true     # Leave comments in diff
+  post_summary_comment: true     # Consolidated review
+  block_on_errors: true          # Block merge on violation
+  warn_on_warnings: true         # Non-blocking but noisy
+
+################################################################################
+# 1. SPEC (SDD) ENFORCEMENT RULES
+################################################################################
+spec:
+  require_spec_file: true
+  spec_paths:
+    - "specs/**/*.md"
+  require_acceptance_criteria: true
+  acceptance_criteria_patterns:
+    - "Given"
+    - "Acceptance Criteria"
+    - "When"
+    - "Then"
+  require_invariants_section: true
+  invariants_patterns:
+    - "Invariant"
+    - "Invariants:"
+  block_if_missing: true
+
+################################################################################
+# 2. ARCHITECTURAL INVARIANCE (VOLTRON GUARD)
+################################################################################
+architecture:
+  enforce_layer_boundaries: true
+  layers:
+    shield:
+      root: "shield/"
+      forbidden_imports:
+        - "storage/"
+        - "db/"
+        - "persistence/"
+        - "brain/"
+        - "tcp"
+    spine:
+      root: "spine/"
+      forbidden_imports:
+        - "shield/"
+        - "brain/"
+        - "websocket"
+    brain:
+      root: "brain/"
+      forbidden_imports:
+        - "shield/"
+        - "tcp"
+        - "raw_socket"
+    storage:
+      root: "storage/"
+      forbidden_imports:
+        - "shield/"
+        - "gateway/"
+        - "websocket"
+
+  detect_direct_http_calls: true
+  forbidden_http_patterns:
+    - "reqwest::"
+    - "axios"
+    - "HTTPClient"
+    - "HTTPoison"
+
+  detect_cross_layer_state: true
+  block_on_violations: true
+
+################################################################################
+# 3. PROTOCOL & STATE MACHINE RULES
+################################################################################
+protocol:
+  proto_paths:
+    - "proto/**/*.proto"
+  require_proto_lint: true
+  require_breaking_check: true
+  require_reserved_tags: true
+  enforce_optional_new_fields: true
+  forbid_required_new_fields: true
+  require_deprecation_annotations: true
+  require_golden_vectors: true
+  proto_break_block: true
+
+state_machines:
+  require_sm_updates_on_code_change: true
+  sm_paths:
+    - "state_machines/**/*.md"
+    - "state_machines/**/*.tla"
+  require_invariant_updates: true
+  require_all_transitions_documented: true
+  block_if_unsynchronized: true
+
+################################################################################
+# 4. TESTING (UNIT + INTEGRATION + ADVERSARIAL)
+################################################################################
+testing:
+  require_unit_tests_for_new_logic: true
+  unit_test_paths:
+    - "*/tests"
+    - "**/*_test.exs"
+  forbid_async_sleeps: true
+  async_sleep_patterns:
+    - "sleep("
+    - "Process.sleep"
+
+  require_integration_tests_if_cross_service: true
+  integration_triggers:
+    - "shield/"
+    - "spine/"
+    - "brain/"
+    - "storage/"
+
+  require_property_based_tests_for_protocol:
+    enabled: true
+    patterns:
+      - "Envelope"
+      - "Command"
+      - "Message"
+
+  block_if_test_coverage_drop: true
+  coverage_thresholds:
+    core_logic: 1.00          # 100%
+    hot_paths: 1.00           # 100%
+    modules: 0.85             # 85%
+
+################################################################################
+# 5. SECURITY & ZERO TRUST ENFORCEMENT
+################################################################################
+security:
+  require_auth_boundaries: true
+  forbid_unvalidated_inputs: true
+
+  tenant_isolation:
+    require_tenant_prefix: true
+    tenant_prefix_patterns:
+      - "tenant"
+      - "TenantID"
+    block_on_missing_prefix: true
+
+  no_secrets_in_code: true
+  secret_detection_patterns:
+    - "API_KEY"
+    - "SECRET"
+    - "PRIVATE_KEY"
+    - "-----BEGIN"
+  block_on_secret_detection: true
+
+  enforce_fail_closed_logic: true
+  fail_closed_patterns:
+    - "unwrap_or_default("
+    - "unwrap_or("
+    - "allow_by_default"
+
+################################################################################
+# 6. OBSERVABILITY-FIRST DEVELOPMENT
+################################################################################
+observability:
+  require_metrics_for_new_handlers: true
+  metric_patterns:
+    - "counter!"
+    - "histogram!"
+    - "gauge!"
+    - "Telemetry."
+
+  require_structured_logs: true
+  structured_log_patterns:
+    - "info!("
+    - "warn!("
+    - "error!("
+    - "Logger.info("
+    - "Logger.error("
+
+  require_traces_for_critical_paths: true
+  tracing_patterns:
+    - "tracing::"
+    - "span!"
+    - "telemetry_span"
+
+  block_if_missing_observability: true
+
+################################################################################
+# 7. PERFORMANCE REGRESSION RULES
+################################################################################
+performance:
+  read_benchmark_output: true
+  benchmark_tool_output_path: "benchmarks/results/*.json"
+  max_allowed_latency_regression_pct: 5
+  max_allowed_allocation_regression_pct: 5
+  block_on_perf_regression: true
+
+################################################################################
+# 8. CHAOS & ADVERSARIAL TESTING RULES
+################################################################################
+chaos:
+  require_fuzz_tests: true
+  fuzz_test_paths:
+    - "fuzz/"
+  require_failure_injection_tests: true
+  block_on_fuzzer_crash: true
+
+################################################################################
+# 9. BACKWARD COMPATIBILITY
+################################################################################
+compatibility:
+  require_old_client_test: true
+  require_new_client_test: true
+  require_mixed_version_cluster_test: true
+  block_on_failure: true
+
+################################################################################
+# 10. TECHNICAL DEBT RULES
+################################################################################
+technical_debt:
+  enforce_todo_has_ticket: true
+  todo_patterns:
+    - "TODO"
+    - "FIXME"
+    - "HACK"
+    - "XXX"
+
+  require_ttl_for_debt_items: true
+  require_debt_record_file: true
+  debt_record_paths:
+    - "technical_debt/**/*.md"
+
+  forbid_accidental_debt: true
+
+  block_on_untracked_debt: true
+  block_on_expired_ttl: true
+
+################################################################################
+# 11. DEPLOYMENT SAFETY NETS (CANARY + ROLLBACK)
+################################################################################
+deployment:
+  require_canary_plan: true
+  require_rollback_plan: true
+  require_shadow_replay_for_protocol_changes: true
+  block_if_no_rollback_defined: true
+
+################################################################################
+# 12. BOT COMMENT STYLING & MESSAGING
+################################################################################
+messages:
+  header: "🛡️ **Sentinel Review — ArqonBus Constitution Enforcement**"
+  footer: "Please resolve all blocking issues and comment `/sentinel recheck`."
+  error_prefix: "❌"
+  warn_prefix:  "⚠️"
+  info_prefix:  "ℹ️"
+
+################################################################################
+# END OF SENTINEL RULESET
+################################################################################

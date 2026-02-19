@@ -49,7 +49,7 @@ python -m arqonbus.main
 
 You should see output like:
 ```
-INFO: ArqonBus server started successfully on 127.0.0.1:8765
+INFO: ArqonBus server started successfully on 127.0.0.1:9100
 INFO: Storage backend: memory
 INFO: Server is ready for connections
 ```
@@ -66,7 +66,7 @@ import websockets
 import json
 
 async def simple_client():
-    uri = "ws://localhost:8765"
+    uri = "ws://localhost:9100"
     
     async with websockets.connect(uri) as websocket:
         # Send a test message
@@ -115,7 +115,7 @@ create_channel_command = {
 
 ```javascript
 // Browser-based client
-const ws = new WebSocket('ws://localhost:8765');
+const ws = new WebSocket('ws://localhost:9100');
 
 ws.onopen = function() {
     console.log('Connected to ArqonBus');
@@ -161,7 +161,7 @@ export ARQONBUS_STORAGE_BACKEND=redis
 export ARQONBUS_REDIS_HOST=localhost
 export ARQONBUS_REDIS_PORT=6379
 export ARQONBUS_SERVER_HOST=0.0.0.0
-export ARQONBUS_SERVER_PORT=8765
+export ARQONBUS_SERVER_PORT=9100
 export ARQONBUS_MAX_CONNECTIONS=1000
 ```
 
@@ -178,7 +178,7 @@ Create a `.env` file for persistent configuration:
 ```bash
 # Server settings
 ARQONBUS_SERVER_HOST=127.0.0.1
-ARQONBUS_SERVER_PORT=8765
+ARQONBUS_SERVER_PORT=9100
 ARQONBUS_MAX_CONNECTIONS=1000
 
 # Storage backend
@@ -203,7 +203,7 @@ ARQONBUS_AUTH_TOKEN=your-secret-token
 
 ```python
 async def chat_client(username):
-    uri = "ws://localhost:8765"
+    uri = "ws://localhost:9100"
     
     async with websockets.connect(uri) as websocket:
         # Join the general channel
@@ -225,7 +225,7 @@ async def chat_client(username):
 
 ```python
 async def iot_device(device_id):
-    uri = "ws://localhost:8765"
+    uri = "ws://localhost:9100"
     
     async with websockets.connect(uri) as websocket:
         # Register device
@@ -255,7 +255,7 @@ async def iot_device(device_id):
 
 ```python
 async def notification_client():
-    uri = "ws://localhost:8765"
+    uri = "ws://localhost:9100"
     
     async with websockets.connect(uri) as websocket:
         # Join notifications channel
@@ -280,7 +280,7 @@ async def notification_client():
 ### 1. Health Check
 
 ```bash
-curl http://localhost:8765/health
+curl http://localhost:9100/health
 ```
 
 Expected response:
@@ -298,7 +298,7 @@ Expected response:
 ### 2. Server Status
 
 ```bash
-curl http://localhost:8765/status
+curl http://localhost:9100/status
 ```
 
 ### 3. Run Integration Tests
@@ -316,8 +316,8 @@ python -m pytest tests/integration/ -v
 ### Port Already in Use
 
 ```bash
-# Find process using port 8765
-lsof -i :8765
+# Find process using port 9100
+lsof -i :9100
 
 # Kill the process
 kill -9 <PID>

@@ -1,0 +1,8 @@
+[package]
+name = "arqonhpo-operator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arqonhpo-core = { path = "../arqonhpo-core" }
+tokio = { version = "1", features = ["full"] }

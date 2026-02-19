@@ -20,9 +20,25 @@ except ImportError:
     web_request = None
     web_response = None
     HTTP_SERVER_AVAILABLE = False
+    # Lightweight stubs for type hints to avoid attribute errors in tests
+    class _StubRequest:
+        pass
+    class _StubResponse:
+        pass
+    class _StubNamespace:
+        Request = _StubRequest
+        Response = _StubResponse
+    web_request = _StubNamespace()
+    web_response = _StubNamespace()
 
 from ..utils.logging import get_logger
-from ..utils.metrics import get_all_metrics, export_prometheus_format
+from ..utils.metrics import (
+    export_prometheus_format,
+    get_all_metrics,
+    record_counter,
+    record_histogram,
+)
+from .. import __version__
 
 logger = get_logger(__name__)
 
@@ -129,29 +145,65 @@ class ArqonBusHTTPServer:
     
     def _setup_routes(self):
         """Set up HTTP routes."""
+        def add_get(path: str, handler):
+            self.app.router.add_get(path, self._tracked_handler(path, handler))
+
+        def add_post(path: str, handler):
+            self.app.router.add_post(path, self._tracked_handler(path, handler))
+
         # Health endpoints
-        self.app.router.add_get("/health", self.health_check)
-        self.app.router.add_get("/status", self.status_check)
-        
+        add_get("/health", self.health_check)
+        add_get("/status", self.status_check)
+        add_get("/version", self.get_version)
+
         # Metrics endpoints
-        self.app.router.add_get("/metrics", self.get_metrics)
-        self.app.router.add_get("/metrics/prometheus", self.get_prometheus_metrics)
-        
+        add_get("/metrics", self.get_metrics)
+        add_get("/metrics/prometheus", self.get_prometheus_metrics)
+
         # Storage endpoints
-        self.app.router.add_get("/storage/history", self.get_storage_history)
-        self.app.router.add_get("/storage/stats", self.get_storage_stats)
-        
+        add_get("/storage/history", self.get_storage_history)
+        add_get("/storage/stats", self.get_storage_stats)
+
         # System endpoints
-        self.app.router.add_get("/system/info", self.get_system_info)
-        self.app.router.add_get("/system/config", self.get_system_config)
-        
+        add_get("/system/info", self.get_system_info)
+        add_get("/system/config", self.get_system_config)
+
         # Telemetry endpoints
-        self.app.router.add_get("/telemetry/events", self.get_telemetry_events)
-        self.app.router.add_get("/telemetry/stats", self.get_telemetry_stats)
-        
+        add_get("/telemetry/events", self.get_telemetry_events)
+        add_get("/telemetry/stats", self.get_telemetry_stats)
+
         # Admin endpoints
-        self.app.router.add_post("/admin/shutdown", self.admin_shutdown)
-        self.app.router.add_post("/admin/restart", self.admin_restart)
+        add_post("/admin/shutdown", self.admin_shutdown)
+        add_post("/admin/restart", self.admin_restart)
+
+    def _tracked_handler(self, endpoint: str, handler):
+        """Wrap endpoint handlers with request metrics and latency tracking."""
+
+        async def _wrapped(request):
+            started_at = time.perf_counter()
+            errored = False
+            try:
+                response = await handler(request)
+                status = getattr(response, "status", 200)
+                if status >= 400:
+                    errored = True
+                return response
+            except Exception:
+                errored = True
+                raise
+            finally:
+                duration_seconds = max(0.0, time.perf_counter() - started_at)
+                self._update_request_stats(endpoint, duration_seconds * 1000.0, error=errored)
+                try:
+                    labels = {"endpoint": endpoint}
+                    record_counter("http_requests_total", 1, labels)
+                    record_histogram("http_request_duration_seconds", duration_seconds, labels)
+                    if errored:
+                        record_counter("http_errors_total", 1, labels)
+                except Exception as e:
+                    logger.warning("Failed to record HTTP metrics for %s: %s", endpoint, e)
+
+        return _wrapped
     
     async def health_check(self, request: web_request.Request) -> web_response.Response:
         """Basic health check endpoint.
@@ -183,7 +235,7 @@ class ArqonBusHTTPServer:
                 "status": "healthy",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "service": "arqonbus",
-                "version": "1.0.0",
+                "version": __version__,
                 "uptime_seconds": time.time() - self._request_stats["start_time"],
                 "endpoints": {
                     "http": self.is_running,
@@ -221,6 +273,16 @@ class ArqonBusHTTPServer:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": str(e)
             }, status=500)
+
+    async def get_version(self, request: web_request.Request) -> web_response.Response:
+        """Service version endpoint."""
+        return web.json_response(
+            {
+                "service": "arqonbus",
+                "version": __version__,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
     
     async def get_metrics(self, request: web_request.Request) -> web_response.Response:
         """Get system metrics endpoint.
@@ -360,7 +422,7 @@ class ArqonBusHTTPServer:
         try:
             info = {
                 "service": "arqonbus",
-                "version": "1.0.0",
+                "version": __version__,
                 "description": "ArqonBus Core Message Bus",
                 "architecture": {
                     "transport": "WebSocket",
@@ -379,9 +441,11 @@ class ArqonBusHTTPServer:
                     "persistence": True
                 },
                 "endpoints": {
-                    "websocket": "ws://localhost:8765",
+                    "websocket": f'ws://{self.config.get("host", "localhost")}:{self.config.get("port", 9100)}',
                     "http": f"http://{self.host}:{self.port}",
-                    "telemetry": f"ws://{self.host}:8081"
+                    "telemetry": (
+                        f'ws://{self.config.get("host", "localhost")}:{self.config.get("telemetry_port", 8081)}'
+                    ),
                 }
             }
             
@@ -481,6 +545,16 @@ class ArqonBusHTTPServer:
                 "error": "Failed to get telemetry stats",
                 "details": str(e)
             }, status=500)
+
+    def _is_admin_request_authorized(self, request: web_request.Request) -> bool:
+        """Validate admin request authorization.
+
+        If no API key is configured, admin endpoints are treated as local/dev open.
+        """
+        if not self.api_key:
+            return True
+        provided = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
+        return provided == self.api_key
     
     async def admin_shutdown(self, request: web_request.Request) -> web_response.Response:
         """Admin shutdown endpoint.
@@ -491,7 +565,11 @@ class ArqonBusHTTPServer:
         Returns:
             Shutdown response
         """
-        # TODO: Add authentication check
+        if not self._is_admin_request_authorized(request):
+            return web.json_response(
+                {"error": "Unauthorized", "details": "Valid X-API-Key required"},
+                status=401,
+            )
         logger.warning("Admin shutdown requested via HTTP endpoint")
         
         try:
@@ -519,7 +597,11 @@ class ArqonBusHTTPServer:
         Returns:
             Restart response
         """
-        # TODO: Add authentication check
+        if not self._is_admin_request_authorized(request):
+            return web.json_response(
+                {"error": "Unauthorized", "details": "Valid X-API-Key required"},
+                status=401,
+            )
         logger.warning("Admin restart requested via HTTP endpoint")
         
         try:
@@ -542,13 +624,14 @@ class ArqonBusHTTPServer:
         """Shutdown the server."""
         await asyncio.sleep(1)  # Give time for response
         await self.stop()
-        # TODO: Implement full server shutdown
+        logger.info("HTTP shutdown sequence completed")
     
     async def _restart_server(self):
         """Restart the server."""
         await asyncio.sleep(1)  # Give time for response
         await self.stop()
-        # TODO: Implement server restart logic
+        await self.start()
+        logger.info("HTTP restart sequence completed")
     
     async def _health_monitor(self):
         """Monitor HTTP server health."""

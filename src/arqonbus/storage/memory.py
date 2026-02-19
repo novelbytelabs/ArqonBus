@@ -421,5 +421,5 @@ class MemoryStorageBackend(StorageBackend):
                 error_message=str(e)
             )
 
-# Alias for backward compatibility and test compatibility
+# Backward compatibility alias expected by other modules/tests
 MemoryStorage = MemoryStorageBackend
