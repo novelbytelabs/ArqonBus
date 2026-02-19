@@ -66,7 +66,7 @@ export ARQONBUS_DEBUG=false
 
 3. **Verify Redis Connectivity**
    ```bash
-   python test_redis_connection.py
+   python scripts/manual_checks/redis_connection_check.py
    ```
 
 4. **Start ArqonBus Server**

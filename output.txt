@@ -1,6 +1,0 @@
-Testing Chutes API with key ending in ...lSec
-Sending request to MiniMaxAI/MiniMax-M2.1-TEE...
-Response received:
-{'id': 'chatcmpl-a0e7c680e36c23df', 'choices': [{'finish_reason': 'stop', 'index': 0, 'logprobs': None, 'message': {'content': '{\n  "result": "YES"\n}', 'refusal': None, 'role': 'assistant', 'annotations': None, 'audio': None, 'function_call': None, 'tool_calls': [], 'reasoning': "The user is asking if I'm online. This is a simple question about my availability. I should respond directly and confirm that I'm here and ready to help.\n", 'reasoning_content': "The user is asking if I'm online. This is a simple question about my availability. I should respond directly and confirm that I'm here and ready to help.\n"}, 'stop_reason': None, 'token_ids': None, 'hidden_states': None}], 'created': 1769632794, 'model': 'MiniMaxAI/MiniMax-M2.1-TEE', 'object': 'chat.completion', 'service_tier': None, 'system_fingerprint': None, 'usage': {'completion_tokens': 42, 'prompt_tokens': 34, 'total_tokens': 76, 'completion_tokens_details': None, 'prompt_tokens_details': None, 'reasoning_tokens': 32}, 'prompt_logprobs': None, 'prompt_token_ids': None, 'kv_transfer_params': None, 'chutes_verification': '2a264a679288c5de3e64b1f2bafbc0fd'}
-SUCCESS
-
