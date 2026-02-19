@@ -85,6 +85,9 @@ Implementation:
 - Freeze roadmap claims and map each claim to test evidence.
 - Add a requirement-to-test index document.
 - Define mandatory “no merge” gates for critical paths.
+- Phase A artifacts created:
+  - `docs/ArqonBus/plan/phase_a_requirement_test_traceability.md`
+  - `docs/ArqonBus/checklist/phase_a_truth_alignment_checklist.md`
 
 Primary files:
 
