@@ -44,6 +44,7 @@ class ArqonBusServer:
 
         storage_kwargs = {"max_size": self.config.storage.max_history_size}
         if self.config.storage.backend in ("redis", "redis_streams"):
+            storage_kwargs["storage_mode"] = self.config.storage.mode
             redis_url = self.config.storage.redis_url
             if not redis_url:
                 protocol = "rediss" if self.config.redis.ssl else "redis"

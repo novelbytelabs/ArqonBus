@@ -1,4 +1,5 @@
 """Storage backend interface for ArqonBus."""
+import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -439,7 +440,13 @@ class StorageRegistry:
         if backend_class is None:
             available = ", ".join(cls.list_backends())
             raise ValueError(f"Unknown storage backend '{name}'. Available: {available}")
-            
+
+        # Some backends (e.g., Redis) expose an async factory to validate
+        # connectivity/capabilities before the instance is returned.
+        create_fn = getattr(backend_class, "create", None)
+        if create_fn and asyncio.iscoroutinefunction(create_fn):
+            return await create_fn(kwargs)
+
         return backend_class(**kwargs)
 
 

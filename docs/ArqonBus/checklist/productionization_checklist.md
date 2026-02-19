@@ -24,10 +24,10 @@ Source plans:
 
 ## Phase 2: Storage Durability Hardening
 
-- [ ] Add explicit `strict`/`degraded` storage mode.
-- [ ] Make Redis unavailability fail startup in `strict` mode.
-- [ ] Emit explicit degraded health signals in `degraded` mode.
-- [ ] Add integration tests for both modes.
+- [x] Add explicit `strict`/`degraded` storage mode.
+- [x] Make Redis unavailability fail startup in `strict` mode.
+- [x] Emit explicit degraded health signals in `degraded` mode.
+- [x] Add integration tests for both modes.
 
 ## Phase 3: Runtime Integrity
 
