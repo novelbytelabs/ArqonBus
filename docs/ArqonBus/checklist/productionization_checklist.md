@@ -1,0 +1,58 @@
+# Productionization Checklist
+
+Last updated: 2026-02-19  
+Owner: ArqonBus maintainers  
+Source plans:
+
+- `docs/ArqonBus/plan/production_readiness_assessment.md`
+- `docs/ArqonBus/plan/productionization_execution_plan.md`
+
+## Phase 0: Baseline Lockdown
+
+- [x] Remove runtime package shadowing from `src/aiohttp/**`.
+- [x] Ensure HTTP server imports real `aiohttp` dependency path.
+- [x] Fix runtime dependency mismatch for `dotenv` (`pyproject.toml` and install tests).
+- [x] Add startup preflight for required environment config.
+- [x] Validate clean install/import in `helios-gpu-118`.
+
+## Phase 1: Security Hardening
+
+- [ ] Remove default JWT secret fallback from Shield production path.
+- [ ] Disable skip-validation outside test profile.
+- [ ] Add regression tests for fail-closed auth startup and token checks.
+- [ ] Re-run `cargo check -p shield` and `cargo test -p shield --tests`.
+
+## Phase 2: Storage Durability Hardening
+
+- [ ] Add explicit `strict`/`degraded` storage mode.
+- [ ] Make Redis unavailability fail startup in `strict` mode.
+- [ ] Emit explicit degraded health signals in `degraded` mode.
+- [ ] Add integration tests for both modes.
+
+## Phase 3: Runtime Integrity
+
+- [ ] Remove or hard-gate prototype operator logic from production paths.
+- [ ] Replace silent exception swallows in hot loops with structured handling.
+- [ ] Add regression tests for no-silent-failure guarantees.
+
+## Phase 4: Deployment Hardening
+
+- [ ] Remove hardcoded bind/port defaults in runtime entrypoints.
+- [ ] Validate environment profile behavior (`dev`, `staging`, `prod`).
+- [ ] Ensure docs and runbooks reflect final config contract.
+
+## Phase 5: Final Validation
+
+- [ ] Unit tests pass.
+- [ ] Integration tests pass.
+- [ ] End-to-end tests pass.
+- [ ] Regression tests pass.
+- [ ] Adversarial tests pass.
+- [ ] CI pipeline green with productionization gates enabled.
+
+## Release Gate
+
+- [ ] No production-path stubs/mocks/placeholders remain.
+- [ ] No auth bypass toggles available in production profile.
+- [ ] No silent durability downgrade in strict profile.
+- [ ] Runbook approved and exercised once end-to-end.

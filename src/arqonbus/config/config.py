@@ -44,6 +44,8 @@ class RedisConfig:
 class StorageConfig:
     """Storage backend configuration."""
     backend: str = "memory"  # memory, redis
+    mode: str = "degraded"  # degraded, strict
+    redis_url: Optional[str] = None
     max_history_size: int = 10000
     retention_hours: int = 24
     enable_persistence: bool = False
@@ -183,6 +185,8 @@ class ArqonBusConfig:
         
         # Storage configuration
         config.storage.backend = os.getenv("ARQONBUS_STORAGE_BACKEND", config.storage.backend)
+        config.storage.mode = os.getenv("ARQONBUS_STORAGE_MODE", config.storage.mode).lower()
+        config.storage.redis_url = os.getenv("ARQONBUS_REDIS_URL", config.storage.redis_url)
         config.storage.max_history_size = int(os.getenv("ARQONBUS_MAX_HISTORY_SIZE", config.storage.max_history_size))
         config.storage.enable_persistence = os.getenv("ARQONBUS_ENABLE_PERSISTENCE", "false").lower() == "true"
         
@@ -279,6 +283,10 @@ class ArqonBusConfig:
                 errors.append(f"Invalid Redis port: {self.redis.port}")
                 
         # Storage validation
+        if self.storage.mode not in ("degraded", "strict"):
+            errors.append(f"Invalid storage mode: {self.storage.mode}")
+        if self.storage.backend not in ("memory", "memory_storage", "redis", "redis_streams"):
+            errors.append(f"Unsupported storage backend: {self.storage.backend}")
         if self.storage.max_history_size < 1:
             errors.append(f"Invalid history size: {self.storage.max_history_size}")
             
@@ -341,6 +349,8 @@ class ArqonBusConfig:
             },
             "storage": {
                 "backend": self.storage.backend,
+                "mode": self.storage.mode,
+                "redis_url": self.storage.redis_url,
                 "max_history_size": self.storage.max_history_size,
                 "enable_persistence": self.storage.enable_persistence
             },
@@ -460,6 +470,41 @@ def validate_config() -> List[str]:
     """
     config = get_config()
     return config.validate()
+
+
+def startup_preflight_errors(config: Optional[ArqonBusConfig] = None) -> List[str]:
+    """Return startup preflight errors for stricter production readiness checks.
+
+    Preflight is strict when:
+    - `ARQONBUS_PREFLIGHT_STRICT=true`, or
+    - `environment=production`.
+    """
+    cfg = config or get_config()
+    errors: List[str] = []
+
+    strict_preflight = os.getenv("ARQONBUS_PREFLIGHT_STRICT", "false").lower() == "true"
+    if cfg.environment.lower() == "production":
+        strict_preflight = True
+
+    if not strict_preflight:
+        return errors
+
+    required_vars = (
+        "ARQONBUS_SERVER_HOST",
+        "ARQONBUS_SERVER_PORT",
+        "ARQONBUS_STORAGE_MODE",
+    )
+    for var_name in required_vars:
+        if not os.getenv(var_name):
+            errors.append(f"Missing required environment variable in strict preflight: {var_name}")
+
+    if cfg.storage.mode == "strict":
+        if cfg.storage.backend not in ("redis", "redis_streams"):
+            errors.append("Storage mode 'strict' requires Redis backend (redis or redis_streams)")
+        if not (cfg.storage.redis_url or os.getenv("ARQONBUS_REDIS_URL")):
+            errors.append("Storage mode 'strict' requires ARQONBUS_REDIS_URL")
+
+    return errors
 
 # Backward compatibility alias for older tests/config consumers
 Config = ArqonBusConfig
