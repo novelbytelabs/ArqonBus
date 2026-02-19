@@ -115,8 +115,14 @@ mod tests {
 
     #[test]
     fn test_mirror_subject() {
-        assert_eq!(mirror_subject("in.t.default.room1"), "shadow.in.t.default.room1");
-        assert_eq!(mirror_subject("events.user.created"), "shadow.events.user.created");
+        assert_eq!(
+            mirror_subject("in.t.default.room1"),
+            "shadow.in.t.default.room1"
+        );
+        assert_eq!(
+            mirror_subject("events.user.created"),
+            "shadow.events.user.created"
+        );
     }
 
     #[test]
@@ -124,8 +130,14 @@ mod tests {
         assert!(subject_matches("in.t.default.*", "in.t.default.room1"));
         assert!(subject_matches("in.t.>", "in.t.default.room1.sub"));
         assert!(!subject_matches("in.t.default.*", "in.t.other.room1"));
-        assert!(subject_matches("events.user.created", "events.user.created"));
-        assert!(!subject_matches("events.user.created", "events.user.deleted"));
+        assert!(subject_matches(
+            "events.user.created",
+            "events.user.created"
+        ));
+        assert!(!subject_matches(
+            "events.user.created",
+            "events.user.deleted"
+        ));
     }
 
     #[test]
@@ -147,6 +159,10 @@ mod tests {
         }
         // Allow 5% tolerance
         let ratio = mirrored as f64 / total as f64;
-        assert!(ratio > 0.45 && ratio < 0.55, "Expected ~50%, got {:.2}%", ratio * 100.0);
+        assert!(
+            ratio > 0.45 && ratio < 0.55,
+            "Expected ~50%, got {:.2}%",
+            ratio * 100.0
+        );
     }
 }

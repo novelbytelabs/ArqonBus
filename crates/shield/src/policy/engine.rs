@@ -1,6 +1,6 @@
-use wasmtime::{Engine, Config, Linker, Module, Store};
 use anyhow::Result;
 use std::sync::Arc;
+use wasmtime::{Config, Engine, Linker, Module, Store};
 
 use crate::policy::abi;
 #[derive(Clone)]
@@ -40,25 +40,43 @@ impl PolicyEngine {
     }
 
     /// Validate a payload using the loaded Wasm module.
-    pub async fn validate(&self, _payload: &[u8]) -> Result<bool> {
+    pub async fn validate(&self, payload: &[u8]) -> Result<bool> {
         let module = match &self.module {
             Some(m) => m,
             None => return Ok(true), // No policy loaded => allow
         };
         let mut store = Store::new(&self.engine, ());
-        // Log fuel limit for observability (also prevents dead_code warning)
-        tracing::debug!("Policy engine fuel limit: {}", self.config.fuel_limit);
+        store.set_fuel(self.config.fuel_limit)?;
         let instance = self.linker.instantiate_async(&mut store, module).await?;
+        if !payload.is_empty() {
+            let memory = instance
+                .get_memory(&mut store, "memory")
+                .ok_or_else(|| anyhow::anyhow!("policy module missing exported memory"))?;
+            let max_payload = self.config.memory_limit_bytes as usize;
+            if payload.len() > max_payload {
+                return Err(anyhow::anyhow!(
+                    "payload size {} exceeds policy memory limit {}",
+                    payload.len(),
+                    max_payload
+                ));
+            }
+            if payload.len() > memory.data_size(&store) {
+                return Err(anyhow::anyhow!(
+                    "payload size {} exceeds module memory size {}",
+                    payload.len(),
+                    memory.data_size(&store)
+                ));
+            }
+            memory.write(&mut store, 0, payload)?;
+        }
         // Assume exported function "policy_check" takes a pointer/len and returns i32 (0=allow,1=deny)
         let func = instance.get_typed_func::<(i32, i32), i32>(&mut store, "policy_check")?;
-        // For simplicity, we skip memory allocation and just pass empty payload.
-        let result = func.call_async(&mut store, (0, 0)).await?;
+        let result = func
+            .call_async(&mut store, (0, payload.len() as i32))
+            .await?;
         Ok(result == 0)
     }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -76,5 +94,17 @@ mod tests {
         let result = engine.validate(b"test payload").await;
         assert!(result.is_ok());
         assert!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_block_empty_policy_module_uses_payload_length() {
+        let mut engine = PolicyEngine::new().unwrap();
+        let module_path = format!("{}/policies/block_empty.wasm", env!("CARGO_MANIFEST_DIR"));
+        engine.load_module(module_path).unwrap();
+
+        let empty = engine.validate(b"").await.unwrap();
+        let non_empty = engine.validate(b"hello").await.unwrap();
+        assert!(!empty);
+        assert!(non_empty);
     }
 }

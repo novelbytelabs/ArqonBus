@@ -48,7 +48,7 @@ pub fn validate_payload(schema_bytes: &[u8], payload: &[u8]) -> Result<(), Vec<V
     // Protobuf field tags use varint encoding, first byte should have bits set
     let first_byte = payload[0];
     let wire_type = first_byte & 0x07;
-    
+
     // Wire types 0-5 are valid, 6 and 7 are reserved/deprecated
     if wire_type > 5 {
         return Err(vec![ValidationError {

@@ -1,2 +1,2 @@
-pub mod wasm;
 pub mod schema;
+pub mod wasm;

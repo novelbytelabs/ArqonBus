@@ -1,16 +1,19 @@
+use crate::auth::jwt::{decode_token, extract_bearer_token, Claims, JwtConfig};
+use crate::middleware::schema::SchemaValidator;
+use crate::policy::engine::PolicyEngine;
+use crate::router::mirroring::{should_mirror, MirrorConfig};
+use crate::router::nats_bridge::NatsBridge;
+use crate::AppState;
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::State,
-    response::IntoResponse,
     http::HeaderMap,
+    http::StatusCode,
+    response::IntoResponse,
+    response::Response,
 };
+use serde::Serialize;
 use tracing::{info, warn};
-use crate::router::nats_bridge::NatsBridge;
-use crate::router::mirroring::{should_mirror, MirrorConfig};
-use crate::auth::jwt::{Claims, JwtConfig, decode_token, extract_bearer_token};
-use crate::middleware::schema::SchemaValidator;
-use crate::policy::engine::PolicyEngine;
-use crate::AppState;
 
 /// The Actor State for each WebSocket connection.
 pub struct ConnectionActor {
@@ -25,17 +28,17 @@ pub struct ConnectionActor {
 
 impl ConnectionActor {
     pub fn new(
-        socket: WebSocket, 
-        nats: NatsBridge, 
-        mirror_config: MirrorConfig, 
+        socket: WebSocket,
+        nats: NatsBridge,
+        mirror_config: MirrorConfig,
         claims: Claims,
         policy: PolicyEngine,
         schema: SchemaValidator,
     ) -> Self {
         let trace_id = uuid::Uuid::new_v4().to_string();
-        Self { 
-            socket, 
-            nats, 
+        Self {
+            socket,
+            nats,
             claims,
             trace_id,
             mirror_config,
@@ -46,7 +49,7 @@ impl ConnectionActor {
 
     pub async fn run(mut self) {
         info!(
-            trace_id = %self.trace_id, 
+            trace_id = %self.trace_id,
             tenant_id = %self.claims.tenant_id,
             "ConnectionActor started"
         );
@@ -64,12 +67,12 @@ impl ConnectionActor {
                     // 2. Policy Validation (FR-006)
                     match self.policy.validate(&payload).await {
                         Ok(false) => {
-                             warn!(tenant=%self.claims.tenant_id, "Policy Deny");
-                             continue;
+                            warn!(tenant=%self.claims.tenant_id, "Policy Deny");
+                            continue;
                         }
                         Err(e) => {
-                             warn!(tenant=%self.claims.tenant_id, "Policy Error: {}", e);
-                             continue;
+                            warn!(tenant=%self.claims.tenant_id, "Policy Error: {}", e);
+                            continue;
                         }
                         _ => {}
                     }
@@ -77,7 +80,7 @@ impl ConnectionActor {
                     // Zero-Copy Hot Path: Forward to NATS
                     let subject = format!("in.t.{}.raw", self.claims.tenant_id);
                     let payload_bytes = bytes::Bytes::from(payload.clone());
-                    
+
                     if let Err(e) = self.nats.publish(&subject, payload_bytes.clone()).await {
                         warn!("Failed to publish to NATS: {}", e);
                         continue;
@@ -91,7 +94,8 @@ impl ConnectionActor {
                     // Traffic Mirroring
                     if let Some(percent) = self.mirror_config.get_percent(&subject) {
                         if should_mirror(&self.trace_id, percent) {
-                            if let Err(e) = self.nats.mirror_publish(&subject, payload_bytes).await {
+                            if let Err(e) = self.nats.mirror_publish(&subject, payload_bytes).await
+                            {
                                 warn!("Failed to mirror to shadow: {}", e);
                             }
                         }
@@ -117,66 +121,60 @@ impl ConnectionActor {
     }
 }
 
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum AuthError {
+    #[error("Missing Authorization header")]
+    MissingAuthorization,
+    #[error("Authorization header is not Bearer token format")]
+    InvalidAuthorizationFormat,
+    #[error("JWT decode failed")]
+    InvalidToken,
+}
+
+#[derive(Serialize)]
+struct ErrorBody {
+    error: &'static str,
+    details: String,
+}
+
+pub fn claims_from_headers(
+    headers: &HeaderMap,
+    jwt_config: &JwtConfig,
+) -> Result<Claims, AuthError> {
+    let auth_header = headers
+        .get("authorization")
+        .and_then(|h| h.to_str().ok())
+        .ok_or(AuthError::MissingAuthorization)?;
+
+    let token = extract_bearer_token(auth_header).ok_or(AuthError::InvalidAuthorizationFormat)?;
+    decode_token(token, jwt_config).map_err(|_| AuthError::InvalidToken)
+}
+
+fn unauthorized_response(err: &AuthError) -> Response {
+    let body = ErrorBody {
+        error: "Unauthorized",
+        details: err.to_string(),
+    };
+    (StatusCode::UNAUTHORIZED, axum::Json(body)).into_response()
+}
+
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    // Extract JWT from Authorization header
-    let auth_header = headers.get("authorization")
-        .and_then(|h| h.to_str().ok());
-    
     let jwt_config = JwtConfig::default();
-    
-    let claims = match auth_header {
-        Some(header) => {
-            match extract_bearer_token(header) {
-                Some(token) => {
-                    match decode_token(token, &jwt_config) {
-                        Ok(c) => c,
-                        Err(e) => {
-                            warn!("JWT decode failed: {}", e);
-                            // For dev mode, use default claims
-                            Claims {
-                                sub: "anonymous".to_string(),
-                                tenant_id: "default".to_string(),
-                                exp: 0,
-                                iat: 0,
-                            }
-                        }
-                    }
-                }
-                None => {
-                    warn!("No Bearer token in Authorization header");
-                    Claims {
-                        sub: "anonymous".to_string(),
-                        tenant_id: "default".to_string(),
-                        exp: 0,
-                        iat: 0,
-                    }
-                }
-            }
-        }
-        None => {
-            // No auth header - use default tenant (dev mode)
-            Claims {
-                sub: "anonymous".to_string(),
-                tenant_id: "default".to_string(),
-                exp: 0,
-                iat: 0,
-            }
+    let claims = match claims_from_headers(&headers, &jwt_config) {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("WebSocket auth rejected: {}", e);
+            return unauthorized_response(&e);
         }
     };
 
     ws.on_upgrade(move |socket| async move {
-        // Validation Hook (Fail Closed)
-        if let Err(e) = state.policy.validate(&[]).await {
-            warn!("Policy Rejection: {}", e);
-            return;
-        }
-
         let actor = ConnectionActor::new(
-            socket, 
+            socket,
             state.nats.clone(),
             state.mirror_config.clone(),
             claims,
@@ -185,4 +183,62 @@ pub async fn ws_handler(
         );
         actor.run().await;
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::jwt::JwtConfig;
+    use axum::http::HeaderValue;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+
+    fn test_config() -> JwtConfig {
+        JwtConfig {
+            secret: "test-secret".to_string(),
+            skip_validation: false,
+        }
+    }
+
+    fn valid_token(secret: &str) -> String {
+        let claims = Claims {
+            sub: "user-1".to_string(),
+            tenant_id: "tenant-a".to_string(),
+            exp: (chrono::Utc::now().timestamp() + 3600) as usize,
+            iat: chrono::Utc::now().timestamp() as usize,
+        };
+        encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .expect("token generation must succeed")
+    }
+
+    #[test]
+    fn test_claims_from_headers_rejects_missing_auth() {
+        let headers = HeaderMap::new();
+        let result = claims_from_headers(&headers, &test_config());
+        assert_eq!(result.unwrap_err(), AuthError::MissingAuthorization);
+    }
+
+    #[test]
+    fn test_claims_from_headers_rejects_invalid_format() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", HeaderValue::from_static("Basic abc"));
+        let result = claims_from_headers(&headers, &test_config());
+        assert_eq!(result.unwrap_err(), AuthError::InvalidAuthorizationFormat);
+    }
+
+    #[test]
+    fn test_claims_from_headers_accepts_valid_token() {
+        let mut headers = HeaderMap::new();
+        let token = valid_token("test-secret");
+        headers.insert(
+            "authorization",
+            HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
+        );
+        let claims = claims_from_headers(&headers, &test_config()).unwrap();
+        assert_eq!(claims.sub, "user-1");
+        assert_eq!(claims.tenant_id, "tenant-a");
+    }
 }

@@ -1,5 +1,5 @@
 //! ArqonBus Shield Benchmarks
-//! 
+//!
 //! Measures the hot-path performance of the Shield layer:
 //! - Raw NATS publish latency (baseline)
 //! - Schema validation overhead
@@ -7,13 +7,13 @@
 //!
 //! Run with: cargo bench --package shield-bench
 
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, black_box, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::time::Duration;
 
 /// Baseline: How fast can we serialize and deserialize protobuf messages?
 fn bench_protobuf_encode_decode(c: &mut Criterion) {
     use prost::Message;
-    
+
     // Simulated envelope (represents arqon.v1.Envelope)
     #[derive(Clone, PartialEq, Message)]
     struct TestEnvelope {
@@ -39,7 +39,7 @@ fn bench_protobuf_encode_decode(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("protobuf");
     group.throughput(Throughput::Elements(1));
-    
+
     group.bench_function("encode_envelope", |b| {
         b.iter(|| {
             let mut buf = Vec::with_capacity(512);
@@ -76,12 +76,12 @@ fn bench_protobuf_encode_decode(c: &mut Criterion) {
 /// Measure raw bytes throughput (simulates NATS publish path)
 fn bench_bytes_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("bytes_ops");
-    
+
     for size in [64, 256, 1024, 4096, 16384].iter() {
         let data: Vec<u8> = (0..*size).map(|i| i as u8).collect();
-        
+
         group.throughput(Throughput::Bytes(*size as u64));
-        
+
         group.bench_with_input(BenchmarkId::new("clone", size), &data, |b, d| {
             b.iter(|| {
                 let cloned = d.clone();
@@ -96,7 +96,7 @@ fn bench_bytes_operations(c: &mut Criterion) {
             })
         });
     }
-    
+
     group.finish();
 }
 
@@ -104,17 +104,17 @@ fn bench_bytes_operations(c: &mut Criterion) {
 fn bench_routing_hash(c: &mut Criterion) {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
-    
+
     let queries = vec![
         "load spec",
         "show constitution",
         "what governs this action",
         "get latest decision from room:control channel:decisions",
     ];
-    
+
     let mut group = c.benchmark_group("routing");
     group.throughput(Throughput::Elements(1));
-    
+
     group.bench_function("hash_query", |b| {
         let query = "show constitution rule about safety";
         b.iter(|| {
@@ -132,7 +132,7 @@ fn bench_routing_hash(c: &mut Criterion) {
             q.hash(&mut hasher);
             cache.insert(hasher.finish(), vec![0u8; 32]); // Cached embedding
         }
-        
+
         let query = "load spec";
         b.iter(|| {
             let mut hasher = DefaultHasher::new();
@@ -148,7 +148,7 @@ fn bench_routing_hash(c: &mut Criterion) {
 /// JSON vs MessagePack vs Protobuf comparison (common payload formats)
 fn bench_serialization_formats(c: &mut Criterion) {
     use serde::{Deserialize, Serialize};
-    
+
     #[derive(Clone, Serialize, Deserialize)]
     struct Message {
         id: String,
@@ -157,7 +157,7 @@ fn bench_serialization_formats(c: &mut Criterion) {
         payload: String,
         timestamp: u64,
     }
-    
+
     let msg = Message {
         id: "msg-12345".to_string(),
         room: "agents".to_string(),
@@ -168,7 +168,7 @@ fn bench_serialization_formats(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("serialization");
     group.throughput(Throughput::Elements(1));
-    
+
     group.bench_function("json_encode", |b| {
         b.iter(|| {
             let json = serde_json::to_vec(&msg).unwrap();
@@ -192,7 +192,7 @@ criterion_group! {
     config = Criterion::default()
         .measurement_time(Duration::from_secs(5))
         .sample_size(1000);
-    targets = 
+    targets =
         bench_protobuf_encode_decode,
         bench_bytes_operations,
         bench_routing_hash,

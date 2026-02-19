@@ -1,19 +1,29 @@
-use async_nats::{Client, HeaderMap};
 use anyhow::Result;
+use async_nats::{Client, HeaderMap};
 
 #[derive(Clone)]
 pub struct NatsBridge {
-    client: Client,
+    client: Option<Client>,
 }
 
 impl NatsBridge {
     pub async fn connect(url: &str) -> Result<Self> {
         let client = async_nats::connect(url).await?;
-        Ok(Self { client })
+        Ok(Self {
+            client: Some(client),
+        })
+    }
+
+    pub fn disconnected() -> Self {
+        Self { client: None }
     }
 
     pub async fn publish(&self, subject: &str, payload: bytes::Bytes) -> Result<()> {
-        self.client.publish(subject.to_string(), payload).await?;
+        let client = self
+            .client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("NATS client unavailable"))?;
+        client.publish(subject.to_string(), payload).await?;
         Ok(())
     }
 
@@ -24,7 +34,11 @@ impl NatsBridge {
         headers: HeaderMap,
         payload: bytes::Bytes,
     ) -> Result<()> {
-        self.client
+        let client = self
+            .client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("NATS client unavailable"))?;
+        client
             .publish_with_headers(subject.to_string(), headers, payload)
             .await?;
         Ok(())
@@ -39,6 +53,21 @@ impl NatsBridge {
         let shadow_subject = format!("shadow.{}", original_subject);
         let mut headers = HeaderMap::new();
         headers.insert("x-arqon-shadow", "true");
-        self.publish_with_headers(&shadow_subject, headers, payload).await
+        self.publish_with_headers(&shadow_subject, headers, payload)
+            .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_disconnected_bridge_fails_closed() {
+        let bridge = NatsBridge::disconnected();
+        let result = bridge
+            .publish("in.t.tenant.raw", bytes::Bytes::from_static(b"msg"))
+            .await;
+        assert!(result.is_err());
     }
 }

@@ -1,8 +1,8 @@
 //! JWT authentication and claims extraction.
 
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use anyhow::{anyhow, Result};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
-use anyhow::{Result, anyhow};
 
 /// JWT claims structure for ArqonBus.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -43,7 +43,7 @@ pub fn decode_token(token: &str, config: &JwtConfig) -> Result<Claims> {
         if parts.len() != 3 {
             return Err(anyhow!("Invalid JWT format"));
         }
-        
+
         use base64::Engine;
         let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .decode(parts[1])
@@ -56,10 +56,10 @@ pub fn decode_token(token: &str, config: &JwtConfig) -> Result<Claims> {
     let key = DecodingKey::from_secret(config.secret.as_bytes());
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
-    
+
     let token_data = decode::<Claims>(token, &key, &validation)
         .map_err(|e| anyhow!("JWT validation failed: {}", e))?;
-    
+
     Ok(token_data.claims)
 }
 
@@ -83,20 +83,21 @@ mod tests {
             secret: "test-secret".to_string(),
             skip_validation: false,
         };
-        
+
         let claims = Claims {
             sub: "user123".to_string(),
             tenant_id: "tenant-abc".to_string(),
             exp: (chrono::Utc::now().timestamp() + 3600) as usize,
             iat: chrono::Utc::now().timestamp() as usize,
         };
-        
+
         let token = encode(
             &Header::default(),
             &claims,
             &EncodingKey::from_secret(config.secret.as_bytes()),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         let decoded = decode_token(&token, &config).unwrap();
         assert_eq!(decoded.sub, "user123");
         assert_eq!(decoded.tenant_id, "tenant-abc");
@@ -115,7 +116,7 @@ mod tests {
             secret: "test-secret".to_string(),
             skip_validation: false,
         };
-        
+
         let result = decode_token("invalid.token.here", &config);
         assert!(result.is_err());
     }
