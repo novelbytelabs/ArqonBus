@@ -4,7 +4,7 @@
 
 **ArqonBus** is a lightweight, structured WebSocket message bus with rooms, channels, and a simple command protocol. It's designed to be the real-time backbone for applications, services, and agents that need organized, multi-channel communication.
 
-> Status: **experimental / WIP**  
+> Status: **experimental (Phase0/Phase1 branch slice complete; broader vNext ongoing)**  
 > Canonical vNext status: `docs/ArqonBus/vnext_status.md`
 
 ---

@@ -121,11 +121,11 @@ For each document/notebook reviewed, follow a consistent template in your notes:
      - Does it inform security, observability, or resource constraints?
      - Does it suggest a new product feature or mode?
 
-4. **Actions:**  
-     - [ ] Update `specification.md` section X.  
-     - [ ] Add a new operator design note.  
-     - [ ] Add an example or tutorial.  
-     - [ ] No immediate change; just recorded insight.
+4. **Actions (choose one or more):**  
+     - Update `specification.md` section X.  
+     - Add a new operator design note.  
+     - Add an example or tutorial.  
+     - No immediate change; just record the insight.
 
 These reflections can live:
 

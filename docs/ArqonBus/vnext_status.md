@@ -2,9 +2,11 @@
 
 Last updated: 2026-02-18
 Branch: `feature/vnext-phase0-phase1`
-Program status: In Progress
+Program status: Phase0/Phase1 slice complete; broader vNext roadmap in progress
 
 ## Why this file exists
+
+Status interpretation: milestones through the current branch slice are complete; remaining "in progress" reflects roadmap scope outside this slice.
 
 This is the canonical status file for vNext execution. If any other document conflicts
 with this file, this file wins until the conflicting document is updated.
