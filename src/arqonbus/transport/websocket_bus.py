@@ -1794,8 +1794,16 @@ async def run_server():
     )
     
     # Initialize components
+    config = get_config()
+    from ..config.config import startup_preflight_errors
+    preflight_errors = startup_preflight_errors(config)
+    if preflight_errors:
+        raise RuntimeError(
+            "Startup preflight failed: " + "; ".join(preflight_errors)
+        )
+
     client_registry = ClientRegistry()
-    ws_bus = WebSocketBus(client_registry)
+    ws_bus = WebSocketBus(client_registry, config=config)
     
     try:
         # Start server

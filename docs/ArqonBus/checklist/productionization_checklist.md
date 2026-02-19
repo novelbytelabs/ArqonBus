@@ -37,9 +37,9 @@ Source plans:
 
 ## Phase 4: Deployment Hardening
 
-- [ ] Remove hardcoded bind/port defaults in runtime entrypoints.
-- [ ] Validate environment profile behavior (`dev`, `staging`, `prod`).
-- [ ] Ensure docs and runbooks reflect final config contract.
+- [x] Remove hardcoded bind/port defaults in runtime entrypoints.
+- [x] Validate environment profile behavior (`dev`, `staging`, `prod`).
+- [x] Ensure docs and runbooks reflect final config contract.
 
 ## Phase 5: Final Validation
 

@@ -7,6 +7,25 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+_ENV_ALIASES = {
+    "development": "dev",
+    "dev": "dev",
+    "staging": "staging",
+    "production": "prod",
+    "prod": "prod",
+}
+
+
+def normalize_environment_name(environment: str) -> str:
+    """Normalize runtime profile names to dev|staging|prod."""
+    normalized = _ENV_ALIASES.get(environment.strip().lower())
+    if normalized is None:
+        raise ValueError(
+            f"Unsupported environment profile: {environment}. "
+            "Expected one of: dev, staging, prod."
+        )
+    return normalized
+
 
 @dataclass
 class ServerConfig:
@@ -251,7 +270,8 @@ class ArqonBusConfig:
         config.holonomy_enabled = os.getenv("ARQONBUS_HOLONOMY_ENABLED", "false").lower() == "true"
         
         # Global configuration
-        config.environment = os.getenv("ARQONBUS_ENVIRONMENT", config.environment)
+        raw_environment = os.getenv("ARQONBUS_ENVIRONMENT", config.environment)
+        config.environment = normalize_environment_name(raw_environment)
         config.debug = os.getenv("ARQONBUS_DEBUG", "false").lower() == "true"
         
         return config
@@ -301,6 +321,8 @@ class ArqonBusConfig:
             errors.append("JWT secret is required when authentication is enabled")
         if self.security.jwt_algorithm not in ("HS256",):
             errors.append(f"Unsupported JWT algorithm: {self.security.jwt_algorithm}")
+        if self.environment not in ("dev", "staging", "prod"):
+            errors.append(f"Unsupported environment profile: {self.environment}")
 
         # CASIL validation
         if self.casil.mode not in ("monitor", "enforce"):
@@ -436,18 +458,19 @@ def get_config() -> ArqonBusConfig:
     return _config
 
 
-def load_config(environment: str = "development") -> ArqonBusConfig:
+def load_config(environment: Optional[str] = None) -> ArqonBusConfig:
     """Load configuration for the given environment.
     
     Args:
-        environment: Environment name (development, production, test)
+        environment: Optional environment override (dev, staging, prod)
         
     Returns:
         Loaded configuration
     """
     global _config
     _config = ArqonBusConfig.from_environment()
-    _config.environment = environment
+    if environment is not None:
+        _config.environment = normalize_environment_name(environment)
     return _config
 
 
@@ -483,7 +506,8 @@ def startup_preflight_errors(config: Optional[ArqonBusConfig] = None) -> List[st
     errors: List[str] = []
 
     strict_preflight = os.getenv("ARQONBUS_PREFLIGHT_STRICT", "false").lower() == "true"
-    if cfg.environment.lower() == "production":
+    cfg_environment = normalize_environment_name(cfg.environment)
+    if cfg_environment in ("staging", "prod"):
         strict_preflight = True
 
     if not strict_preflight:

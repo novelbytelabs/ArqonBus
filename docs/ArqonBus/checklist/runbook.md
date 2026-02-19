@@ -15,9 +15,19 @@ This runbook provides operational procedures for deploying, managing, and troubl
 
 ### Environment Setup
 
+Profile contract:
+- Supported profiles: `dev`, `staging`, `prod`
+- Alias mapping: `development -> dev`, `production -> prod`
+- Strict preflight is always enabled in `staging` and `prod`
+- Strict preflight requires explicit `ARQONBUS_SERVER_HOST`, `ARQONBUS_SERVER_PORT`, `ARQONBUS_STORAGE_MODE`
+- If `ARQONBUS_STORAGE_MODE=strict`, `ARQONBUS_REDIS_URL` is required
+
 ```bash
 # Required environment variables for production
+export ARQONBUS_ENVIRONMENT=prod
 export ARQONBUS_STORAGE_BACKEND=redis
+export ARQONBUS_STORAGE_MODE=strict
+export ARQONBUS_REDIS_URL=rediss://:your-redis-password@your-redis-host.com:6379/0
 export ARQONBUS_REDIS_HOST=your-redis-host.com
 export ARQONBUS_REDIS_PORT=6379
 export ARQONBUS_REDIS_SSL=true

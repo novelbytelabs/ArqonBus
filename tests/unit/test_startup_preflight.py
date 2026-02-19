@@ -1,4 +1,11 @@
-from arqonbus.config.config import ArqonBusConfig, startup_preflight_errors
+import pytest
+
+from arqonbus.config.config import (
+    ArqonBusConfig,
+    load_config,
+    normalize_environment_name,
+    startup_preflight_errors,
+)
 
 
 def test_storage_mode_and_redis_url_load_from_environment(monkeypatch):
@@ -44,6 +51,39 @@ def test_startup_preflight_strict_storage_requires_redis_url(monkeypatch):
 def test_startup_preflight_non_strict_allows_defaults(monkeypatch):
     monkeypatch.setenv("ARQONBUS_PREFLIGHT_STRICT", "false")
     cfg = ArqonBusConfig()
-    cfg.environment = "development"
+    cfg.environment = "dev"
 
     assert startup_preflight_errors(cfg) == []
+
+
+def test_environment_name_normalization_accepts_profile_aliases():
+    assert normalize_environment_name("development") == "dev"
+    assert normalize_environment_name("DEV") == "dev"
+    assert normalize_environment_name("staging") == "staging"
+    assert normalize_environment_name("production") == "prod"
+    assert normalize_environment_name("prod") == "prod"
+
+
+def test_environment_name_normalization_rejects_unknown_profile():
+    with pytest.raises(ValueError, match="Unsupported environment profile"):
+        normalize_environment_name("test")
+
+
+def test_staging_profile_enables_strict_preflight_without_flag(monkeypatch):
+    monkeypatch.delenv("ARQONBUS_PREFLIGHT_STRICT", raising=False)
+    monkeypatch.delenv("ARQONBUS_SERVER_HOST", raising=False)
+    monkeypatch.delenv("ARQONBUS_SERVER_PORT", raising=False)
+    monkeypatch.delenv("ARQONBUS_STORAGE_MODE", raising=False)
+
+    cfg = ArqonBusConfig()
+    cfg.environment = "staging"
+    errors = startup_preflight_errors(cfg)
+    assert any("ARQONBUS_SERVER_HOST" in e for e in errors)
+    assert any("ARQONBUS_SERVER_PORT" in e for e in errors)
+    assert any("ARQONBUS_STORAGE_MODE" in e for e in errors)
+
+
+def test_load_config_respects_environment_variable_when_override_missing(monkeypatch):
+    monkeypatch.setenv("ARQONBUS_ENVIRONMENT", "production")
+    cfg = load_config()
+    assert cfg.environment == "prod"
