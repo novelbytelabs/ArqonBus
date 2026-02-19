@@ -18,6 +18,19 @@ def test_storage_mode_and_redis_url_load_from_environment(monkeypatch):
     assert cfg.storage.redis_url == "redis://127.0.0.1:6379/0"
 
 
+def test_storage_backend_accepts_valkey_alias(monkeypatch):
+    monkeypatch.setenv("ARQONBUS_STORAGE_BACKEND", "valkey")
+    cfg = ArqonBusConfig.from_environment()
+    assert cfg.storage.backend == "valkey"
+
+
+def test_storage_uses_valkey_url_alias(monkeypatch):
+    monkeypatch.setenv("ARQONBUS_VALKEY_URL", "redis://127.0.0.1:6380/0")
+    monkeypatch.delenv("ARQONBUS_REDIS_URL", raising=False)
+    cfg = ArqonBusConfig.from_environment()
+    assert cfg.storage.redis_url == "redis://127.0.0.1:6380/0"
+
+
 def test_startup_preflight_strict_requires_explicit_core_env(monkeypatch):
     monkeypatch.setenv("ARQONBUS_PREFLIGHT_STRICT", "true")
     monkeypatch.delenv("ARQONBUS_SERVER_HOST", raising=False)
@@ -46,6 +59,40 @@ def test_startup_preflight_strict_storage_requires_redis_url(monkeypatch):
     errors = startup_preflight_errors(cfg)
 
     assert any("ARQONBUS_REDIS_URL" in e for e in errors)
+
+
+def test_startup_preflight_strict_storage_accepts_valkey_url(monkeypatch):
+    monkeypatch.setenv("ARQONBUS_PREFLIGHT_STRICT", "true")
+    monkeypatch.setenv("ARQONBUS_SERVER_HOST", "127.0.0.1")
+    monkeypatch.setenv("ARQONBUS_SERVER_PORT", "9100")
+    monkeypatch.setenv("ARQONBUS_STORAGE_MODE", "strict")
+    monkeypatch.setenv("ARQONBUS_VALKEY_URL", "redis://127.0.0.1:6379/0")
+    monkeypatch.delenv("ARQONBUS_REDIS_URL", raising=False)
+
+    cfg = ArqonBusConfig()
+    cfg.storage.mode = "strict"
+    cfg.storage.backend = "valkey"
+    cfg.storage.redis_url = None
+    errors = startup_preflight_errors(cfg)
+
+    assert not any("ARQONBUS_REDIS_URL" in e for e in errors)
+    assert not any("ARQONBUS_VALKEY_URL" in e for e in errors)
+
+
+def test_startup_preflight_strict_postgres_requires_url(monkeypatch):
+    monkeypatch.setenv("ARQONBUS_PREFLIGHT_STRICT", "true")
+    monkeypatch.setenv("ARQONBUS_SERVER_HOST", "127.0.0.1")
+    monkeypatch.setenv("ARQONBUS_SERVER_PORT", "9100")
+    monkeypatch.setenv("ARQONBUS_STORAGE_MODE", "strict")
+    monkeypatch.delenv("ARQONBUS_POSTGRES_URL", raising=False)
+
+    cfg = ArqonBusConfig()
+    cfg.storage.mode = "strict"
+    cfg.storage.backend = "postgres"
+    cfg.storage.postgres_url = None
+    errors = startup_preflight_errors(cfg)
+
+    assert any("ARQONBUS_POSTGRES_URL" in e for e in errors)
 
 
 def test_startup_preflight_non_strict_allows_defaults(monkeypatch):

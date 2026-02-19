@@ -9,6 +9,30 @@ from arqonbus.protocol.ids import generate_message_id
 from arqonbus.transport.websocket_bus import WebSocketBus
 
 
+class _FakeFirecrackerRuntime:
+    def __init__(self):
+        self.launched = []
+        self.stopped = []
+
+    def snapshot(self):
+        return {"ready": True, "vm_count": len(self.launched), "runtime": "firecracker"}
+
+    async def launch_vm(self, substrate_id: str, metadata: dict):
+        vm = {"vm_id": f"fc-{substrate_id}", "substrate_id": substrate_id, "status": "running"}
+        self.launched.append(vm)
+        return vm
+
+    async def stop_vm(self, vm_id: str):
+        self.stopped.append(vm_id)
+        return {"stopped": True, "vm_id": vm_id}
+
+    async def list_vms(self):
+        return {"vms": list(self.launched), "count": len(self.launched)}
+
+    async def close(self):
+        return None
+
+
 def _command(command: str, args: dict) -> Envelope:
     return Envelope(
         id=generate_message_id(),
@@ -153,3 +177,51 @@ async def test_omega_clear_events_requires_admin():
     response = bus.send_to_client.call_args.args[1]
     assert response.status == "error"
     assert response.error_code == "AUTHORIZATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_omega_vm_probe_reports_runtime_status():
+    bus = _make_bus(omega_enabled=True)
+    bus._omega_firecracker = _FakeFirecrackerRuntime()
+    await bus._handle_command(_command("op.omega.vm.probe", {}), "client-1")
+    response = bus.send_to_client.call_args.args[1]
+    assert response.status == "success"
+    assert response.payload["data"]["ready"] is True
+
+
+@pytest.mark.asyncio
+async def test_omega_vm_launch_requires_admin():
+    bus = _make_bus(role="user", omega_enabled=True)
+    bus._omega_firecracker = _FakeFirecrackerRuntime()
+    await bus._handle_command(
+        _command("op.omega.vm.launch", {"substrate_id": "omega_x"}),
+        "client-1",
+    )
+    response = bus.send_to_client.call_args.args[1]
+    assert response.status == "error"
+    assert response.error_code == "AUTHORIZATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_omega_vm_launch_and_stop_flow():
+    bus = _make_bus(omega_enabled=True)
+    bus._omega_firecracker = _FakeFirecrackerRuntime()
+    await bus._handle_command(
+        _command("op.omega.register_substrate", {"name": "alpha", "kind": "relational"}),
+        "client-1",
+    )
+    register_response = bus.send_to_client.call_args.args[1]
+    substrate_id = register_response.payload["data"]["substrate_id"]
+
+    await bus._handle_command(
+        _command("op.omega.vm.launch", {"substrate_id": substrate_id}),
+        "client-1",
+    )
+    launch_response = bus.send_to_client.call_args.args[1]
+    assert launch_response.status == "success"
+    vm_id = launch_response.payload["data"]["vm_id"]
+
+    await bus._handle_command(_command("op.omega.vm.stop", {"vm_id": vm_id}), "client-1")
+    stop_response = bus.send_to_client.call_args.args[1]
+    assert stop_response.status == "success"
+    assert stop_response.payload["data"]["stopped"] is True

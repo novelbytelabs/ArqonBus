@@ -450,16 +450,30 @@ class StorageRegistry:
         return backend_class(**kwargs)
 
 
-# Register built-in backends
-# Import inside a try block to avoid hard dependency loops.
+# Register built-in backends.
+# Imports are intentionally isolated so one optional backend import failure
+# does not prevent core backends from being available.
 try:
     from .memory import MemoryStorageBackend
-    from .redis_streams import RedisStreamsStorage
-    
+
     StorageRegistry.register("memory", MemoryStorageBackend)
     StorageRegistry.register("memory_storage", MemoryStorageBackend)
+except ImportError:
+    pass
+
+try:
+    from .redis_streams import RedisStreamsStorage
+
     StorageRegistry.register("redis", RedisStreamsStorage)
     StorageRegistry.register("redis_streams", RedisStreamsStorage)
+    StorageRegistry.register("valkey", RedisStreamsStorage)
+    StorageRegistry.register("valkey_streams", RedisStreamsStorage)
 except ImportError:
-    # Backends remain unregistered if optional deps are missing.
+    pass
+
+try:
+    from .postgres import PostgresStorageBackend
+
+    StorageRegistry.register("postgres", PostgresStorageBackend)
+except ImportError:
     pass

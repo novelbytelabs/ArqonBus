@@ -29,7 +29,7 @@ def test_configuration():
         config = get_config()
         assert config.server.host == "127.0.0.1"
         assert config.server.port == 9100
-        assert config.storage.backend in ["memory", "redis"]  # Backend can be either
+        assert config.storage.backend in ["memory", "redis", "valkey", "postgres"]
         
         print("Configuration loading successful")
     except Exception as e:

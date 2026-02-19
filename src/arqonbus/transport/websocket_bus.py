@@ -21,6 +21,7 @@ from ..routing.client_registry import ClientRegistry
 from ..config.config import get_config
 from ..casil.integration import CasilIntegration
 from ..casil.outcome import CASILDecision
+from ..omega.firecracker_runtime import FirecrackerOmegaRuntime
 from ..security.jwt_auth import JWTAuthError, validate_jwt
 
 
@@ -114,6 +115,7 @@ class WebSocketBus:
         self._store: Dict[str, Dict[str, Any]] = {}
         self._omega_substrates: Dict[str, _OmegaSubstrate] = {}
         self._omega_events: list[Dict[str, Any]] = []
+        self._omega_firecracker = FirecrackerOmegaRuntime(self.config.tier_omega)
         self._ops_lock = asyncio.Lock()
         
         # Statistics
@@ -202,6 +204,7 @@ class WebSocketBus:
 
         # Cleanup scheduled operator jobs.
         await self._cancel_all_cron_jobs()
+        await self._omega_firecracker.close()
         
         # Close server
         self.server.close()
@@ -797,6 +800,8 @@ class WebSocketBus:
             "max_substrates": self.config.tier_omega.max_substrates,
             "substrate_count": len(self._omega_substrates),
             "event_count": len(self._omega_events),
+            "runtime": self.config.tier_omega.runtime,
+            "firecracker": self._omega_firecracker.snapshot(),
         }
 
     def _require_omega_enabled(self) -> None:
@@ -833,6 +838,20 @@ class WebSocketBus:
                 raise ValueError("Tier-Omega substrate limit reached")
             self._omega_substrates[substrate.substrate_id] = substrate
 
+        if self._omega_requires_firecracker(substrate.kind, substrate.metadata):
+            try:
+                vm_info = await self._omega_firecracker.launch_vm(substrate.substrate_id, substrate.metadata)
+            except Exception:
+                async with self._ops_lock:
+                    self._omega_substrates.pop(substrate.substrate_id, None)
+                raise
+            async with self._ops_lock:
+                existing = self._omega_substrates.get(substrate.substrate_id)
+                if existing:
+                    existing.metadata = dict(existing.metadata)
+                    existing.metadata["runtime"] = "firecracker"
+                    existing.metadata["firecracker_vm"] = vm_info
+
         return {
             "substrate_id": substrate.substrate_id,
             "name": substrate.name,
@@ -860,6 +879,11 @@ class WebSocketBus:
             ]
             removed_events = previous_count - len(self._omega_events)
 
+        vm_info = (substrate.metadata or {}).get("firecracker_vm", {})
+        vm_id = vm_info.get("vm_id") if isinstance(vm_info, dict) else None
+        if vm_id:
+            await self._omega_firecracker.stop_vm(vm_id)
+
         return {
             "removed": True,
             "substrate_id": substrate_id,
@@ -867,6 +891,58 @@ class WebSocketBus:
             "kind": substrate.kind,
             "removed_events": removed_events,
         }
+
+    def _omega_requires_firecracker(self, kind: str, metadata: Dict[str, Any]) -> bool:
+        normalized_kind = str(kind).strip().lower()
+        runtime = str(metadata.get("runtime", "")).strip().lower() if isinstance(metadata, dict) else ""
+        return (
+            self.config.tier_omega.runtime == "firecracker"
+            or normalized_kind in {"firecracker", "microvm", "vm"}
+            or runtime == "firecracker"
+        )
+
+    async def _omega_probe_firecracker(self) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        return self._omega_firecracker.snapshot()
+
+    async def _omega_list_vms(self) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        return await self._omega_firecracker.list_vms()
+
+    async def _omega_launch_vm(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can launch Tier-Omega VMs")
+
+        substrate_id = str(args.get("substrate_id", "")).strip()
+        if not substrate_id:
+            raise ValueError("'substrate_id' is required")
+
+        async with self._ops_lock:
+            substrate = self._omega_substrates.get(substrate_id)
+            if substrate is None:
+                raise ValueError(f"Unknown substrate_id: {substrate_id}")
+            metadata = dict(substrate.metadata or {})
+
+        vm_info = await self._omega_firecracker.launch_vm(substrate_id, metadata)
+        async with self._ops_lock:
+            substrate = self._omega_substrates.get(substrate_id)
+            if substrate:
+                substrate.metadata = dict(substrate.metadata)
+                substrate.metadata["runtime"] = "firecracker"
+                substrate.metadata["firecracker_vm"] = vm_info
+        return vm_info
+
+    async def _omega_stop_vm(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can stop Tier-Omega VMs")
+
+        vm_id = str(args.get("vm_id", "")).strip()
+        if not vm_id:
+            raise ValueError("'vm_id' is required")
+
+        return await self._omega_firecracker.stop_vm(vm_id)
 
     async def _omega_list_substrates(self) -> Dict[str, Any]:
         self._require_omega_enabled()
@@ -1276,6 +1352,50 @@ class WebSocketBus:
                     envelope.id,
                     success=True,
                     message="Tier-Omega events listed",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.vm.probe":
+                data = await self._omega_probe_firecracker()
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega Firecracker runtime probe",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.vm.list":
+                data = await self._omega_list_vms()
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega Firecracker VMs listed",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.vm.launch":
+                data = await self._omega_launch_vm(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega Firecracker VM launched",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.vm.stop":
+                data = await self._omega_stop_vm(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega Firecracker VM stop requested",
                     data=data,
                 )
                 return

@@ -9,7 +9,7 @@ This runbook provides operational procedures for deploying, managing, and troubl
 ### System Information
 - **Version**: v1.0.0
 - **Protocol**: WebSocket-based real-time messaging
-- **Storage**: Memory (development) or Redis Streams (production)
+- **Storage**: Memory (development) or Valkey/Redis Streams or Postgres (production)
 - **Monitoring**: HTTP endpoints + Prometheus metrics
 - **Authentication**: Optional token-based authentication
 
@@ -20,18 +20,20 @@ Profile contract:
 - Alias mapping: `development -> dev`, `production -> prod`
 - Strict preflight is always enabled in `staging` and `prod`
 - Strict preflight requires explicit `ARQONBUS_SERVER_HOST`, `ARQONBUS_SERVER_PORT`, `ARQONBUS_STORAGE_MODE`
-- If `ARQONBUS_STORAGE_MODE=strict`, `ARQONBUS_REDIS_URL` is required
+- If `ARQONBUS_STORAGE_MODE=strict`, storage URL is required:
+  - Valkey/Redis backends: `ARQONBUS_VALKEY_URL` or `ARQONBUS_REDIS_URL`
+  - Postgres backend: `ARQONBUS_POSTGRES_URL`
 
 ```bash
 # Required environment variables for production
 export ARQONBUS_ENVIRONMENT=prod
-export ARQONBUS_STORAGE_BACKEND=redis
+export ARQONBUS_STORAGE_BACKEND=valkey
 export ARQONBUS_STORAGE_MODE=strict
-export ARQONBUS_REDIS_URL=rediss://:your-redis-password@your-redis-host.com:6379/0
-export ARQONBUS_REDIS_HOST=your-redis-host.com
-export ARQONBUS_REDIS_PORT=6379
-export ARQONBUS_REDIS_SSL=true
-export ARQONBUS_REDIS_PASSWORD=your-redis-password
+export ARQONBUS_VALKEY_URL=rediss://:your-valkey-password@your-valkey-host.com:6379/0
+export ARQONBUS_VALKEY_HOST=your-valkey-host.com
+export ARQONBUS_VALKEY_PORT=6379
+export ARQONBUS_VALKEY_SSL=true
+export ARQONBUS_VALKEY_PASSWORD=your-valkey-password
 export ARQONBUS_SERVER_HOST=0.0.0.0
 export ARQONBUS_SERVER_PORT=9100
 export ARQONBUS_MAX_CONNECTIONS=1000
@@ -47,7 +49,8 @@ export ARQONBUS_DEBUG=false
 ### 1. Production Deployment
 
 #### Prerequisites
-- Redis instance (managed or self-hosted)
+- Valkey/Redis instance (managed or self-hosted)
+- Postgres instance (managed or self-hosted) when using `ARQONBUS_STORAGE_BACKEND=postgres`
 - SSL certificates (for HTTPS/WebSocket connections)
 - System monitoring setup
 
@@ -64,7 +67,7 @@ export ARQONBUS_DEBUG=false
    pip install -r requirements.txt
    ```
 
-3. **Verify Redis Connectivity**
+3. **Verify Valkey/Redis Connectivity**
    ```bash
    python scripts/manual_checks/redis_connection_check.py
    ```
@@ -78,7 +81,7 @@ export ARQONBUS_DEBUG=false
    ./run_arqonbus.sh start
 
    # With custom configuration
-   ARQONBUS_STORAGE_BACKEND=redis python -m arqonbus.main --host 0.0.0.0 --port 9100
+   ARQONBUS_STORAGE_BACKEND=valkey python -m arqonbus.main --host 0.0.0.0 --port 9100
    ```
 
 5. **Verify Health**
@@ -134,6 +137,7 @@ Tier-Omega experimental lane (feature-flagged):
 - `op.omega.register_substrate|list_substrates|unregister_substrate` (admin-only registration/removal)
 - `op.omega.emit_event` (admin-only event emission)
 - `op.omega.list_events|clear_events` (`clear_events` is admin-only)
+- `op.omega.vm.probe|list|launch|stop` (`launch|stop` are admin-only)
 
 Tier-Omega flags:
 
@@ -143,6 +147,12 @@ export ARQONBUS_OMEGA_LAB_ROOM=omega-lab
 export ARQONBUS_OMEGA_LAB_CHANNEL=signals
 export ARQONBUS_OMEGA_MAX_EVENTS=1000
 export ARQONBUS_OMEGA_MAX_SUBSTRATES=128
+export ARQONBUS_OMEGA_RUNTIME=memory # memory|firecracker
+export ARQONBUS_OMEGA_FIRECRACKER_BIN=firecracker
+export ARQONBUS_OMEGA_KERNEL_IMAGE=/opt/firecracker/vmlinux.bin
+export ARQONBUS_OMEGA_ROOTFS_IMAGE=/opt/firecracker/rootfs.ext4
+export ARQONBUS_OMEGA_WORKSPACE_DIR=/tmp/arqonbus-omega
+export ARQONBUS_OMEGA_MAX_VMS=8
 ```
 
 CASIL hot reload example envelope:
@@ -439,11 +449,27 @@ python -m arqonbus.main --storage-backend memory
 | `ARQONBUS_SERVER_HOST` | 127.0.0.1 | Server bind address |
 | `ARQONBUS_SERVER_PORT` | 9100 | Server port |
 | `ARQONBUS_MAX_CONNECTIONS` | 1000 | Maximum concurrent connections |
-| `ARQONBUS_STORAGE_BACKEND` | memory | Storage backend (memory/redis) |
+| `ARQONBUS_STORAGE_BACKEND` | memory | Storage backend (`memory`, `redis`, `valkey`, `postgres`) |
 | `ARQONBUS_REDIS_HOST` | localhost | Redis host |
 | `ARQONBUS_REDIS_PORT` | 6379 | Redis port |
 | `ARQONBUS_REDIS_PASSWORD` | None | Redis password |
 | `ARQONBUS_REDIS_SSL` | false | Enable SSL for Redis |
+| `ARQONBUS_VALKEY_HOST` | localhost | Valkey host (Redis-compatible alias) |
+| `ARQONBUS_VALKEY_PORT` | 6379 | Valkey port |
+| `ARQONBUS_VALKEY_PASSWORD` | None | Valkey password |
+| `ARQONBUS_VALKEY_SSL` | false | Enable SSL for Valkey |
+| `ARQONBUS_POSTGRES_URL` | None | Postgres DSN for `postgres` backend |
+| `ARQONBUS_POSTGRES_HOST` | localhost | Postgres host |
+| `ARQONBUS_POSTGRES_PORT` | 5432 | Postgres port |
+| `ARQONBUS_POSTGRES_DATABASE` | arqonbus | Postgres database |
+| `ARQONBUS_POSTGRES_USER` | arqonbus | Postgres user |
+| `ARQONBUS_POSTGRES_PASSWORD` | None | Postgres password |
+| `ARQONBUS_OMEGA_RUNTIME` | memory | Tier-Omega runtime (`memory` or `firecracker`) |
+| `ARQONBUS_OMEGA_FIRECRACKER_BIN` | firecracker | Firecracker binary path/name |
+| `ARQONBUS_OMEGA_KERNEL_IMAGE` | None | Firecracker kernel image path |
+| `ARQONBUS_OMEGA_ROOTFS_IMAGE` | None | Firecracker rootfs image path |
+| `ARQONBUS_OMEGA_WORKSPACE_DIR` | /tmp/arqonbus-omega | Firecracker VM workspace |
+| `ARQONBUS_OMEGA_MAX_VMS` | 8 | Max active Tier-Omega Firecracker VMs |
 | `ARQONBUS_MAX_MESSAGE_SIZE` | 1048576 | Maximum WebSocket message size |
 | `ARQONBUS_COMPRESSION` | true | Enable message compression |
 | `ARQONBUS_ENABLE_TELEMETRY` | true | Enable telemetry events |
