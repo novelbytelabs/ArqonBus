@@ -53,6 +53,9 @@ jobs:
       - name: Enforce protobuf-first infra guardrails
         run: |
           python scripts/ci/check_protobuf_first.py
+      - name: Enforce protobuf version lock policy
+        run: |
+          bash scripts/check_protobuf_lock.sh "$GITHUB_WORKSPACE"
       - name: Run shared protobuf fixture tests (Python)
         run: |
           python -m pytest -q tests/unit/test_protobuf_codec.py tests/unit/test_protobuf_contract_fixture.py
