@@ -6,6 +6,25 @@ Last updated: 2026-02-20
 Productionization and Continuum integration slices are complete through projector persistence, operational hardening, CI postgres gating, and release-gate closeout hardening.
 
 ## Latest completed work (unreleased in this handoff snapshot)
+- Added Phase C protocol/time semantics test closure:
+  - `src/arqonbus/protocol/time_semantics.py`
+  - `src/arqonbus/protocol/validator.py` (sequence/vector/causal metadata validation)
+  - `src/arqonbus/storage/interface.py` (`get_history_replay` API with strict sequence checks)
+  - `src/arqonbus/storage/memory.py` (timezone-safe replay filtering)
+  - `src/arqonbus/protocol/ids.py` (ULID-style compatibility for cross-language fixture IDs)
+  - `tests/unit/test_ids_validation.py`
+  - `tests/unit/test_timekeeper_sequence.py`
+  - `tests/unit/test_vector_clock.py`
+  - `tests/integration/test_history_get_replay.py`
+  - `tests/integration/test_json_adapter_compat.py`
+  - `tests/integration/test_proto_contract_crosslang.py`
+  - `tests/integration/test_time_ordering_e2e.py`
+  - `tests/integration/test_history_replay_e2e.py`
+  - `tests/regression/test_time_envelope_regressions.py`
+  - `tests/regression/test_proto_json_adapter_regressions.py`
+  - `tests/regression/test_proto_evolution_regressions.py`
+  - `docs/ArqonBus/checklist/phase_c_protocol_time_test_task_list.md`
+  - `docs/ArqonBus/vnext_status.md`
 - Added Postgres-backed socket e2e test for Continuum projector lane:
   - `tests/integration/test_continuum_projector_postgres_e2e.py`
 - Added projector metrics instrumentation (lag/DLQ/replay/backfill):
@@ -74,6 +93,10 @@ User-validated local runtime checks:
 - Integration: `tests/integration/test_continuum_projector_postgres.py` passed in native environment.
 
 Agent-run test highlights in this session:
+- `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_ids_validation.py tests/unit/test_timekeeper_sequence.py tests/unit/test_vector_clock.py tests/integration/test_history_get_replay.py tests/integration/test_json_adapter_compat.py tests/integration/test_proto_contract_crosslang.py tests/integration/test_time_ordering_e2e.py tests/integration/test_history_replay_e2e.py tests/regression/test_time_envelope_regressions.py tests/regression/test_proto_json_adapter_regressions.py tests/regression/test_proto_evolution_regressions.py`
+  - Result: passed (17 passed)
+- `conda run -n helios-gpu-118 python scripts/ci/check_protobuf_first.py`
+  - Result: passed
 - `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_continuum_projector_lane.py tests/unit/test_continuum_integration_contract.py tests/unit/test_tier_omega_lane.py tests/unit/test_startup_preflight.py tests/unit/test_postgres_storage.py --maxfail=20`
   - Result: passed
 - `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_startup_preflight.py tests/unit/test_continuum_projector_lane.py tests/unit/test_postgres_storage.py --maxfail=20`

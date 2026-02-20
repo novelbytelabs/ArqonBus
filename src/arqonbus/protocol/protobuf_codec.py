@@ -114,6 +114,19 @@ def envelope_from_proto(pb: envelope_pb2.Envelope) -> Envelope:
 
     timestamp = datetime.fromtimestamp(pb.timestamp / 1000.0, tz=timezone.utc)
     metadata = _dict_from_struct(payload_msg.metadata)
+    # Struct numbers are decoded as floats; coerce known integer fields back to int.
+    sequence = metadata.get("sequence")
+    if isinstance(sequence, float) and sequence.is_integer():
+        metadata["sequence"] = int(sequence)
+    vector_clock = metadata.get("vector_clock")
+    if isinstance(vector_clock, dict):
+        normalized_clock: Dict[str, Any] = {}
+        for node, counter in vector_clock.items():
+            if isinstance(counter, float) and counter.is_integer():
+                normalized_clock[str(node)] = int(counter)
+            else:
+                normalized_clock[str(node)] = counter
+        metadata["vector_clock"] = normalized_clock
     if pb.tenant_id:
         metadata.setdefault("tenant_id", pb.tenant_id)
     if pb.twist_id:

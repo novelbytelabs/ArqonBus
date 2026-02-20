@@ -240,6 +240,44 @@ class MessageStorage:
             List of history entries
         """
         return await self.backend.get_history(limit=limit, since=since)
+
+    async def get_history_replay(
+        self,
+        *,
+        room: Optional[str] = None,
+        channel: Optional[str] = None,
+        from_ts: datetime,
+        to_ts: datetime,
+        limit: int = 1000,
+        strict_sequence: bool = True,
+    ) -> List[HistoryEntry]:
+        """Get replay window in chronological order with optional sequence monotonicity check."""
+        if to_ts < from_ts:
+            raise ValueError("to_ts must be >= from_ts")
+
+        entries = await self.backend.get_history(
+            room=room,
+            channel=channel,
+            limit=limit,
+            since=from_ts,
+            until=to_ts,
+        )
+        entries = sorted(entries, key=lambda entry: entry.stored_at)
+
+        if strict_sequence:
+            last_sequence: Optional[int] = None
+            for entry in entries:
+                metadata = entry.envelope.metadata or {}
+                sequence = metadata.get("sequence") if isinstance(metadata, dict) else None
+                if sequence is None:
+                    continue
+                if not isinstance(sequence, int):
+                    raise ValueError("metadata.sequence must be an integer for strict_sequence replay")
+                if last_sequence is not None and sequence < last_sequence:
+                    raise ValueError("Sequence regression detected in replay window")
+                last_sequence = sequence
+
+        return entries
     
     async def search_messages(
         self,

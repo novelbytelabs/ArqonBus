@@ -2,6 +2,7 @@
 import time
 import uuid
 import threading
+import re
 from typing import Optional
 
 
@@ -119,6 +120,9 @@ def is_valid_message_id(message_id: str) -> bool:
         return False
     
     parts = message_id.split("_")
+    if len(parts) == 2:
+        # Compatibility path for ULID-like IDs used by cross-language fixtures.
+        return bool(_ULID_LIKE_RE.fullmatch(parts[1]))
     if len(parts) != 4:
         return False
         
@@ -136,3 +140,4 @@ def is_valid_message_id(message_id: str) -> bool:
         return True
     except ValueError:
         return False
+_ULID_LIKE_RE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")

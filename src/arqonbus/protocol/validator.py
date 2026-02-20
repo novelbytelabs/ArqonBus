@@ -123,6 +123,31 @@ class EnvelopeValidator:
         # Messages with room/channel should have routing info
         if envelope.room and not envelope.channel:
             logger.warning(f"Message has room '{envelope.room}' but no channel")
+
+        metadata = envelope.metadata or {}
+        if isinstance(metadata, dict):
+            sequence = metadata.get("sequence")
+            if sequence is not None:
+                if not isinstance(sequence, int) or sequence < 1:
+                    errors.append("metadata.sequence must be a positive integer")
+
+            vector_clock = metadata.get("vector_clock")
+            if vector_clock is not None:
+                if not isinstance(vector_clock, dict):
+                    errors.append("metadata.vector_clock must be an object")
+                else:
+                    for node_id, counter in vector_clock.items():
+                        if not isinstance(node_id, str) or not node_id:
+                            errors.append("metadata.vector_clock keys must be non-empty strings")
+                            break
+                        if not isinstance(counter, int) or counter < 0:
+                            errors.append("metadata.vector_clock values must be non-negative integers")
+                            break
+
+            causal_parent_id = metadata.get("causal_parent_id")
+            if causal_parent_id is not None:
+                if not isinstance(causal_parent_id, str) or not is_valid_message_id(causal_parent_id):
+                    errors.append("metadata.causal_parent_id must be a valid message ID")
             
         return errors
     

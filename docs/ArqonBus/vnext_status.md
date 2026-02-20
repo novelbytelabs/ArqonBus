@@ -50,6 +50,7 @@ Out of scope for this slice:
 | M12: Release-gate closeout hardening | Completed | Removed synthesis prototype path, blocked `JWT_SKIP_VALIDATION` in prod preflight, and validated full Python+Shield gates. |
 | M13: Protobuf-first infrastructure closure | Completed | Added canonical Rust envelope protobuf codec in Python, protobuf wire support, and protobuf-first storage persistence with JSON adapters constrained to human-facing paths. |
 | M14: Protobuf anti-regression guardrails | Completed | Added CI hard-fail protobuf-first policy checks and shared Python/Rust protobuf fixture contract tests. |
+| M15: Protocol/time semantics test closure | Completed | Added monotonic sequence + vector-clock validation utilities, replay API strict sequence checks, and unit/integration/e2e/regression coverage including protobuf evolution regression. |
 
 ## Phase 0 Completion Checklist
 
