@@ -39,6 +39,12 @@ Productionization and Continuum integration slices are complete through projecto
 - Added strict preflight policy for protobuf infra in staging/prod:
   - `src/arqonbus/config/config.py`
   - `tests/unit/test_startup_preflight.py`
+- Added anti-regression CI/protocol contract guardrails:
+  - `scripts/ci/check_protobuf_first.py`
+  - `.github/workflows/arqonbus-tests.yml` (`protobuf-contract` job)
+  - `tests/unit/test_protobuf_contract_fixture.py`
+  - `crates/proto/tests/protobuf_contract_fixture.rs`
+  - `crates/proto/tests/fixtures/python_envelope.bin`
 
 ## Recent completed work (latest first)
 - `fe8a34a` - `hardening: require valkey+postgres stack in prod preflight`

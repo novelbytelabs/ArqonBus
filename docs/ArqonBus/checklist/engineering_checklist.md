@@ -3,7 +3,7 @@
 This file is a strategic checklist spanning a broader multi-stack vision (Rust/Elixir + platform ops),
 while current implementation work on this branch is Python-focused vNext.
 
-Reconciled: 2026-02-19
+Reconciled: 2026-02-20
 
 Status legend:
 - ✅ Complete in current repo/slice
@@ -14,7 +14,10 @@ Status legend:
 
 - ✅ Engineering doctrine present (`docs/ArqonBus/spec/engineering_doctrine.md`).
 - ✅ Minimal SDD enforcement template present (`docs/ArqonBus/templates/github_pr_template.md`).
-- 🟡 Protobuf usage is present (`src/arqonbus/proto/arqon.proto`), but centralized generation strategy is not documented as a single policy artifact.
+- ✅ Protobuf-first infra guardrails are enforced in runtime preflight + CI:
+  - Runtime/preflight policy: `src/arqonbus/config/config.py`
+  - CI guard: `scripts/ci/check_protobuf_first.py` via `.github/workflows/arqonbus-tests.yml`
+  - Shared fixture contract tests: `tests/unit/test_protobuf_contract_fixture.py`, `crates/proto/tests/protobuf_contract_fixture.rs`
 - 🟡 State-machine governance exists in doctrine/template references, but a fully standardized Mermaid-only representation policy is not explicitly codified as a single source.
 - ⏳ Rust/Elixir formatter+linter enforcement is not active in this Python CI profile.
 

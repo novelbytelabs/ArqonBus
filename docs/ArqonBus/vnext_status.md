@@ -49,6 +49,7 @@ Out of scope for this slice:
 | M11: Continuum projector operational hardening | Completed | Added Postgres-backed socket e2e, projector metrics/alerts, migration+backup/restore runbook, and CI Postgres integration stage. |
 | M12: Release-gate closeout hardening | Completed | Removed synthesis prototype path, blocked `JWT_SKIP_VALIDATION` in prod preflight, and validated full Python+Shield gates. |
 | M13: Protobuf-first infrastructure closure | Completed | Added canonical Rust envelope protobuf codec in Python, protobuf wire support, and protobuf-first storage persistence with JSON adapters constrained to human-facing paths. |
+| M14: Protobuf anti-regression guardrails | Completed | Added CI hard-fail protobuf-first policy checks and shared Python/Rust protobuf fixture contract tests. |
 
 ## Phase 0 Completion Checklist
 
