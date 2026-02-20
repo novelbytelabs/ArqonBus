@@ -3,6 +3,7 @@ import asyncio
 from copy import deepcopy
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -23,6 +24,7 @@ from ..casil.integration import CasilIntegration
 from ..casil.outcome import CASILDecision
 from ..omega.firecracker_runtime import FirecrackerOmegaRuntime
 from ..security.jwt_auth import JWTAuthError, validate_jwt
+from ..utils.metrics import record_counter, record_gauge, record_histogram
 
 
 logger = logging.getLogger(__name__)
@@ -291,6 +293,27 @@ class WebSocketBus:
     @staticmethod
     def _utc_now_iso() -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _safe_record_counter(name: str, value: float = 1, labels: Optional[Dict[str, str]] = None) -> None:
+        try:
+            record_counter(name, value, labels)
+        except Exception:
+            logger.debug("Metric counter recording failed", exc_info=True)
+
+    @staticmethod
+    def _safe_record_gauge(name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
+        try:
+            record_gauge(name, value, labels)
+        except Exception:
+            logger.debug("Metric gauge recording failed", exc_info=True)
+
+    @staticmethod
+    def _safe_record_histogram(name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
+        try:
+            record_histogram(name, value, labels)
+        except Exception:
+            logger.debug("Metric histogram recording failed", exc_info=True)
 
     @staticmethod
     def _parse_iso8601(raw_value: Any, field_name: str) -> datetime:
@@ -888,7 +911,12 @@ class WebSocketBus:
     async def _continuum_dlq_push(self, reason: str, event: Dict[str, Any]) -> Dict[str, Any]:
         backend = self._continuum_backend()
         if backend is not None:
-            return await backend.continuum_projector_dlq_push(reason, event)
+            dlq_record = await backend.continuum_projector_dlq_push(reason, event)
+            self._safe_record_counter(
+                "continuum_projector_dlq_events_total",
+                labels={"action": "push", "backend": "postgres"},
+            )
+            return dlq_record
         dlq_record = {
             "dlq_id": f"dlq_{uuid.uuid4().hex[:12]}",
             "topic": "continuum.episode.dlq.v1",
@@ -898,13 +926,37 @@ class WebSocketBus:
         }
         async with self._ops_lock:
             self._continuum_dlq.append(dlq_record)
+            dlq_depth = len(self._continuum_dlq)
+        self._safe_record_counter(
+            "continuum_projector_dlq_events_total",
+            labels={"action": "push", "backend": "memory"},
+        )
+        self._safe_record_gauge("continuum_projector_dlq_depth", dlq_depth)
         return dlq_record
 
     async def _project_continuum_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
         self._validate_continuum_event(event)
+        event_type = str(event.get("event_type", "unknown"))
+        source_ts = str(event.get("source_ts", ""))
+        try:
+            source_dt = self._parse_iso8601(source_ts, "source_ts")
+            lag_seconds = max(0.0, (datetime.now(timezone.utc) - source_dt).total_seconds())
+            self._safe_record_histogram(
+                "continuum_projector_event_lag_seconds",
+                lag_seconds,
+                labels={"event_type": event_type},
+            )
+        except Exception:
+            logger.debug("Unable to compute continuum event lag", exc_info=True)
         backend = self._continuum_backend()
         if backend is not None:
-            return await backend.continuum_project_event(event)
+            result = await backend.continuum_project_event(event)
+            status = str(result.get("status", "unknown"))
+            self._safe_record_counter(
+                "continuum_projector_events_total",
+                labels={"status": status, "event_type": event_type, "backend": "postgres"},
+            )
+            return result
 
         tenant_id = str(event["tenant_id"])
         agent_id = str(event["agent_id"])
@@ -920,22 +972,32 @@ class WebSocketBus:
 
         async with self._ops_lock:
             if dedup_key in self._continuum_seen_events:
-                return {
+                result = {
                     "status": "duplicate",
                     "event_id": event_id,
                     "projection_key": projection_key,
                 }
+                self._safe_record_counter(
+                    "continuum_projector_events_total",
+                    labels={"status": "duplicate", "event_type": event_type, "backend": "memory"},
+                )
+                return result
 
             existing = self._continuum_projection.get(projection_key)
             if existing:
                 existing_ts = self._parse_iso8601(existing.last_event_ts, "last_event_ts")
                 if incoming_ts < existing_ts:
-                    return {
+                    result = {
                         "status": "stale_rejected",
                         "event_id": event_id,
                         "projection_key": projection_key,
                         "existing_last_event_ts": existing.last_event_ts,
                     }
+                    self._safe_record_counter(
+                        "continuum_projector_events_total",
+                        labels={"status": "stale_rejected", "event_type": event_type, "backend": "memory"},
+                    )
+                    return result
 
             projection = _ContinuumProjection(
                 tenant_id=tenant_id,
@@ -958,24 +1020,38 @@ class WebSocketBus:
                 {"event": deepcopy(event), "projected_at": self._utc_now_iso()}
             )
 
-        return {
+        result = {
             "status": "projected",
             "event_id": event_id,
             "projection_key": projection_key,
             "deleted": projection.deleted,
         }
+        self._safe_record_counter(
+            "continuum_projector_events_total",
+            labels={"status": "projected", "event_type": event_type, "backend": "memory"},
+        )
+        return result
 
     async def _continuum_projector_status(self) -> Dict[str, Any]:
         backend = self._continuum_backend()
         if backend is not None:
-            return await backend.continuum_projector_status()
+            status = await backend.continuum_projector_status()
+            self._safe_record_gauge("continuum_projector_projection_count", float(status.get("projection_count", 0)))
+            self._safe_record_gauge("continuum_projector_seen_event_count", float(status.get("seen_event_count", 0)))
+            self._safe_record_gauge("continuum_projector_dlq_depth", float(status.get("dlq_count", 0)))
+            return status
         async with self._ops_lock:
-            return {
+            status = {
                 "projection_count": len(self._continuum_projection),
                 "seen_event_count": len(self._continuum_seen_events),
                 "dlq_count": len(self._continuum_dlq),
                 "event_log_count": len(self._continuum_event_log),
             }
+        self._safe_record_gauge("continuum_projector_projection_count", float(status["projection_count"]))
+        self._safe_record_gauge("continuum_projector_seen_event_count", float(status["seen_event_count"]))
+        self._safe_record_gauge("continuum_projector_dlq_depth", float(status["dlq_count"]))
+        self._safe_record_gauge("continuum_projector_event_log_count", float(status["event_log_count"]))
+        return status
 
     async def _continuum_project_event_command(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
         await self._require_admin(client_id, "project Continuum events")
@@ -986,6 +1062,10 @@ class WebSocketBus:
             return await self._project_continuum_event(event)
         except Exception as exc:
             dlq = await self._continuum_dlq_push(f"projection_failed:{exc}", event)
+            self._safe_record_counter(
+                "continuum_projector_events_total",
+                labels={"status": "dlq_queued", "event_type": str(event.get("event_type", "unknown"))},
+            )
             return {
                 "status": "dlq_queued",
                 "error": str(exc),
@@ -1062,25 +1142,60 @@ class WebSocketBus:
         if backend is not None:
             record = await backend.continuum_projector_dlq_get(dlq_id)
             if record is None:
+                self._safe_record_counter(
+                    "continuum_projector_dlq_replay_total",
+                    labels={"replayed": "false", "reason": "not_found", "backend": "postgres"},
+                )
                 return {"replayed": False, "dlq_id": dlq_id, "reason": "not_found"}
             result = await backend.continuum_project_event(record["event"])
             if result.get("status") in {"projected", "duplicate", "stale_rejected"}:
                 await backend.continuum_projector_dlq_remove(dlq_id)
+                self._safe_record_counter(
+                    "continuum_projector_dlq_events_total",
+                    labels={"action": "remove", "backend": "postgres"},
+                )
+                self._safe_record_counter(
+                    "continuum_projector_dlq_replay_total",
+                    labels={"replayed": "true", "reason": "accepted", "backend": "postgres"},
+                )
                 return {"replayed": True, "dlq_id": dlq_id, "result": result}
+            self._safe_record_counter(
+                "continuum_projector_dlq_replay_total",
+                labels={"replayed": "false", "reason": "rejected", "backend": "postgres"},
+            )
             return {"replayed": False, "dlq_id": dlq_id, "result": result}
         async with self._ops_lock:
             record = next((item for item in self._continuum_dlq if item["dlq_id"] == dlq_id), None)
         if record is None:
+            self._safe_record_counter(
+                "continuum_projector_dlq_replay_total",
+                labels={"replayed": "false", "reason": "not_found", "backend": "memory"},
+            )
             return {"replayed": False, "dlq_id": dlq_id, "reason": "not_found"}
         result = await self._project_continuum_event(record["event"])
         if result.get("status") in {"projected", "duplicate", "stale_rejected"}:
             async with self._ops_lock:
                 self._continuum_dlq = [item for item in self._continuum_dlq if item["dlq_id"] != dlq_id]
+                dlq_depth = len(self._continuum_dlq)
+            self._safe_record_counter(
+                "continuum_projector_dlq_events_total",
+                labels={"action": "remove", "backend": "memory"},
+            )
+            self._safe_record_gauge("continuum_projector_dlq_depth", float(dlq_depth))
+            self._safe_record_counter(
+                "continuum_projector_dlq_replay_total",
+                labels={"replayed": "true", "reason": "accepted", "backend": "memory"},
+            )
             return {"replayed": True, "dlq_id": dlq_id, "result": result}
+        self._safe_record_counter(
+            "continuum_projector_dlq_replay_total",
+            labels={"replayed": "false", "reason": "rejected", "backend": "memory"},
+        )
         return {"replayed": False, "dlq_id": dlq_id, "result": result}
 
     async def _continuum_projector_backfill(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
         await self._require_admin(client_id, "run Continuum projector backfill")
+        started_at = time.perf_counter()
         from_ts_raw = args.get("from_ts")
         to_ts_raw = args.get("to_ts")
         if from_ts_raw is None or to_ts_raw is None:
@@ -1102,6 +1217,10 @@ class WebSocketBus:
                 agent_id=agent_filter,
             )
             if dry_run:
+                self._safe_record_counter(
+                    "continuum_projector_backfill_total",
+                    labels={"dry_run": "true", "backend": "postgres"},
+                )
                 return {
                     "dry_run": True,
                     "selected_count": len(selected_events),
@@ -1127,7 +1246,7 @@ class WebSocketBus:
                 except Exception as exc:
                     await backend.continuum_projector_dlq_push(f"backfill_failed:{exc}", event)
                     dlq_queued += 1
-            return {
+            result = {
                 "dry_run": False,
                 "selected_count": len(selected_events),
                 "projected": projected,
@@ -1139,6 +1258,24 @@ class WebSocketBus:
                 "tenant_id": tenant_filter,
                 "agent_id": agent_filter,
             }
+            self._safe_record_counter(
+                "continuum_projector_backfill_total",
+                labels={"dry_run": "false", "backend": "postgres"},
+            )
+            self._safe_record_counter("continuum_projector_backfill_events_total", projected, {"outcome": "projected"})
+            self._safe_record_counter("continuum_projector_backfill_events_total", duplicates, {"outcome": "duplicate"})
+            self._safe_record_counter(
+                "continuum_projector_backfill_events_total",
+                stale_rejected,
+                {"outcome": "stale_rejected"},
+            )
+            self._safe_record_counter("continuum_projector_backfill_events_total", dlq_queued, {"outcome": "dlq_queued"})
+            self._safe_record_histogram(
+                "continuum_projector_backfill_duration_seconds",
+                time.perf_counter() - started_at,
+                labels={"backend": "postgres"},
+            )
+            return result
 
         async with self._ops_lock:
             source_items = list(self._continuum_event_log)
@@ -1158,6 +1295,10 @@ class WebSocketBus:
             selected_events.append(event)
 
         if dry_run:
+            self._safe_record_counter(
+                "continuum_projector_backfill_total",
+                labels={"dry_run": "true", "backend": "memory"},
+            )
             return {
                 "dry_run": True,
                 "selected_count": len(selected_events),
@@ -1185,7 +1326,7 @@ class WebSocketBus:
                 await self._continuum_dlq_push(f"backfill_failed:{exc}", event)
                 dlq_queued += 1
 
-        return {
+        result = {
             "dry_run": False,
             "selected_count": len(selected_events),
             "projected": projected,
@@ -1197,6 +1338,24 @@ class WebSocketBus:
             "tenant_id": tenant_filter,
             "agent_id": agent_filter,
         }
+        self._safe_record_counter(
+            "continuum_projector_backfill_total",
+            labels={"dry_run": "false", "backend": "memory"},
+        )
+        self._safe_record_counter("continuum_projector_backfill_events_total", projected, {"outcome": "projected"})
+        self._safe_record_counter("continuum_projector_backfill_events_total", duplicates, {"outcome": "duplicate"})
+        self._safe_record_counter(
+            "continuum_projector_backfill_events_total",
+            stale_rejected,
+            {"outcome": "stale_rejected"},
+        )
+        self._safe_record_counter("continuum_projector_backfill_events_total", dlq_queued, {"outcome": "dlq_queued"})
+        self._safe_record_histogram(
+            "continuum_projector_backfill_duration_seconds",
+            time.perf_counter() - started_at,
+            labels={"backend": "memory"},
+        )
+        return result
 
     def _omega_snapshot(self) -> Dict[str, Any]:
         return {

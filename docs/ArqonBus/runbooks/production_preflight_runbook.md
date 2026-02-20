@@ -40,6 +40,7 @@ conda run -n helios-gpu-118 python -m pip install -e .
 conda run -n helios-gpu-118 python scripts/manual_checks/redis_connection_check.py
 conda run -n helios-gpu-118 python scripts/manual_checks/postgres_connection_check.py
 conda run -n helios-gpu-118 pytest -q tests/unit tests/integration --maxfail=20
+conda run -n helios-gpu-118 pytest -q tests/integration/test_continuum_projector_postgres.py tests/integration/test_continuum_projector_postgres_e2e.py
 cargo check -p shield
 cargo test -p shield --tests
 ```
@@ -72,3 +73,10 @@ When preflight fails, capture:
 - whether failure is config, dependency, or code regression
 
 Route to engineering with severity label (`blocker`, `critical`, `high`).
+
+## Projector Data Safety
+
+- Apply projector schema migration before enabling projector lane in a new Postgres environment:
+  - `scripts/migrations/20260220_continuum_projector_postgres.sql`
+- Backup/restore playbook:
+  - `docs/ArqonBus/runbooks/continuum_projector_postgres_migration_backup_restore.md`

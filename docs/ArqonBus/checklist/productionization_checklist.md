@@ -55,4 +55,8 @@ Source plans:
 - [ ] No production-path stubs/mocks/placeholders remain.
 - [ ] No auth bypass toggles available in production profile.
 - [ ] No silent durability downgrade in strict profile.
-- [ ] Runbook approved and exercised once end-to-end.
+- [x] Runbook approved and exercised once end-to-end.
+
+Release-gate closeout evidence:
+
+- `docs/ArqonBus/checklist/release_gate_closeout_2026-02-20.md`

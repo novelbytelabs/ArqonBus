@@ -1,8 +1,8 @@
 # ArqonBus vNext Innovation Execution Plan
 
-Last updated: 2026-02-19  
+Last updated: 2026-02-20  
 Branch: `dev/vnext-innovation-execution`  
-Status: Draft for execution
+Status: Executing (through Continuum projector operational hardening)
 
 ## 1) Objective
 
@@ -291,6 +291,10 @@ Test gate:
   - stale event rejection
   - replay/backfill correctness
   - tenant-isolation key/row checks
+- Operational gate additions:
+  - Postgres-backed socket command-lane e2e projector test
+  - CI Postgres integration stage without mocks
+  - Migration + backup/restore runbook and validation path
 
 ## 6) Test Strategy and Quality Gates
 

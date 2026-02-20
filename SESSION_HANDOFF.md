@@ -3,7 +3,21 @@
 Last updated: 2026-02-20
 
 ## Current status
-Productionization and Continuum integration slices are complete through projector persistence and production data-stack hardening.
+Productionization and Continuum integration slices are complete through projector persistence, operational hardening, and CI postgres gating.
+
+## Latest completed work (unreleased in this handoff snapshot)
+- Added Postgres-backed socket e2e test for Continuum projector lane:
+  - `tests/integration/test_continuum_projector_postgres_e2e.py`
+- Added projector metrics instrumentation (lag/DLQ/replay/backfill):
+  - `src/arqonbus/transport/websocket_bus.py`
+  - `tests/unit/test_continuum_projector_lane.py`
+- Added Postgres migration SQL + backup/restore runbook:
+  - `scripts/migrations/20260220_continuum_projector_postgres.sql`
+  - `docs/ArqonBus/runbooks/continuum_projector_postgres_migration_backup_restore.md`
+- Added dedicated CI stage for live Postgres projector tests:
+  - `.github/workflows/arqonbus-tests.yml`
+- Added release-gate closeout note:
+  - `docs/ArqonBus/checklist/release_gate_closeout_2026-02-20.md`
 
 ## Recent completed work (latest first)
 - `fe8a34a` - `hardening: require valkey+postgres stack in prod preflight`

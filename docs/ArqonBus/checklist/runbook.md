@@ -156,6 +156,11 @@ Continuum projector lane (admin-only):
 - `op.continuum.projector.dlq.list|dlq.replay`
 - `op.continuum.projector.backfill` (`from_ts`, `to_ts`, optional `tenant_id`, `agent_id`, `dry_run`)
 
+Continuum projector data migration/restore:
+
+- Runbook: `docs/ArqonBus/runbooks/continuum_projector_postgres_migration_backup_restore.md`
+- SQL migration: `scripts/migrations/20260220_continuum_projector_postgres.sql`
+
 Tier-Omega flags:
 
 ```bash
@@ -234,6 +239,9 @@ Set up alerts for:
 - Storage backend health failures
 - Memory usage growth patterns
 - WebSocket connection timeouts
+- Continuum projector lag p95 > 30s for 5m (`arqonbus_continuum_projector_event_lag_seconds`)
+- Continuum projector DLQ depth > 100 for 10m (`arqonbus_continuum_projector_dlq_depth`)
+- Continuum projector replay failure ratio > 5% for 15m (`arqonbus_continuum_projector_dlq_replay_total`)
 
 ### Prometheus Metrics
 
@@ -242,6 +250,14 @@ Available at `/metrics`:
 - `arqonbus_messages_total`
 - `arqonbus_storage_operations_total`
 - `arqonbus_uptime_seconds`
+- `arqonbus_continuum_projector_projection_count`
+- `arqonbus_continuum_projector_seen_event_count`
+- `arqonbus_continuum_projector_dlq_depth`
+- `arqonbus_continuum_projector_events_total`
+- `arqonbus_continuum_projector_event_lag_seconds`
+- `arqonbus_continuum_projector_dlq_replay_total`
+- `arqonbus_continuum_projector_backfill_total`
+- `arqonbus_continuum_projector_backfill_events_total`
 
 ## CASIL Operations (Feature 002)
 

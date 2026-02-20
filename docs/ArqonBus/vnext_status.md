@@ -46,6 +46,7 @@ Out of scope for this slice:
 | M8: Continuum projector/replay implementation | Completed | Added `op.continuum.projector.*` command lane with projection, stale guard, DLQ replay/list, and backfill controls. |
 | M9: Postgres-backed projector persistence | Completed | Added Postgres projection/events/DLQ tables and backend hooks consumed by projector lane. |
 | M10: Production data-stack hardening | Completed | Production preflight now requires both Valkey and Postgres URLs by default, plus real connectivity checks. |
+| M11: Continuum projector operational hardening | Completed | Added Postgres-backed socket e2e, projector metrics/alerts, migration+backup/restore runbook, and CI Postgres integration stage. |
 
 ## Phase 0 Completion Checklist
 
@@ -155,6 +156,9 @@ python -m pytest -q -m performance
 - [x] Valkey connection check passed (`ARQONBUS_VALKEY_URL=redis://127.0.0.1:6379/0`)
 - [x] Postgres connection check passed (`ARQONBUS_POSTGRES_URL=postgresql://arqonbus:arqonbus@127.0.0.1:5432/arqonbus`)
 - [x] Real Postgres integration test passed (`tests/integration/test_continuum_projector_postgres.py`)
+- [x] Socket command-lane e2e projector persistence test added (`tests/integration/test_continuum_projector_postgres_e2e.py`)
+- [x] CI Postgres projector stage added (`.github/workflows/arqonbus-tests.yml`)
+- [x] Projector migration/backup restore runbook added (`docs/ArqonBus/runbooks/continuum_projector_postgres_migration_backup_restore.md`)
 
 ## Epoch 1 Checkpoint 2.2 Progress
 

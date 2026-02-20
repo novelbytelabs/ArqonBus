@@ -287,3 +287,35 @@ async def test_backfill_uses_backend_event_source_when_available():
     assert data["dry_run"] is False
     assert data["selected_count"] == 2
     assert data["projected"] == 2
+
+
+@pytest.mark.asyncio
+async def test_projector_records_metrics_for_projection_and_dlq_paths():
+    bus = _make_bus(role="admin")
+    counter_calls = []
+    gauge_calls = []
+    histogram_calls = []
+
+    bus._safe_record_counter = lambda name, value=1, labels=None: counter_calls.append((name, value, labels))
+    bus._safe_record_gauge = lambda name, value, labels=None: gauge_calls.append((name, value, labels))
+    bus._safe_record_histogram = lambda name, value, labels=None: histogram_calls.append((name, value, labels))
+
+    await bus._handle_command(
+        _command("op.continuum.projector.project_event", {"event": _event(event_id="evt-metric-1")}),
+        "client-1",
+    )
+
+    invalid_event = _event(event_id="evt-metric-bad")
+    invalid_event["payload"].pop("content_ref")
+    await bus._handle_command(
+        _command("op.continuum.projector.project_event", {"event": invalid_event}),
+        "client-1",
+    )
+
+    await bus._handle_command(_command("op.continuum.projector.status", {}), "client-1")
+
+    metric_names = [name for name, _, _ in counter_calls]
+    assert "continuum_projector_events_total" in metric_names
+    assert "continuum_projector_dlq_events_total" in metric_names
+    assert any(name == "continuum_projector_dlq_depth" for name, _, _ in gauge_calls)
+    assert any(name == "continuum_projector_event_lag_seconds" for name, _, _ in histogram_calls)
