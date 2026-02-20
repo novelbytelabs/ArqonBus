@@ -1,71 +1,63 @@
 # ArqonBus Session Handoff
 
-Last updated: 2026-02-19
+Last updated: 2026-02-20
 
 ## Current status
-Productionization phases completed through Phase 5. Release Gate items remain.
+Productionization and Continuum integration slices are complete through projector persistence and production data-stack hardening.
 
-## Completed phases and commits
-- Phase 0: `60dd765` - `phase-0: add production preflight and remove aiohttp shadow package`
-- Phase 1: `725f042` - `phase-1: harden shield jwt runtime and auth test determinism`
-- Phase 2: `b26b7c6` - `phase-2: enforce strict redis mode and explicit degraded storage semantics`
-- Phase 3: `54c5e87` - `phase-3: harden runtime integrity and no-silent-failure paths`
-- Phase 4: `084a32f` - `phase-4: enforce profile contract and startup preflight`
-- Phase 5: `afc9f05` - `phase-5: run full validation matrix and gate checks`
+## Recent completed work (latest first)
+- `fe8a34a` - `hardening: require valkey+postgres stack in prod preflight`
+  - Production preflight now requires both Valkey and Postgres URLs by default in `prod`.
+  - Added real connectivity checks:
+    - `scripts/manual_checks/redis_connection_check.py`
+    - `scripts/manual_checks/postgres_connection_check.py`
+  - Added real integration test (live Postgres path):
+    - `tests/integration/test_continuum_projector_postgres.py`
+- `358c27b` - `feat: persist continuum projector state via postgres backend hooks`
+  - Added Postgres tables/hooks for Continuum projection/events/DLQ.
+  - Wired projector lane to use backend hooks when available.
+- `4a888ad` - `feat: add continuum projector lane with dlq and backfill controls`
+  - Added `op.continuum.projector.*` command lane:
+    - `status`, `project_event`, `get`, `list`
+    - `dlq.list`, `dlq.replay`
+    - `backfill`
+- `776afce` - `plan: add continuum/reflex integration track and update vnext status`
+- `2daf648` - `docs: add continuum-bus integration contract and executable stubs`
+- `eb7fa43` - `feat: add valkey+postgres backends and tier-omega firecracker runtime`
 
-## Key changes shipped
-- Startup preflight and dependency cleanup (Python side)
-- Shield JWT hardening + fail-closed startup checks (Rust side)
-- Redis storage strict/degraded explicit runtime behavior and tests
-- Prototype RSI operator is now fail-closed in production unless explicitly enabled.
-- Silent exception swallows in WebSocket cron/cleanup paths replaced with structured logs.
-- Redis stream consumer JSON decode failures now emit debug telemetry instead of silently passing.
-- Runtime environment profile names are normalized to `dev|staging|prod`.
-- Strict preflight now applies to both `staging` and `prod` profiles.
-- WebSocket module entrypoint enforces preflight before bind/start.
-- Runbook docs now explicitly define the environment profile contract and strict preflight requirements.
+## Verification evidence (2026-02-20)
 
-## Tests passing this session
-- `conda run -n helios-gpu-118 pytest -q tests/regression/test_phase3_runtime_integrity.py tests/unit/test_websocket_bus_processing.py tests/integration/test_redis_storage.py`
-- `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_startup_preflight.py tests/unit/test_websocket_entrypoint_preflight.py`
-- `conda run -n helios-gpu-118 python -m pytest -q tests/unit tests/integration --maxfail=20`
-- `conda run -n helios-gpu-118 python -m pytest -q tests/unit`
-- `conda run -n helios-gpu-118 python -m pytest -q tests/integration`
-- `conda run -n helios-gpu-118 python -m pytest -q tests/regression`
-- `ARQONBUS_REQUIRE_SOCKET_TESTS=1 conda run -n helios-gpu-118 python -m pytest -q -m "e2e and not external and not performance" tests`
-- `conda run -n helios-gpu-118 python -m pytest -q tests/integration/casil/test_hygiene_policies.py tests/integration/casil/test_redaction_behavior.py tests/regression/test_phase1_regressions.py tests/integration/test_epoch1_gate.py`
-- `COVERAGE_FILE=.coverage.unit conda run -n helios-gpu-118 python -m pytest -q -m "unit and not regression and not e2e and not external and not performance" --cov=arqonbus --cov-branch --cov-report=term-missing --cov-report=xml:coverage-unit.xml tests`
-- `COVERAGE_FILE=.coverage.integration conda run -n helios-gpu-118 python -m pytest -q -m "integration and not e2e and not external and not performance" --cov=arqonbus --cov-branch --cov-report=term-missing --cov-report=xml:coverage-integration.xml tests/integration`
-- `COVERAGE_FILE=.coverage.e2e ARQONBUS_REQUIRE_SOCKET_TESTS=1 conda run -n helios-gpu-118 python -m pytest -q -m "e2e and not external and not performance" --cov=arqonbus --cov-branch --cov-report=term-missing --cov-report=xml:coverage-e2e.xml tests`
-- `COVERAGE_FILE=.coverage.regression conda run -n helios-gpu-118 python -m pytest -q -m "regression and not external and not performance" --cov=arqonbus --cov-branch --cov-report=term-missing --cov-report=xml:coverage-regression.xml tests`
-- `conda run -n helios-gpu-118 python -m coverage combine .coverage.unit .coverage.integration .coverage.e2e .coverage.regression`
-- `conda run -n helios-gpu-118 python -m coverage report --fail-under=35`
-- `cargo test -p shield --tests`
+User-validated local runtime checks:
+- Valkey: `redis://127.0.0.1:6379/0` reachable.
+- Postgres: `postgresql://arqonbus:arqonbus@127.0.0.1:5432/arqonbus` reachable.
+- Integration: `tests/integration/test_continuum_projector_postgres.py` passed in native environment.
 
-## In-progress (Release Gate)
-Targets identified:
-- Confirm no production-path stubs/mocks/placeholders remain.
-- Confirm no auth bypass toggles available in production profile.
-- Confirm no silent durability downgrade in strict profile.
-- Runbook approved and exercised once end-to-end.
+Agent-run test highlights in this session:
+- `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_continuum_projector_lane.py tests/unit/test_continuum_integration_contract.py tests/unit/test_tier_omega_lane.py tests/unit/test_startup_preflight.py tests/unit/test_postgres_storage.py --maxfail=20`
+  - Result: passed
+- `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_startup_preflight.py tests/unit/test_continuum_projector_lane.py tests/unit/test_postgres_storage.py --maxfail=20`
+  - Result: passed
 
-Files updated in Phase 5:
-- `docs/ArqonBus/checklist/productionization_checklist.md`
-- `SESSION_HANDOFF.md`
-
-Notes:
-- Unrelated local modification remains: `.codex/config.toml` (left untouched intentionally).
+## Source-of-truth docs updated
+- `docs/ArqonBus/vnext_status.md`
+- `docs/ArqonBus/plan/vnext_innovation_execution_plan.md`
+- `docs/ArqonBus/spec/continuum_integration_contract.md`
+- `docs/ArqonBus/checklist/runbook.md`
+- `docs/ArqonBus/runbooks/production_preflight_runbook.md`
 
 ## Fast resume checklist
 1. `cd /home/irbsurfer/Projects/arqon/ArqonBus`
-2. Open `SESSION_HANDOFF.md` and `docs/ArqonBus/checklist/productionization_checklist.md`
-3. Verify committed/pushed Phase 5 state with `git status` and `git log --oneline -n 5`
-4. Execute Release Gate checks and sign-off
-5. Run tests:
-   - `conda run -n helios-gpu-118 python -m pytest -q tests/unit tests/integration --maxfail=20`
-   - `cargo test -p shield --tests`
-6. Commit/push with a `release-gate:` message
+2. Confirm branch and cleanliness:
+   - `git branch --show-current`
+   - `git status --short`
+3. Export local runtime URLs (if not already set):
+   - `ARQONBUS_VALKEY_URL=redis://127.0.0.1:6379/0`
+   - `ARQONBUS_POSTGRES_URL=postgresql://arqonbus:arqonbus@127.0.0.1:5432/arqonbus`
+4. Run preflight checks:
+   - `conda run -n helios-gpu-118 python scripts/manual_checks/redis_connection_check.py`
+   - `conda run -n helios-gpu-118 python scripts/manual_checks/postgres_connection_check.py`
+5. Run projector integration verification:
+   - `conda run -n helios-gpu-118 python -m pytest -q tests/integration/test_continuum_projector_postgres.py`
 
-## Gotchas
-- If Codex is launched from `ArqonStudio`, writes to `ArqonBus` may trigger permission prompts.
-- Best fix: launch Codex with cwd in `ArqonBus` so writable root matches target repo.
+## Notes
+- Unrelated local modification remains: `.codex/config.toml` (left untouched intentionally).

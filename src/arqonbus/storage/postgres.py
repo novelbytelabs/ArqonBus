@@ -254,7 +254,7 @@ class PostgresStorageBackend(StorageBackend):
 
             entries: List[HistoryEntry] = []
             for row in rows:
-                envelope_dict = dict(row["envelope"])
+                envelope_dict = json.loads(row["envelope"]) if isinstance(row["envelope"], str) else (row["envelope"] or {})
                 entries.append(
                     HistoryEntry(
                         envelope=Envelope.from_dict(envelope_dict),
@@ -524,7 +524,7 @@ class PostgresStorageBackend(StorageBackend):
             "summary": row["summary"],
             "tags": list(row["tags"] or []),
             "embedding_ref": row["embedding_ref"],
-            "metadata": dict(row["metadata"] or {}),
+            "metadata": json.loads(row["metadata"]) if isinstance(row["metadata"], str) else (row["metadata"] or {}),
             "last_event_id": row["last_event_id"],
             "last_event_ts": row["last_event_ts"].isoformat(),
             "updated_at": row["updated_at"].isoformat(),
@@ -571,7 +571,7 @@ class PostgresStorageBackend(StorageBackend):
                 "summary": row["summary"],
                 "tags": list(row["tags"] or []),
                 "embedding_ref": row["embedding_ref"],
-                "metadata": dict(row["metadata"] or {}),
+                "metadata": json.loads(row["metadata"]) if isinstance(row["metadata"], str) else (row["metadata"] or {}),
                 "last_event_id": row["last_event_id"],
                 "last_event_ts": row["last_event_ts"].isoformat(),
                 "updated_at": row["updated_at"].isoformat(),
@@ -623,7 +623,7 @@ class PostgresStorageBackend(StorageBackend):
             {
                 "dlq_id": row["dlq_id"],
                 "reason": row["reason"],
-                "event": dict(row["event"]),
+                "event": json.loads(row["event"]) if isinstance(row["event"], str) else (row["event"] or {}),
                 "queued_at": row["queued_at"].isoformat(),
                 "topic": "continuum.episode.dlq.v1",
             }
@@ -647,7 +647,7 @@ class PostgresStorageBackend(StorageBackend):
         return {
             "dlq_id": row["dlq_id"],
             "reason": row["reason"],
-            "event": dict(row["event"]),
+            "event": json.loads(row["event"]) if isinstance(row["event"], str) else (row["event"] or {}),
             "queued_at": row["queued_at"].isoformat(),
             "topic": "continuum.episode.dlq.v1",
         }
@@ -689,4 +689,4 @@ class PostgresStorageBackend(StorageBackend):
         """
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, *params)
-        return [dict(row["event"]) for row in rows]
+        return [json.loads(row["event"]) if isinstance(row["event"], str) else (row["event"] or {}) for row in rows]

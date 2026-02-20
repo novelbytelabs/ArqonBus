@@ -43,7 +43,9 @@ Out of scope for this slice:
 | M5: Tier-Omega lifecycle hardening | Completed | Added substrate/event lifecycle controls and bounded lane governance. |
 | M6: Valkey/Postgres + Tier-Omega Firecracker runtime | Completed | Added `valkey*` aliases, `postgres` backend, compose service, and `op.omega.vm.probe|list|launch|stop`. |
 | M7: Continuum/Reflex integration contract baseline | Completed | Added contract spec + executable contract stubs for event/idempotency/failure semantics. |
-| M8: Continuum projector/replay implementation | In progress | Implement Bus-side projector, DLQ, replay/backfill integration suites. |
+| M8: Continuum projector/replay implementation | Completed | Added `op.continuum.projector.*` command lane with projection, stale guard, DLQ replay/list, and backfill controls. |
+| M9: Postgres-backed projector persistence | Completed | Added Postgres projection/events/DLQ tables and backend hooks consumed by projector lane. |
+| M10: Production data-stack hardening | Completed | Production preflight now requires both Valkey and Postgres URLs by default, plus real connectivity checks. |
 
 ## Phase 0 Completion Checklist
 
@@ -142,11 +144,17 @@ python -m pytest -q -m performance
 
 ## Active Next Slice: Projector + Replay Delivery (In Progress)
 
-- [ ] Implement Continuum episode projector (Bus -> Postgres) with idempotent upsert keying
-- [ ] Implement stale update rejection by monotonic `source_ts`
-- [ ] Implement DLQ emission path: `continuum.episode.dlq.v1`
-- [ ] Implement replay/backfill control path (`from_ts`, `to_ts`, `tenant_id`, `agent_id`, `dry_run`)
-- [ ] Add integration/regression suites for projector/replay/failure injection
+- [x] Implement Continuum episode projector (Bus -> Postgres) with idempotent upsert keying
+- [x] Implement stale update rejection by monotonic `source_ts`
+- [x] Implement DLQ emission path: `continuum.episode.dlq.v1`
+- [x] Implement replay/backfill control path (`from_ts`, `to_ts`, `tenant_id`, `agent_id`, `dry_run`)
+- [x] Add integration/regression suites for projector/replay/failure injection
+
+## Verification Evidence (2026-02-20)
+
+- [x] Valkey connection check passed (`ARQONBUS_VALKEY_URL=redis://127.0.0.1:6379/0`)
+- [x] Postgres connection check passed (`ARQONBUS_POSTGRES_URL=postgresql://arqonbus:arqonbus@127.0.0.1:5432/arqonbus`)
+- [x] Real Postgres integration test passed (`tests/integration/test_continuum_projector_postgres.py`)
 
 ## Epoch 1 Checkpoint 2.2 Progress
 
