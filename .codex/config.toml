@@ -1,5 +1,5 @@
 model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
+model_reasoning_effort = "medium"
 
 [projects."/home/irbsurfer/Projects/arqon"]
 trust_level = "trusted"
@@ -41,6 +41,9 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."/home/irbsurfer/Projects/arqon/ArqonLattice"]
+trust_level = "trusted"
+
+[projects."/home/irbsurfer/Projects/arqon/ArqonBus"]
 trust_level = "trusted"
 
 [notice.model_migrations]
