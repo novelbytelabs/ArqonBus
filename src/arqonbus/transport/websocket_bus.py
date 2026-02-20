@@ -63,6 +63,23 @@ class _OmegaSubstrate:
     created_at: str
 
 
+@dataclass
+class _ContinuumProjection:
+    tenant_id: str
+    agent_id: str
+    episode_id: str
+    event_type: str
+    content_ref: str
+    summary: Optional[str]
+    tags: list[str]
+    embedding_ref: Optional[str]
+    metadata: Dict[str, Any]
+    last_event_id: str
+    last_event_ts: str
+    updated_at: str
+    deleted: bool = False
+
+
 class _FeatureDisabledError(RuntimeError):
     """Raised when a feature-flagged command path is disabled."""
 
@@ -116,6 +133,10 @@ class WebSocketBus:
         self._omega_substrates: Dict[str, _OmegaSubstrate] = {}
         self._omega_events: list[Dict[str, Any]] = []
         self._omega_firecracker = FirecrackerOmegaRuntime(self.config.tier_omega)
+        self._continuum_projection: Dict[tuple[str, str, str], _ContinuumProjection] = {}
+        self._continuum_seen_events: Set[tuple[str, str, str]] = set()
+        self._continuum_dlq: list[Dict[str, Any]] = []
+        self._continuum_event_log: list[Dict[str, Any]] = []
         self._ops_lock = asyncio.Lock()
         
         # Statistics
@@ -272,6 +293,15 @@ class WebSocketBus:
         return datetime.now(timezone.utc).isoformat()
 
     @staticmethod
+    def _parse_iso8601(raw_value: Any, field_name: str) -> datetime:
+        if not isinstance(raw_value, str):
+            raise ValueError(f"'{field_name}' must be an ISO8601 timestamp string")
+        normalized = raw_value.strip()
+        if normalized.endswith("Z"):
+            normalized = normalized[:-1] + "+00:00"
+        return datetime.fromisoformat(normalized)
+
+    @staticmethod
     def _parse_positive_float(raw_value: Any, field_name: str) -> float:
         value = float(raw_value)
         if value <= 0:
@@ -322,6 +352,10 @@ class WebSocketBus:
     async def _client_is_admin(self, client_id: str) -> bool:
         metadata = await self._client_metadata(client_id)
         return str(metadata.get("role", "")).lower() == "admin"
+
+    async def _require_admin(self, client_id: str, action: str) -> None:
+        if not await self._client_is_admin(client_id):
+            raise PermissionError(f"Only admin clients can {action}")
 
     async def _default_store_namespace(self, client_id: str) -> str:
         metadata = await self._client_metadata(client_id)
@@ -790,6 +824,286 @@ class WebSocketBus:
             self.casil.engine.config = candidate
 
         return self._casil_snapshot(candidate)
+
+    @staticmethod
+    def _continuum_required_keys() -> tuple[set[str], set[str]]:
+        envelope_fields = {
+            "event_id",
+            "event_type",
+            "tenant_id",
+            "agent_id",
+            "episode_id",
+            "source_ts",
+            "schema_version",
+            "payload",
+        }
+        payload_fields = {"content_ref", "tags", "metadata"}
+        return envelope_fields, payload_fields
+
+    def _validate_continuum_event(self, event: Dict[str, Any]) -> None:
+        envelope_fields, payload_fields = self._continuum_required_keys()
+        missing_envelope = envelope_fields.difference(event.keys())
+        if missing_envelope:
+            raise ValueError(f"Missing required envelope fields: {sorted(missing_envelope)}")
+
+        event_type = str(event.get("event_type", "")).strip()
+        allowed_types = {
+            "episode.created",
+            "episode.updated",
+            "episode.deleted",
+            "episode.summarized",
+        }
+        if event_type not in allowed_types:
+            raise ValueError(f"Unsupported event_type: {event_type}")
+
+        schema_version = int(event.get("schema_version", 0))
+        if schema_version != 1:
+            raise ValueError(f"Unsupported schema_version: {schema_version}")
+
+        self._parse_iso8601(event["source_ts"], "source_ts")
+
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            raise ValueError("'payload' must be an object")
+
+        missing_payload = payload_fields.difference(payload.keys())
+        if missing_payload:
+            raise ValueError(f"Missing required payload fields: {sorted(missing_payload)}")
+
+        if not isinstance(payload.get("tags"), list) or any(
+            not isinstance(tag, str) for tag in payload.get("tags", [])
+        ):
+            raise ValueError("'payload.tags' must be a list of strings")
+        if not isinstance(payload.get("metadata"), dict):
+            raise ValueError("'payload.metadata' must be an object")
+
+    async def _continuum_dlq_push(self, reason: str, event: Dict[str, Any]) -> Dict[str, Any]:
+        dlq_record = {
+            "dlq_id": f"dlq_{uuid.uuid4().hex[:12]}",
+            "topic": "continuum.episode.dlq.v1",
+            "reason": reason,
+            "event": deepcopy(event),
+            "queued_at": self._utc_now_iso(),
+        }
+        async with self._ops_lock:
+            self._continuum_dlq.append(dlq_record)
+        return dlq_record
+
+    async def _project_continuum_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        self._validate_continuum_event(event)
+        tenant_id = str(event["tenant_id"])
+        agent_id = str(event["agent_id"])
+        episode_id = str(event["episode_id"])
+        event_id = str(event["event_id"])
+        source_ts = str(event["source_ts"])
+        event_type = str(event["event_type"])
+        payload = event["payload"]
+        dedup_key = (tenant_id, agent_id, event_id)
+        projection_key = (tenant_id, agent_id, episode_id)
+
+        incoming_ts = self._parse_iso8601(source_ts, "source_ts")
+
+        async with self._ops_lock:
+            if dedup_key in self._continuum_seen_events:
+                return {
+                    "status": "duplicate",
+                    "event_id": event_id,
+                    "projection_key": projection_key,
+                }
+
+            existing = self._continuum_projection.get(projection_key)
+            if existing:
+                existing_ts = self._parse_iso8601(existing.last_event_ts, "last_event_ts")
+                if incoming_ts < existing_ts:
+                    return {
+                        "status": "stale_rejected",
+                        "event_id": event_id,
+                        "projection_key": projection_key,
+                        "existing_last_event_ts": existing.last_event_ts,
+                    }
+
+            projection = _ContinuumProjection(
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+                episode_id=episode_id,
+                event_type=event_type,
+                content_ref=str(payload.get("content_ref")),
+                summary=payload.get("summary"),
+                tags=[str(tag) for tag in payload.get("tags", [])],
+                embedding_ref=payload.get("embedding_ref"),
+                metadata=dict(payload.get("metadata", {})),
+                last_event_id=event_id,
+                last_event_ts=source_ts,
+                updated_at=self._utc_now_iso(),
+                deleted=event_type == "episode.deleted",
+            )
+            self._continuum_projection[projection_key] = projection
+            self._continuum_seen_events.add(dedup_key)
+            self._continuum_event_log.append(
+                {"event": deepcopy(event), "projected_at": self._utc_now_iso()}
+            )
+
+        return {
+            "status": "projected",
+            "event_id": event_id,
+            "projection_key": projection_key,
+            "deleted": projection.deleted,
+        }
+
+    async def _continuum_projector_status(self) -> Dict[str, Any]:
+        async with self._ops_lock:
+            return {
+                "projection_count": len(self._continuum_projection),
+                "seen_event_count": len(self._continuum_seen_events),
+                "dlq_count": len(self._continuum_dlq),
+                "event_log_count": len(self._continuum_event_log),
+            }
+
+    async def _continuum_project_event_command(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "project Continuum events")
+        event = args.get("event")
+        if not isinstance(event, dict):
+            raise ValueError("'event' is required and must be an object")
+        try:
+            return await self._project_continuum_event(event)
+        except Exception as exc:
+            dlq = await self._continuum_dlq_push(f"projection_failed:{exc}", event)
+            return {
+                "status": "dlq_queued",
+                "error": str(exc),
+                "dlq_id": dlq["dlq_id"],
+            }
+
+    async def _continuum_projector_get(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "read Continuum projector state")
+        tenant_id = str(args.get("tenant_id", "")).strip()
+        agent_id = str(args.get("agent_id", "")).strip()
+        episode_id = str(args.get("episode_id", "")).strip()
+        if not tenant_id or not agent_id or not episode_id:
+            raise ValueError("'tenant_id', 'agent_id', and 'episode_id' are required")
+        key = (tenant_id, agent_id, episode_id)
+        async with self._ops_lock:
+            projection = self._continuum_projection.get(key)
+        if projection is None:
+            return {"found": False, "tenant_id": tenant_id, "agent_id": agent_id, "episode_id": episode_id}
+        return {"found": True, "projection": projection.__dict__}
+
+    async def _continuum_projector_list(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "list Continuum projector state")
+        tenant_filter = str(args.get("tenant_id", "")).strip() or None
+        agent_filter = str(args.get("agent_id", "")).strip() or None
+        limit = int(args.get("limit", 100))
+        if limit < 1:
+            raise ValueError("'limit' must be >= 1")
+        async with self._ops_lock:
+            rows = list(self._continuum_projection.values())
+        filtered = []
+        for row in rows:
+            if tenant_filter and row.tenant_id != tenant_filter:
+                continue
+            if agent_filter and row.agent_id != agent_filter:
+                continue
+            filtered.append(row.__dict__)
+        filtered.sort(key=lambda row: row["updated_at"], reverse=True)
+        filtered = filtered[:limit]
+        return {"count": len(filtered), "items": filtered, "limit": limit}
+
+    async def _continuum_projector_dlq_list(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "list Continuum DLQ")
+        limit = int(args.get("limit", 100))
+        if limit < 1:
+            raise ValueError("'limit' must be >= 1")
+        async with self._ops_lock:
+            items = list(self._continuum_dlq)[-limit:]
+        return {"count": len(items), "items": items, "limit": limit}
+
+    async def _continuum_projector_dlq_replay(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "replay Continuum DLQ items")
+        dlq_id = str(args.get("dlq_id", "")).strip()
+        if not dlq_id:
+            raise ValueError("'dlq_id' is required")
+        async with self._ops_lock:
+            record = next((item for item in self._continuum_dlq if item["dlq_id"] == dlq_id), None)
+        if record is None:
+            return {"replayed": False, "dlq_id": dlq_id, "reason": "not_found"}
+        result = await self._project_continuum_event(record["event"])
+        if result.get("status") in {"projected", "duplicate", "stale_rejected"}:
+            async with self._ops_lock:
+                self._continuum_dlq = [item for item in self._continuum_dlq if item["dlq_id"] != dlq_id]
+            return {"replayed": True, "dlq_id": dlq_id, "result": result}
+        return {"replayed": False, "dlq_id": dlq_id, "result": result}
+
+    async def _continuum_projector_backfill(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "run Continuum projector backfill")
+        from_ts_raw = args.get("from_ts")
+        to_ts_raw = args.get("to_ts")
+        if from_ts_raw is None or to_ts_raw is None:
+            raise ValueError("'from_ts' and 'to_ts' are required")
+        from_ts = self._parse_iso8601(from_ts_raw, "from_ts")
+        to_ts = self._parse_iso8601(to_ts_raw, "to_ts")
+        if to_ts < from_ts:
+            raise ValueError("'to_ts' must be >= 'from_ts'")
+        tenant_filter = str(args.get("tenant_id", "")).strip() or None
+        agent_filter = str(args.get("agent_id", "")).strip() or None
+        dry_run = bool(args.get("dry_run", False))
+
+        async with self._ops_lock:
+            source_items = list(self._continuum_event_log)
+
+        selected_events: list[Dict[str, Any]] = []
+        for item in source_items:
+            event = item.get("event", {})
+            if not isinstance(event, dict):
+                continue
+            event_ts = self._parse_iso8601(event.get("source_ts"), "source_ts")
+            if event_ts < from_ts or event_ts > to_ts:
+                continue
+            if tenant_filter and str(event.get("tenant_id")) != tenant_filter:
+                continue
+            if agent_filter and str(event.get("agent_id")) != agent_filter:
+                continue
+            selected_events.append(event)
+
+        if dry_run:
+            return {
+                "dry_run": True,
+                "selected_count": len(selected_events),
+                "from_ts": from_ts_raw,
+                "to_ts": to_ts_raw,
+                "tenant_id": tenant_filter,
+                "agent_id": agent_filter,
+            }
+
+        projected = 0
+        duplicates = 0
+        stale_rejected = 0
+        dlq_queued = 0
+        for event in selected_events:
+            try:
+                result = await self._project_continuum_event(event)
+                status = result.get("status")
+                if status == "projected":
+                    projected += 1
+                elif status == "duplicate":
+                    duplicates += 1
+                elif status == "stale_rejected":
+                    stale_rejected += 1
+            except Exception as exc:
+                await self._continuum_dlq_push(f"backfill_failed:{exc}", event)
+                dlq_queued += 1
+
+        return {
+            "dry_run": False,
+            "selected_count": len(selected_events),
+            "projected": projected,
+            "duplicates": duplicates,
+            "stale_rejected": stale_rejected,
+            "dlq_queued": dlq_queued,
+            "from_ts": from_ts_raw,
+            "to_ts": to_ts_raw,
+            "tenant_id": tenant_filter,
+            "agent_id": agent_filter,
+        }
 
     def _omega_snapshot(self) -> Dict[str, Any]:
         return {
@@ -1554,6 +1868,84 @@ class WebSocketBus:
                     envelope.id,
                     success=True,
                     message="Store keys listed",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.status":
+                await self._require_admin(client_id, "read Continuum projector status")
+                data = await self._continuum_projector_status()
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector status",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.project_event":
+                data = await self._continuum_project_event_command(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum event projection processed",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.get":
+                data = await self._continuum_projector_get(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector get result",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.list":
+                data = await self._continuum_projector_list(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector list result",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.dlq.list":
+                data = await self._continuum_projector_dlq_list(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector DLQ list result",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.dlq.replay":
+                data = await self._continuum_projector_dlq_replay(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector DLQ replay result",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.backfill":
+                data = await self._continuum_projector_backfill(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector backfill result",
                     data=data,
                 )
                 return

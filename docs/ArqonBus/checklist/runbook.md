@@ -139,6 +139,14 @@ Tier-Omega experimental lane (feature-flagged):
 - `op.omega.list_events|clear_events` (`clear_events` is admin-only)
 - `op.omega.vm.probe|list|launch|stop` (`launch|stop` are admin-only)
 
+Continuum projector lane (admin-only):
+
+- `op.continuum.projector.status`
+- `op.continuum.projector.project_event` (projects one `continuum.episode.v1` event)
+- `op.continuum.projector.get|list`
+- `op.continuum.projector.dlq.list|dlq.replay`
+- `op.continuum.projector.backfill` (`from_ts`, `to_ts`, optional `tenant_id`, `agent_id`, `dry_run`)
+
 Tier-Omega flags:
 
 ```bash
