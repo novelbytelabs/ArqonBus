@@ -23,6 +23,10 @@ Profile contract:
 - If `ARQONBUS_STORAGE_MODE=strict`, storage URL is required:
   - Valkey/Redis backends: `ARQONBUS_VALKEY_URL` or `ARQONBUS_REDIS_URL`
   - Postgres backend: `ARQONBUS_POSTGRES_URL`
+- In `prod`, dual data stack is required by default:
+  - shared hot-state URL: `ARQONBUS_VALKEY_URL` (or `ARQONBUS_REDIS_URL`)
+  - durable shared-state URL: `ARQONBUS_POSTGRES_URL`
+  - override only with explicit exception: `ARQONBUS_REQUIRE_DUAL_DATA_STACK=false`
 
 ```bash
 # Required environment variables for production
@@ -70,6 +74,11 @@ export ARQONBUS_DEBUG=false
 3. **Verify Valkey/Redis Connectivity**
    ```bash
    python scripts/manual_checks/redis_connection_check.py
+   ```
+
+4. **Verify Postgres Connectivity**
+   ```bash
+   python scripts/manual_checks/postgres_connection_check.py
    ```
 
 4. **Start ArqonBus Server**
@@ -472,6 +481,7 @@ python -m arqonbus.main --storage-backend memory
 | `ARQONBUS_POSTGRES_DATABASE` | arqonbus | Postgres database |
 | `ARQONBUS_POSTGRES_USER` | arqonbus | Postgres user |
 | `ARQONBUS_POSTGRES_PASSWORD` | None | Postgres password |
+| `ARQONBUS_REQUIRE_DUAL_DATA_STACK` | true in `prod`, else false | Require both Valkey and Postgres URLs in preflight |
 | `ARQONBUS_OMEGA_RUNTIME` | memory | Tier-Omega runtime (`memory` or `firecracker`) |
 | `ARQONBUS_OMEGA_FIRECRACKER_BIN` | firecracker | Firecracker binary path/name |
 | `ARQONBUS_OMEGA_KERNEL_IMAGE` | None | Firecracker kernel image path |

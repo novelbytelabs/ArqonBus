@@ -10,7 +10,7 @@ Provide operators a deterministic preflight process before starting ArqonBus/Shi
 
 - Python environment is `helios-gpu-118`.
 - Rust toolchain pinned to 1.82 for core crates.
-- Required services reachable (Redis/Valkey, NATS, Ollama if enabled).
+- Required services reachable (Valkey/Redis, Postgres, NATS, Ollama if enabled).
 
 ## Configuration Checklist
 
@@ -19,7 +19,9 @@ Provide operators a deterministic preflight process before starting ArqonBus/Shi
 - [ ] `ARQONBUS_SERVER_HOST` set explicitly.
 - [ ] `ARQONBUS_SERVER_PORT` set explicitly (no hardcoded defaults relied on).
 - [ ] `ARQONBUS_STORAGE_MODE` set (`strict` recommended for production).
-- [ ] `ARQONBUS_REDIS_URL` configured and reachable for strict mode.
+- [ ] `ARQONBUS_VALKEY_URL` (or `ARQONBUS_REDIS_URL`) configured and reachable.
+- [ ] `ARQONBUS_POSTGRES_URL` configured and reachable.
+- [ ] `ARQONBUS_REQUIRE_DUAL_DATA_STACK` left default (`true` in prod) unless approved exception.
 - [ ] `ARQONBUS_TELEMETRY_HOST` / `ARQONBUS_TELEMETRY_PORT` configured.
 
 ## Shield
@@ -35,6 +37,8 @@ Run from repo root (`ArqonBus`):
 
 ```bash
 conda run -n helios-gpu-118 python -m pip install -e .
+conda run -n helios-gpu-118 python scripts/manual_checks/redis_connection_check.py
+conda run -n helios-gpu-118 python scripts/manual_checks/postgres_connection_check.py
 conda run -n helios-gpu-118 pytest -q tests/unit tests/integration --maxfail=20
 cargo check -p shield
 cargo test -p shield --tests
@@ -53,7 +57,8 @@ If any command fails, do not deploy.
 
 - Missing `JWT_SECRET` or detected default secret value.
 - `JWT_SKIP_VALIDATION` present in production environment.
-- Storage mode `strict` with Redis unavailable.
+- Production preflight missing either Valkey/Redis URL or Postgres URL.
+- Storage mode `strict` with required datastore unavailable.
 - Dependency import errors in clean environment.
 - Any failing unit/integration/e2e/regression/adversarial gates.
 

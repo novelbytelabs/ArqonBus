@@ -691,6 +691,29 @@ def startup_preflight_errors(config: Optional[ArqonBusConfig] = None) -> List[st
                 "Storage mode 'strict' requires one of: redis, redis_streams, valkey, valkey_streams, postgres"
             )
 
+    # Production policy: require both shared hot-state (Valkey/Redis URL)
+    # and durable projection/state (Postgres URL), independent of selected
+    # primary storage backend. Can be disabled only with explicit override.
+    require_dual_data_stack_raw = os.getenv("ARQONBUS_REQUIRE_DUAL_DATA_STACK")
+    if require_dual_data_stack_raw is None:
+        require_dual_data_stack = cfg_environment == "prod"
+    else:
+        require_dual_data_stack = require_dual_data_stack_raw.strip().lower() == "true"
+
+    if require_dual_data_stack:
+        if not (
+            cfg.storage.redis_url
+            or os.getenv("ARQONBUS_REDIS_URL")
+            or os.getenv("ARQONBUS_VALKEY_URL")
+        ):
+            errors.append(
+                "Dual data stack requires ARQONBUS_VALKEY_URL (or ARQONBUS_REDIS_URL) for shared hot-state"
+            )
+        if not (cfg.storage.postgres_url or os.getenv("ARQONBUS_POSTGRES_URL")):
+            errors.append(
+                "Dual data stack requires ARQONBUS_POSTGRES_URL for durable shared state"
+            )
+
     return errors
 
 # Backward compatibility alias for older tests/config consumers

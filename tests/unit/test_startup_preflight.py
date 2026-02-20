@@ -95,6 +95,61 @@ def test_startup_preflight_strict_postgres_requires_url(monkeypatch):
     assert any("ARQONBUS_POSTGRES_URL" in e for e in errors)
 
 
+def test_prod_preflight_requires_dual_data_stack_by_default(monkeypatch):
+    monkeypatch.delenv("ARQONBUS_PREFLIGHT_STRICT", raising=False)
+    monkeypatch.delenv("ARQONBUS_REQUIRE_DUAL_DATA_STACK", raising=False)
+    monkeypatch.setenv("ARQONBUS_SERVER_HOST", "127.0.0.1")
+    monkeypatch.setenv("ARQONBUS_SERVER_PORT", "9100")
+    monkeypatch.setenv("ARQONBUS_STORAGE_MODE", "strict")
+    monkeypatch.delenv("ARQONBUS_REDIS_URL", raising=False)
+    monkeypatch.delenv("ARQONBUS_VALKEY_URL", raising=False)
+    monkeypatch.delenv("ARQONBUS_POSTGRES_URL", raising=False)
+
+    cfg = ArqonBusConfig()
+    cfg.environment = "prod"
+    cfg.storage.mode = "strict"
+    cfg.storage.backend = "postgres"
+    errors = startup_preflight_errors(cfg)
+
+    assert any("Dual data stack requires ARQONBUS_VALKEY_URL" in e for e in errors)
+    assert any("Dual data stack requires ARQONBUS_POSTGRES_URL" in e for e in errors)
+
+
+def test_prod_preflight_dual_data_stack_passes_when_both_urls_set(monkeypatch):
+    monkeypatch.delenv("ARQONBUS_PREFLIGHT_STRICT", raising=False)
+    monkeypatch.delenv("ARQONBUS_REQUIRE_DUAL_DATA_STACK", raising=False)
+    monkeypatch.setenv("ARQONBUS_SERVER_HOST", "127.0.0.1")
+    monkeypatch.setenv("ARQONBUS_SERVER_PORT", "9100")
+    monkeypatch.setenv("ARQONBUS_STORAGE_MODE", "strict")
+    monkeypatch.setenv("ARQONBUS_VALKEY_URL", "redis://127.0.0.1:6379/0")
+    monkeypatch.setenv("ARQONBUS_POSTGRES_URL", "postgresql://127.0.0.1:5432/arqonbus")
+
+    cfg = ArqonBusConfig()
+    cfg.environment = "prod"
+    cfg.storage.mode = "strict"
+    cfg.storage.backend = "postgres"
+    errors = startup_preflight_errors(cfg)
+    assert not any("Dual data stack requires" in e for e in errors)
+
+
+def test_dual_data_stack_can_be_explicitly_disabled(monkeypatch):
+    monkeypatch.setenv("ARQONBUS_PREFLIGHT_STRICT", "true")
+    monkeypatch.setenv("ARQONBUS_REQUIRE_DUAL_DATA_STACK", "false")
+    monkeypatch.setenv("ARQONBUS_SERVER_HOST", "127.0.0.1")
+    monkeypatch.setenv("ARQONBUS_SERVER_PORT", "9100")
+    monkeypatch.setenv("ARQONBUS_STORAGE_MODE", "strict")
+    monkeypatch.delenv("ARQONBUS_REDIS_URL", raising=False)
+    monkeypatch.delenv("ARQONBUS_VALKEY_URL", raising=False)
+    monkeypatch.setenv("ARQONBUS_POSTGRES_URL", "postgresql://127.0.0.1:5432/arqonbus")
+
+    cfg = ArqonBusConfig()
+    cfg.environment = "prod"
+    cfg.storage.mode = "strict"
+    cfg.storage.backend = "postgres"
+    errors = startup_preflight_errors(cfg)
+    assert not any("Dual data stack requires ARQONBUS_VALKEY_URL" in e for e in errors)
+
+
 def test_startup_preflight_non_strict_allows_defaults(monkeypatch):
     monkeypatch.setenv("ARQONBUS_PREFLIGHT_STRICT", "false")
     cfg = ArqonBusConfig()
