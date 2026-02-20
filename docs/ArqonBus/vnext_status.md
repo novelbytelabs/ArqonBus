@@ -1,8 +1,8 @@
 # ArqonBus vNext Status (Single Source of Truth)
 
-Last updated: 2026-02-18
-Branch: `feature/vnext-phase0-phase1`
-Program status: Phase0/Phase1 slice complete; broader vNext roadmap in progress
+Last updated: 2026-02-20
+Branch: `dev/vnext-innovation-execution`
+Program status: Phase0-7 complete for current slice; Continuum/Reflex integration track now active
 
 ## Why this file exists
 
@@ -22,6 +22,9 @@ Current implementation scope:
 - Epoch 3 Tier-Omega experimental lane bootstrap (feature-flagged, isolated)
 - Tier-Omega lifecycle hardening (bounded substrates/events with admin controls)
 - Stability hardening discovered during manual gate validation
+- Storage substrate expansion (Valkey aliases + Postgres backend)
+- Tier-Omega Firecracker runtime integration (`op.omega.vm.*`)
+- Continuum/Reflex integration contract baseline
 
 Out of scope for this slice:
 
@@ -38,6 +41,9 @@ Out of scope for this slice:
 | M3: Epoch 2 Factory gate | Completed | CLI + SDK + standard operators + CASIL hot reload checkpoint closed. |
 | M4: Tier-Omega experimental lane | Completed | Added feature-flagged `op.omega.*` path with unit/integration/e2e/regression coverage. |
 | M5: Tier-Omega lifecycle hardening | Completed | Added substrate/event lifecycle controls and bounded lane governance. |
+| M6: Valkey/Postgres + Tier-Omega Firecracker runtime | Completed | Added `valkey*` aliases, `postgres` backend, compose service, and `op.omega.vm.probe|list|launch|stop`. |
+| M7: Continuum/Reflex integration contract baseline | Completed | Added contract spec + executable contract stubs for event/idempotency/failure semantics. |
+| M8: Continuum projector/replay implementation | In progress | Implement Bus-side projector, DLQ, replay/backfill integration suites. |
 
 ## Phase 0 Completion Checklist
 
@@ -119,6 +125,28 @@ python -m pytest -q -m performance
 - [x] Added admin lifecycle commands (`op.omega.unregister_substrate`, `op.omega.clear_events`)
 - [x] Added event query filters (`substrate_id`, `signal`) for `op.omega.list_events`
 - [x] Added unit/integration/e2e/regression coverage for lifecycle controls and filter isolation
+
+## Phase 8: Storage + Runtime Substrate Expansion (Completed)
+
+- [x] Added storage backend aliases (`valkey`, `valkey_streams`) and strict preflight support for Valkey envs
+- [x] Added Postgres storage backend and runtime wiring (`ARQONBUS_STORAGE_BACKEND=postgres`)
+- [x] Added Postgres service in `deploy/docker-compose.yml`
+- [x] Added Tier-Omega Firecracker runtime integration and admin VM controls (`op.omega.vm.*`)
+- [x] Added unit/integration coverage for new storage/runtime behavior
+
+## Phase 9: Continuum/Reflex Integration Contract (Completed Baseline)
+
+- [x] Added contract spec: `docs/ArqonBus/spec/continuum_integration_contract.md`
+- [x] Linked contract from `docs/ArqonBus/spec/00_master_spec.md`
+- [x] Added executable contract stubs: `tests/unit/test_continuum_integration_contract.py`
+
+## Active Next Slice: Projector + Replay Delivery (In Progress)
+
+- [ ] Implement Continuum episode projector (Bus -> Postgres) with idempotent upsert keying
+- [ ] Implement stale update rejection by monotonic `source_ts`
+- [ ] Implement DLQ emission path: `continuum.episode.dlq.v1`
+- [ ] Implement replay/backfill control path (`from_ts`, `to_ts`, `tenant_id`, `agent_id`, `dry_run`)
+- [ ] Add integration/regression suites for projector/replay/failure injection
 
 ## Epoch 1 Checkpoint 2.2 Progress
 

@@ -248,6 +248,50 @@ Exit criteria:
 - Reproducible build artifacts and tagged release.
 - PyPI publish pipeline validated.
 
+### Phase G: Continuum/Reflex Integration Track (Active)
+
+Goal: formalize and implement cross-product boundaries and event contracts without violating local hot-path ownership.
+
+Implementation:
+
+- Finalize and enforce the Continuum <-> Bus contract:
+  - Topic contract: `continuum.episode.v1`
+  - Projection contract: Bus -> Postgres
+  - Coordination contract: tenant-scoped Valkey keys only for shared hot state
+- Add integration adapters:
+  - Continuum event producer contract tests/fixtures
+  - Bus-side projector skeleton and idempotency guards (`event_id`, upsert key)
+  - Replay/backfill controls with DLQ (`continuum.episode.dlq.v1`)
+- Add Reflex integration boundary tests:
+  - Reflex hot-path remains local (`RAM/Sled`)
+  - Bus interaction is async publish/subscribe and cache-coordination only
+
+Primary files:
+
+- `docs/ArqonBus/spec/continuum_integration_contract.md`
+- `docs/ArqonBus/spec/00_master_spec.md`
+- `src/arqonbus/storage/postgres.py`
+- `src/arqonbus/storage/redis_streams.py`
+- `src/arqonbus/config/config.py`
+- `tests/unit/test_continuum_integration_contract.py`
+- `tests/integration/` (new projector/replay integration suites)
+
+Exit criteria:
+
+- Continuum/Reflex/Bus ownership boundaries codified and referenced from status + runbook.
+- Idempotent projection path implemented with stale-update guard.
+- Replay/backfill and DLQ paths are tested with failure injection.
+- Tenant-scoping for Valkey keys and Postgres row namespaces is enforced by tests.
+
+Test gate:
+
+- Contract + integration + regression suites for:
+  - event schema validation
+  - projector idempotency
+  - stale event rejection
+  - replay/backfill correctness
+  - tenant-isolation key/row checks
+
 ## 6) Test Strategy and Quality Gates
 
 Required suites per phase:
@@ -287,7 +331,8 @@ Additions required:
 3. Phase C (protocol/time semantics closure).
 4. Phase D (modularization and operator runtime formalization).
 5. Phase E (performance/governance hardening).
-6. Phase F (packaging/PyPI/releases).
+6. Phase G (Continuum/Reflex integration track).
+7. Phase F (packaging/PyPI/releases).
 
 ## 9) Definition of Done for “Full vNext Ambition”
 
