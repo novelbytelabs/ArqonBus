@@ -36,7 +36,7 @@ async def _run() -> int:
         print(f"ERROR: unable to reach Valkey/Redis at {redis_url}: {exc}")
         return 1
     finally:
-        await client.close()
+        await client.aclose()
 
 
 if __name__ == "__main__":

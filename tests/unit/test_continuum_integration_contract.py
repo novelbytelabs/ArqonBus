@@ -100,6 +100,15 @@ def valkey_key_is_tenant_prefixed(key: str) -> bool:
     return key.startswith("tenant:")
 
 
+def is_reflex_hotpath_pointer(content_ref: str) -> bool:
+    return content_ref.startswith(("sqlite://", "sled://", "ram://"))
+
+
+def contains_forbidden_hotpath_dump(payload: dict) -> bool:
+    forbidden = {"raw_content", "episode_body", "embedding_vector", "full_state_dump"}
+    return any(key in payload for key in forbidden)
+
+
 def test_contract_event_minimum_shape_is_valid():
     event = _build_event()
     assert validate_contract_event(event) == []
@@ -160,3 +169,16 @@ def test_fail_open_vs_fail_closed_contract_examples():
     publish_success = policy_allows_publish
     assert publish_success is False
 
+
+def test_reflex_boundary_requires_pointer_style_content_refs():
+    event = _build_event()
+    assert is_reflex_hotpath_pointer(event["payload"]["content_ref"]) is True
+    event["payload"]["content_ref"] = "postgres://projection/episode/01JYAAAAAAAAAAAAAAAAAAAAAA"
+    assert is_reflex_hotpath_pointer(event["payload"]["content_ref"]) is False
+
+
+def test_reflex_boundary_forbids_hotpath_state_dump_fields():
+    payload = _build_event()["payload"]
+    assert contains_forbidden_hotpath_dump(payload) is False
+    payload["full_state_dump"] = {"raw": "..." * 3}
+    assert contains_forbidden_hotpath_dump(payload) is True

@@ -1,7 +1,7 @@
 # Arqon Continuum <-> ArqonBus Integration Contract (v0.1)
 
-Status: Draft  
-Last Updated: 2026-02-19  
+Status: Active  
+Last Updated: 2026-02-20  
 Owners: ArqonBus + Arqon Continuum maintainers
 
 ## 1. Scope and Roles
@@ -105,3 +105,10 @@ Rules:
 4. Enable replay/backfill with operational runbook.
 5. Enforce alerts on lag, DLQ volume, and projection error rates.
 
+## 11. Reflex Boundary Rules
+
+- Reflex hot-path memory/indexing (`RAM/Sled`) remains in-process and local to Reflex.
+- Bus integration from Reflex is asynchronous (`publish/subscribe`) and coordination-only.
+- Bus contracts must not require Reflex to route canonical episode content through Valkey/Postgres.
+- Valkey usage for Reflex coordination remains tenant-scoped key families only.
+- Any Reflex-facing payload published through Bus should use references/pointers, not raw hot-path state dumps.

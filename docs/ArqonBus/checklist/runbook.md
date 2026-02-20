@@ -166,6 +166,7 @@ Continuum projector data migration/restore:
 
 - Runbook: `docs/ArqonBus/runbooks/continuum_projector_postgres_migration_backup_restore.md`
 - SQL migration: `scripts/migrations/20260220_continuum_projector_postgres.sql`
+- Combined rollout smoke checks: `scripts/manual_checks/rollout_smoke_check.sh`
 
 Tier-Omega flags:
 

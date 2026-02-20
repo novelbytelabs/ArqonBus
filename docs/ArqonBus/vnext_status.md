@@ -53,6 +53,8 @@ Out of scope for this slice:
 | M15: Protocol/time semantics test closure | Completed | Added monotonic sequence + vector-clock validation utilities, replay API strict sequence checks, and unit/integration/e2e/regression coverage including protobuf evolution regression. |
 | M16: History command-lane time semantics delivery | Completed | Added `op.history.get|replay` websocket command contracts, replay strict-sequence controls, and protobuf e2e command-lane coverage. |
 | M17: RC performance + CI hardening | Completed | Added replay/protobuf latency gates and aligned performance CI selector to run full performance marker suite. |
+| M18: Cross-project boundary codification (Continuum/Reflex) | Completed | Promoted Continuum contract to Active and codified Reflex integration boundary with executable contract tests. |
+| M19: Release candidate execution + rollout smoke artifacts | Completed | Published RC notes, added rollout smoke script, and captured full matrix verification evidence. |
 
 ## Phase 0 Completion Checklist
 

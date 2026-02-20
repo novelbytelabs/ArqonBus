@@ -193,6 +193,7 @@ graph TD
 ## 9. Companion Contracts
 
 - Continuum integration contract: `docs/ArqonBus/spec/continuum_integration_contract.md`
+- Reflex integration boundary: `docs/ArqonBus/spec/reflex_integration_boundary.md`
 
 ---
 **End of Specification**

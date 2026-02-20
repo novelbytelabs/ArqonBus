@@ -61,3 +61,4 @@ Release-gate closeout evidence:
 
 - `docs/ArqonBus/checklist/release_gate_closeout_2026-02-20.md`
 - `docs/ArqonBus/checklist/release_candidate_hardening_2026-02-20.md`
+- `docs/ArqonBus/releases/2026-02-20_v0.1.0-rc1.md`

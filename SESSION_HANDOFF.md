@@ -6,6 +6,19 @@ Last updated: 2026-02-20
 Productionization and Continuum integration slices are complete through projector persistence, operational hardening, CI postgres gating, and release-gate closeout hardening.
 
 ## Latest completed work (unreleased in this handoff snapshot)
+- Added release-candidate notes artifact:
+  - `docs/ArqonBus/releases/2026-02-20_v0.1.0-rc1.md`
+- Added rollout smoke automation script:
+  - `scripts/manual_checks/rollout_smoke_check.sh`
+- Added Reflex integration boundary spec and linked companion references:
+  - `docs/ArqonBus/spec/reflex_integration_boundary.md`
+  - `docs/ArqonBus/spec/00_master_spec.md`
+  - `docs/ArqonBus/spec/continuum_integration_contract.md`
+- Extended executable cross-project boundary checks:
+  - `tests/unit/test_continuum_integration_contract.py`
+- Updated runbook/status for release execution track:
+  - `docs/ArqonBus/checklist/runbook.md`
+  - `docs/ArqonBus/vnext_status.md`
 - Added websocket command-lane history semantics:
   - `src/arqonbus/transport/websocket_bus.py` (`op.history.get|replay` + aliases)
   - room-scoped fail-closed access for non-admin clients
