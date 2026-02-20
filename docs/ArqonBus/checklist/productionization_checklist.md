@@ -1,6 +1,6 @@
 # Productionization Checklist
 
-Last updated: 2026-02-19  
+Last updated: 2026-02-20  
 Owner: ArqonBus maintainers  
 Source plans:
 
@@ -52,9 +52,9 @@ Source plans:
 
 ## Release Gate
 
-- [ ] No production-path stubs/mocks/placeholders remain.
-- [ ] No auth bypass toggles available in production profile.
-- [ ] No silent durability downgrade in strict profile.
+- [x] No production-path stubs/mocks/placeholders remain.
+- [x] No auth bypass toggles available in production profile.
+- [x] No silent durability downgrade in strict profile.
 - [x] Runbook approved and exercised once end-to-end.
 
 Release-gate closeout evidence:

@@ -10,23 +10,19 @@ from arqonbus.transport.websocket_bus import WebSocketBus
 
 
 @pytest.mark.asyncio
-async def test_synthesis_operator_fails_closed_in_production(monkeypatch):
-    monkeypatch.setenv("ARQONBUS_ENVIRONMENT", "production")
-    monkeypatch.delenv("ARQONBUS_ENABLE_PROTOTYPE_RSI", raising=False)
-
-    operator = SynthesisOperator("op-phase3", ["synthesis"])
-    with pytest.raises(RuntimeError, match="disabled in production"):
-        await operator.process(State(context={"variant": "speed"}))
-
-
-@pytest.mark.asyncio
-async def test_synthesis_operator_can_run_when_explicitly_enabled(monkeypatch):
-    monkeypatch.setenv("ARQONBUS_ENVIRONMENT", "production")
-    monkeypatch.setenv("ARQONBUS_ENABLE_PROTOTYPE_RSI", "true")
-
+async def test_synthesis_operator_safety_variant_returns_guardrail_action():
     operator = SynthesisOperator("op-phase3", ["synthesis"])
     action = await operator.process(State(context={"variant": "safety"}))
     assert action.description.startswith("Safety:")
+    assert action.payload["assert"] == "error_rate < 0.02"
+
+
+@pytest.mark.asyncio
+async def test_synthesis_operator_speed_variant_returns_tune_action():
+    operator = SynthesisOperator("op-phase3", ["synthesis"])
+    action = await operator.process(State(context={"variant": "speed", "latency_p99_ms": 120}))
+    assert action.description.startswith("Performance:")
+    assert action.payload["param"] == "dispatch_batch_size"
 
 
 @pytest.mark.asyncio

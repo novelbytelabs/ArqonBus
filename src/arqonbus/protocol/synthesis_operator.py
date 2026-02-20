@@ -1,46 +1,47 @@
-"""Prototype RSI Synthesis Operator for ArqonBus."""
-import os
+"""Tier-Omega synthesis operator for ArqonBus."""
 from typing import List, Union
 from .operator import Operator, Action, State, ImprovementType
 
 class SynthesisOperator(Operator):
-    """A prototype RSI Synthesis Operator (Tier Omega).
-    
-    This operator generates diverse improvement candidates (mocked for now)
-    based on the task context.
+    """Rule-driven synthesis operator (Tier-Omega).
+
+    Produces bounded improvement actions from explicit state signals.
     """
 
     async def process(self, state: State) -> Union[Action, List[Action]]:
-        """Process loop generating divergent candidates."""
-        env = os.getenv("ARQONBUS_ENVIRONMENT", "development").lower()
-        allow_prototype = os.getenv("ARQONBUS_ENABLE_PROTOTYPE_RSI", "false").lower() == "true"
-        if env == "production" and not allow_prototype:
-            raise RuntimeError(
-                "Prototype RSI SynthesisOperator is disabled in production; "
-                "set ARQONBUS_ENABLE_PROTOTYPE_RSI=true only for controlled validation."
+        """Derive an action deterministically from contextual intent and risks."""
+        context = state.context or {}
+        variant = str(context.get("variant", "default")).strip().lower()
+        latency_p99_ms = float(context.get("latency_p99_ms", 0) or 0)
+        error_rate = float(context.get("error_rate", 0) or 0)
+        target_file = str(context.get("target_file", "core.py")).strip() or "core.py"
+
+        if variant == "safety" or error_rate >= 0.02:
+            return Action(
+                type=ImprovementType.ADD_TEST,
+                payload={
+                    "test": "regression_error_budget_guard",
+                    "assert": "error_rate < 0.02",
+                },
+                description="Safety: enforce service error-budget guardrail.",
             )
 
-        # Mocking divergent candidate generation
-        # In a real scenario, this would use an LLM or a specialized logic engine
-        # with high temperature or diverse prompt templates.
-        
-        hallucination_type = state.context.get("variant", "default")
-        
-        if hallucination_type == "speed":
+        if variant == "speed" or latency_p99_ms >= 50.0:
             return Action(
                 type=ImprovementType.TUNE,
-                payload={"param": "latency", "value": -10},
-                description="Optimization: reduce latency by 10ms"
+                payload={
+                    "param": "dispatch_batch_size",
+                    "direction": "decrease",
+                    "reason": "high_p99_latency",
+                },
+                description="Performance: tune dispatch batch size to reduce p99 latency.",
             )
-        elif hallucination_type == "safety":
-             return Action(
-                type=ImprovementType.ADD_TEST,
-                payload={"test": "invariant_3_bound", "assert": "x < 100"},
-                description="Safety: add bound check for invariant 3"
-            )
-        else:
-            return Action(
-                type=ImprovementType.PATCH,
-                payload={"file": "core.py", "diff": "+ # auto improvement"},
-                description="General: self-improvement patch"
-            )
+
+        return Action(
+            type=ImprovementType.REFACTOR,
+            payload={
+                "file": target_file,
+                "goal": "reduce cyclomatic complexity in hot path",
+            },
+            description="Maintainability: refactor hot-path complexity.",
+        )

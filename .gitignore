@@ -142,6 +142,7 @@ static/
 *.log
 *.sqlite
 *.sqlite3
+dump.rdb
 
 # Temporary files
 *~

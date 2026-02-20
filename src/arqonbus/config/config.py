@@ -714,6 +714,11 @@ def startup_preflight_errors(config: Optional[ArqonBusConfig] = None) -> List[st
                 "Dual data stack requires ARQONBUS_POSTGRES_URL for durable shared state"
             )
 
+    if cfg_environment == "prod" and os.getenv("JWT_SKIP_VALIDATION") is not None:
+        errors.append(
+            "JWT_SKIP_VALIDATION is forbidden in production preflight"
+        )
+
     return errors
 
 # Backward compatibility alias for older tests/config consumers

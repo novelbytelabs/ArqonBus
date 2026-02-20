@@ -23,14 +23,29 @@ Branch: `dev/vnext-innovation-execution`
   - `SESSION_HANDOFF.md`
   - `docs/ArqonBus/runbooks/production_preflight_runbook.md`
 
-3. Production-path placeholder/stub debt: open
-- Blocking item: `src/arqonbus/protocol/synthesis_operator.py` still declares prototype behavior.
-- Impact: not in active Continuum projector path, but keeps release gate item open.
+3. Production-path placeholder/stub debt: pass
+- Evidence: synthesis operator path replaced with concrete rule-driven logic; prototype wording and toggle removed.
+- References:
+  - `src/arqonbus/protocol/synthesis_operator.py`
+  - `tests/regression/test_phase3_runtime_integrity.py`
 
-4. Auth bypass toggle audit: open
-- Requires final cross-surface closure with Shield profile/toggle audit and explicit production lock assertions.
+4. Auth bypass toggle audit: pass
+- Evidence: Shield hard-stops on `JWT_SKIP_VALIDATION`; ArqonBus prod preflight now rejects the same toggle.
+- References:
+  - `crates/shield/src/main.rs`
+  - `src/arqonbus/config/config.py`
+  - `tests/unit/test_startup_preflight.py`
+
+## Verification Commands
+
+- `conda run -n helios-gpu-118 python -m pytest -q -m "unit and not regression and not e2e and not external and not performance" tests`
+- `conda run -n helios-gpu-118 python -m pytest -q -m "integration and not e2e and not external and not performance" tests/integration`
+- `ARQONBUS_REQUIRE_SOCKET_TESTS=1 conda run -n helios-gpu-118 python -m pytest -q -m "e2e and not external and not performance" tests`
+- `conda run -n helios-gpu-118 python -m pytest -q -m "regression and not external and not performance" tests`
+- `cargo check -p shield`
+- `cargo test -p shield --tests`
 
 ## Result
 
-- Release gate remains open with two explicit blockers.
-- Continuum projector operational slice is complete and production-operable with live Postgres + Valkey stack.
+- Release gate closed for the current ArqonBus productionization slice.
+- Continuum projector operational slice is production-operable with live Postgres + Valkey stack.

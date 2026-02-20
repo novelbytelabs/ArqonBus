@@ -51,6 +51,7 @@ def test_startup_preflight_strict_storage_requires_redis_url(monkeypatch):
     monkeypatch.setenv("ARQONBUS_SERVER_PORT", "9100")
     monkeypatch.setenv("ARQONBUS_STORAGE_MODE", "strict")
     monkeypatch.delenv("ARQONBUS_REDIS_URL", raising=False)
+    monkeypatch.delenv("ARQONBUS_VALKEY_URL", raising=False)
 
     cfg = ArqonBusConfig()
     cfg.storage.mode = "strict"
@@ -156,6 +157,23 @@ def test_startup_preflight_non_strict_allows_defaults(monkeypatch):
     cfg.environment = "dev"
 
     assert startup_preflight_errors(cfg) == []
+
+
+def test_prod_preflight_rejects_jwt_skip_validation_toggle(monkeypatch):
+    monkeypatch.delenv("ARQONBUS_PREFLIGHT_STRICT", raising=False)
+    monkeypatch.setenv("JWT_SKIP_VALIDATION", "1")
+    monkeypatch.setenv("ARQONBUS_SERVER_HOST", "127.0.0.1")
+    monkeypatch.setenv("ARQONBUS_SERVER_PORT", "9100")
+    monkeypatch.setenv("ARQONBUS_STORAGE_MODE", "strict")
+    monkeypatch.setenv("ARQONBUS_VALKEY_URL", "redis://127.0.0.1:6379/0")
+    monkeypatch.setenv("ARQONBUS_POSTGRES_URL", "postgresql://127.0.0.1:5432/arqonbus")
+
+    cfg = ArqonBusConfig()
+    cfg.environment = "prod"
+    cfg.storage.mode = "strict"
+    cfg.storage.backend = "postgres"
+    errors = startup_preflight_errors(cfg)
+    assert any("JWT_SKIP_VALIDATION is forbidden" in e for e in errors)
 
 
 def test_environment_name_normalization_accepts_profile_aliases():

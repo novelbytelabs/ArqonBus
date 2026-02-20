@@ -3,7 +3,7 @@
 Last updated: 2026-02-20
 
 ## Current status
-Productionization and Continuum integration slices are complete through projector persistence, operational hardening, and CI postgres gating.
+Productionization and Continuum integration slices are complete through projector persistence, operational hardening, CI postgres gating, and release-gate closeout hardening.
 
 ## Latest completed work (unreleased in this handoff snapshot)
 - Added Postgres-backed socket e2e test for Continuum projector lane:
@@ -18,6 +18,14 @@ Productionization and Continuum integration slices are complete through projecto
   - `.github/workflows/arqonbus-tests.yml`
 - Added release-gate closeout note:
   - `docs/ArqonBus/checklist/release_gate_closeout_2026-02-20.md`
+- Replaced synthesis prototype behavior with concrete deterministic operator logic:
+  - `src/arqonbus/protocol/synthesis_operator.py`
+  - `tests/regression/test_phase3_runtime_integrity.py`
+- Added production preflight rejection for auth bypass toggle:
+  - `src/arqonbus/config/config.py`
+  - `tests/unit/test_startup_preflight.py`
+- Added ignore for local Valkey snapshot artifact:
+  - `.gitignore` (`dump.rdb`)
 
 ## Recent completed work (latest first)
 - `fe8a34a` - `hardening: require valkey+postgres stack in prod preflight`
