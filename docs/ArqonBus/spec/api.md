@@ -599,7 +599,7 @@ arqonbus_command_executions_total{command="ping"} 50
   "description": "ArqonBus Core Message Bus",
   "architecture": {
     "transport": "WebSocket",
-    "protocol": "JSON Envelope",
+    "protocol": "Protobuf Envelope (infra), JSON adapters (human-facing)",
     "storage": "Memory (optional Redis Streams)",
     "telemetry": "WebSocket",
     "monitoring": "HTTP Endpoints"

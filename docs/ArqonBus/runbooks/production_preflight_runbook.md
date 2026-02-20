@@ -22,6 +22,8 @@ Provide operators a deterministic preflight process before starting ArqonBus/Shi
 - [ ] `ARQONBUS_VALKEY_URL` (or `ARQONBUS_REDIS_URL`) configured and reachable.
 - [ ] `ARQONBUS_POSTGRES_URL` configured and reachable.
 - [ ] `ARQONBUS_REQUIRE_DUAL_DATA_STACK` left default (`true` in prod) unless approved exception.
+- [ ] `ARQONBUS_INFRA_PROTOCOL=protobuf`.
+- [ ] `ARQONBUS_ALLOW_JSON_INFRA=false`.
 - [ ] `ARQONBUS_TELEMETRY_HOST` / `ARQONBUS_TELEMETRY_PORT` configured.
 
 ## Shield

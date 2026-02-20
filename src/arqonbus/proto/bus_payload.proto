@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package arqon.pybus.v1;
+
+import "google/protobuf/struct.proto";
+
+message BusPayload {
+  string envelope_id = 1;
+  string envelope_type = 2;
+  string version = 3;
+  string sender = 4;
+  string channel = 5;
+  string command = 6;
+  string request_id = 7;
+  string status = 8;
+  string error = 9;
+  string error_code = 10;
+  string from_client = 11;
+  string to_client = 12;
+  google.protobuf.Struct payload = 20;
+  google.protobuf.Struct args = 21;
+  google.protobuf.Struct metadata = 22;
+}

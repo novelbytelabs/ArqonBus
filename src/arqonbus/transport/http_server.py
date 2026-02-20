@@ -426,7 +426,7 @@ class ArqonBusHTTPServer:
                 "description": "ArqonBus Core Message Bus",
                 "architecture": {
                     "transport": "WebSocket",
-                    "protocol": "JSON Envelope",
+                    "protocol": "Protobuf Envelope (infra), JSON adapters (human-facing)",
                     "storage": "Redis Streams (optional)",
                     "telemetry": "WebSocket",
                     "monitoring": "HTTP Endpoints"

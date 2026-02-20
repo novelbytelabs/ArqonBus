@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from .interface import HistoryEntry, StorageBackend, StorageResult
 from .memory import MemoryStorageBackend
 from ..protocol.envelope import Envelope
+from ..protocol.protobuf_codec import envelope_from_proto_bytes, envelope_to_proto_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +108,11 @@ class PostgresStorageBackend(StorageBackend):
             channel TEXT NOT NULL,
             sender TEXT,
             stored_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            envelope JSONB NOT NULL
+            envelope JSONB NOT NULL,
+            envelope_proto BYTEA
         );
+        ALTER TABLE arqonbus_message_history
+          ADD COLUMN IF NOT EXISTS envelope_proto BYTEA;
         CREATE INDEX IF NOT EXISTS idx_arqonbus_room_channel_stored_at
           ON arqonbus_message_history (room, channel, stored_at DESC);
         CREATE INDEX IF NOT EXISTS idx_arqonbus_stored_at
@@ -178,12 +182,13 @@ class PostgresStorageBackend(StorageBackend):
             room = envelope.room or "default"
             channel = envelope.channel or "default"
             envelope_json = json.dumps(envelope.to_dict())
+            envelope_proto = envelope_to_proto_bytes(envelope)
             async with self.pool.acquire() as conn:
                 await conn.execute(
                     """
                     INSERT INTO arqonbus_message_history
-                        (message_id, room, channel, sender, envelope)
-                    VALUES ($1, $2, $3, $4, $5::jsonb)
+                        (message_id, room, channel, sender, envelope, envelope_proto)
+                    VALUES ($1, $2, $3, $4, $5::jsonb, $6::bytea)
                     ON CONFLICT (message_id) DO NOTHING
                     """,
                     envelope.id,
@@ -191,6 +196,7 @@ class PostgresStorageBackend(StorageBackend):
                     channel,
                     envelope.sender,
                     envelope_json,
+                    envelope_proto,
                 )
             return StorageResult(
                 success=True,
@@ -242,7 +248,7 @@ class PostgresStorageBackend(StorageBackend):
             params.append(max(1, int(limit)))
 
             query = f"""
-                SELECT envelope, stored_at
+                SELECT envelope, envelope_proto, stored_at
                 FROM arqonbus_message_history
                 {where_clause}
                 ORDER BY stored_at DESC
@@ -254,10 +260,18 @@ class PostgresStorageBackend(StorageBackend):
 
             entries: List[HistoryEntry] = []
             for row in rows:
-                envelope_dict = json.loads(row["envelope"]) if isinstance(row["envelope"], str) else (row["envelope"] or {})
+                if row.get("envelope_proto"):
+                    envelope = envelope_from_proto_bytes(bytes(row["envelope_proto"]))
+                else:
+                    envelope_dict = (
+                        json.loads(row["envelope"])
+                        if isinstance(row["envelope"], str)
+                        else (row["envelope"] or {})
+                    )
+                    envelope = Envelope.from_dict(envelope_dict)
                 entries.append(
                     HistoryEntry(
-                        envelope=Envelope.from_dict(envelope_dict),
+                        envelope=envelope,
                         stored_at=row["stored_at"],
                         storage_metadata={"backend": "postgres"},
                     )

@@ -48,6 +48,7 @@ Out of scope for this slice:
 | M10: Production data-stack hardening | Completed | Production preflight now requires both Valkey and Postgres URLs by default, plus real connectivity checks. |
 | M11: Continuum projector operational hardening | Completed | Added Postgres-backed socket e2e, projector metrics/alerts, migration+backup/restore runbook, and CI Postgres integration stage. |
 | M12: Release-gate closeout hardening | Completed | Removed synthesis prototype path, blocked `JWT_SKIP_VALIDATION` in prod preflight, and validated full Python+Shield gates. |
+| M13: Protobuf-first infrastructure closure | Completed | Added canonical Rust envelope protobuf codec in Python, protobuf wire support, and protobuf-first storage persistence with JSON adapters constrained to human-facing paths. |
 
 ## Phase 0 Completion Checklist
 

@@ -126,6 +126,12 @@ class Envelope:
         """Convert envelope to JSON string."""
         import json
         return json.dumps(self.to_dict())
+
+    def to_proto_bytes(self) -> bytes:
+        """Convert envelope to protobuf bytes for infrastructure transport."""
+        from .protobuf_codec import envelope_to_proto_bytes
+
+        return envelope_to_proto_bytes(self)
     
     @classmethod
     def from_json(cls, json_str: str) -> "Envelope":
@@ -133,6 +139,13 @@ class Envelope:
         import json
         data = json.loads(json_str)
         return cls.from_dict(data)
+
+    @classmethod
+    def from_proto_bytes(cls, payload: bytes) -> "Envelope":
+        """Create envelope from protobuf bytes."""
+        from .protobuf_codec import envelope_from_proto_bytes
+
+        return envelope_from_proto_bytes(payload)
     
     def validate(self) -> List[str]:
         """Validate envelope and return list of validation errors."""

@@ -1628,6 +1628,20 @@ class WebSocketBus:
             "signal": signal,
         }
 
+    def _wire_format_for_websocket(self, websocket: Any) -> str:
+        wire_format = getattr(websocket, "_arqon_wire_format", None)
+        if wire_format in ("json", "protobuf"):
+            return wire_format
+        if self.config.infra_protocol == "protobuf" and not self.config.allow_json_infra:
+            return "protobuf"
+        return "json"
+
+    async def _send_envelope_wire(self, websocket: Any, envelope: Envelope, wire_format: str) -> None:
+        if wire_format == "protobuf":
+            await websocket.send(envelope.to_proto_bytes())
+            return
+        await websocket.send(envelope.to_json())
+
     async def _handle_connection(self, websocket: Any):
         """Handle new WebSocket connection.
         
@@ -1671,14 +1685,17 @@ class WebSocketBus:
                 payload={"welcome": "Connected to ArqonBus", "client_id": client_id},
                 sender="arqonbus"
             )
-            await websocket.send(welcome_msg.to_json())
+            await self._send_envelope_wire(
+                websocket,
+                welcome_msg,
+                self._wire_format_for_websocket(websocket),
+            )
             # Track connection event for telemetry-style stats
             self._stats["events_emitted"] += 1
             
             # Handle incoming messages
-            async for message_str in websocket:
-
-                await self._handle_message_from_client(client_id, websocket, message_str)
+            async for message_data in websocket:
+                await self._handle_message_from_client(client_id, websocket, message_data)
                 
         except ConnectionClosed:
             logger.info(f"Client {client_id} disconnected normally")
@@ -1690,17 +1707,35 @@ class WebSocketBus:
             if client_id:
                 await self._disconnect_client(client_id)
     
-    async def _handle_message_from_client(self, client_id: str, websocket: Any, message_str: str):
+    async def _handle_message_from_client(self, client_id: str, websocket: Any, message_data: Any):
         """Handle incoming message from client.
         
         Args:
             client_id: Client who sent the message
             websocket: Client's WebSocket connection
-            message_str: Raw message string
+            message_data: Raw message payload (JSON text or protobuf bytes)
         """
         try:
             # Parse and validate message
-            envelope, validation_errors = EnvelopeValidator.validate_and_parse_json(message_str)
+            envelope, validation_errors, wire_format = EnvelopeValidator.validate_and_parse_wire(message_data)
+            setattr(websocket, "_arqon_wire_format", wire_format)
+
+            if (
+                wire_format == "json"
+                and self.config.infra_protocol == "protobuf"
+                and not self.config.allow_json_infra
+                and envelope.type in {"message", "command", "response", "error", "telemetry", "operator.join"}
+            ):
+                error_msg = Envelope(
+                    type="error",
+                    request_id=envelope.id,
+                    error="JSON wire format is forbidden for infrastructure traffic",
+                    error_code="INFRA_PROTOCOL_ERROR",
+                    payload={"required_protocol": "protobuf"},
+                    sender="arqonbus",
+                )
+                await self._send_envelope_wire(websocket, error_msg, wire_format)
+                return
             
             if validation_errors:
                 error_msg = Envelope(
@@ -1711,7 +1746,7 @@ class WebSocketBus:
                     payload={"errors": validation_errors},
                     sender="arqonbus"
                 )
-                await websocket.send(error_msg.to_json())
+                await self._send_envelope_wire(websocket, error_msg, wire_format)
                 return
             
             # Add client info to envelope
@@ -1741,7 +1776,7 @@ class WebSocketBus:
                         room=envelope.room,
                         channel=envelope.channel,
                     )
-                    await websocket.send(error_msg.to_json())
+                    await self._send_envelope_wire(websocket, error_msg, wire_format)
                     return
             
             # Route message based on type
@@ -1759,7 +1794,7 @@ class WebSocketBus:
                     payload=envelope.payload,
                     sender="arqonbus"
                 )
-                await websocket.send(ack.to_json())
+                await self._send_envelope_wire(websocket, ack, wire_format)
             elif envelope.type == "command":
                 ack = Envelope(
                     id=envelope.id,
@@ -1768,7 +1803,7 @@ class WebSocketBus:
                     payload={"result": "ok"},
                     sender="arqonbus"
                 )
-                await websocket.send(ack.to_json())
+                await self._send_envelope_wire(websocket, ack, wire_format)
             
         except Exception as e:
             logger.error(f"Error processing message from client {client_id}: {e}")
@@ -1782,7 +1817,11 @@ class WebSocketBus:
                 sender="arqonbus"
             )
             try:
-                await websocket.send(error_msg.to_json())
+                await self._send_envelope_wire(
+                    websocket,
+                    error_msg,
+                    self._wire_format_for_websocket(websocket),
+                )
             except Exception as exc:
                 logger.warning(
                     "Failed to send error envelope to client %s: %s",
@@ -2461,7 +2500,8 @@ class WebSocketBus:
         try:
             client_info = await self.client_registry.get_client(client_id)
             if client_info:
-                await client_info.websocket.send(envelope.to_json())
+                wire_format = self._wire_format_for_websocket(client_info.websocket)
+                await self._send_envelope_wire(client_info.websocket, envelope, wire_format)
                 return True
         except ConnectionClosed:
             logger.info(f"Client {client_id} disconnected during send")

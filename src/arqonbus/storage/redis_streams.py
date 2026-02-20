@@ -5,6 +5,7 @@ for scalable message persistence and history retrieval.
 """
 
 import json
+import base64
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
@@ -23,6 +24,7 @@ except ImportError:
     REDIS_AVAILABLE = False
 
 from ..protocol.envelope import Envelope
+from ..protocol.protobuf_codec import envelope_from_proto_bytes, envelope_to_proto_bytes
 from ..utils.logging import get_logger
 from .interface import StorageBackend, StorageResult, HistoryEntry
 from .memory import MemoryStorageBackend
@@ -235,7 +237,8 @@ class RedisStreamsStorage(StorageBackend):
                 "sender": envelope.sender or "",
                 "room": envelope.room or "",
                 "channel": envelope.channel or "",
-                "payload": json.dumps(envelope.payload) if envelope.payload else "{}"
+                "payload": json.dumps(envelope.payload) if envelope.payload else "{}",
+                "envelope_proto_b64": base64.b64encode(envelope_to_proto_bytes(envelope)).decode("ascii"),
             }
             
             # Main message stream
@@ -344,15 +347,19 @@ class RedisStreamsStorage(StorageBackend):
                     if until and timestamp >= until:
                         continue
                     
-                    envelope = Envelope(
-                        id=msg_data.get("id", ""),
-                        type=msg_data.get("type", ""),
-                        timestamp=timestamp,
-                        sender=msg_data.get("sender") or None,
-                        room=msg_data.get("room") or None,
-                        channel=msg_data.get("channel") or None,
-                        payload=json.loads(msg_data.get("payload", "{}"))
-                    )
+                    proto_b64 = msg_data.get("envelope_proto_b64")
+                    if proto_b64:
+                        envelope = envelope_from_proto_bytes(base64.b64decode(proto_b64))
+                    else:
+                        envelope = Envelope(
+                            id=msg_data.get("id", ""),
+                            type=msg_data.get("type", ""),
+                            timestamp=timestamp,
+                            sender=msg_data.get("sender") or None,
+                            room=msg_data.get("room") or None,
+                            channel=msg_data.get("channel") or None,
+                            payload=json.loads(msg_data.get("payload", "{}"))
+                        )
                     
                     history_entry = HistoryEntry(
                         envelope=envelope,

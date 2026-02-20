@@ -27,6 +27,9 @@ Profile contract:
   - shared hot-state URL: `ARQONBUS_VALKEY_URL` (or `ARQONBUS_REDIS_URL`)
   - durable shared-state URL: `ARQONBUS_POSTGRES_URL`
   - override only with explicit exception: `ARQONBUS_REQUIRE_DUAL_DATA_STACK=false`
+- Infra protocol contract in `staging`/`prod`:
+  - `ARQONBUS_INFRA_PROTOCOL=protobuf`
+  - `ARQONBUS_ALLOW_JSON_INFRA=false`
 
 ```bash
 # Required environment variables for production
@@ -45,6 +48,8 @@ export ARQONBUS_ENABLE_TELEMETRY=true
 export ARQONBUS_ENABLE_AUTH=true
 export ARQONBUS_AUTH_JWT_SECRET=replace-with-strong-secret
 export ARQONBUS_AUTH_JWT_ALGORITHM=HS256
+export ARQONBUS_INFRA_PROTOCOL=protobuf
+export ARQONBUS_ALLOW_JSON_INFRA=false
 export ARQONBUS_DEBUG=false
 ```
 
@@ -498,6 +503,8 @@ python -m arqonbus.main --storage-backend memory
 | `ARQONBUS_POSTGRES_USER` | arqonbus | Postgres user |
 | `ARQONBUS_POSTGRES_PASSWORD` | None | Postgres password |
 | `ARQONBUS_REQUIRE_DUAL_DATA_STACK` | true in `prod`, else false | Require both Valkey and Postgres URLs in preflight |
+| `ARQONBUS_INFRA_PROTOCOL` | protobuf | Infrastructure wire protocol (`protobuf` or `json`) |
+| `ARQONBUS_ALLOW_JSON_INFRA` | true in `dev`, false otherwise | Allow JSON envelopes on infrastructure wire |
 | `ARQONBUS_OMEGA_RUNTIME` | memory | Tier-Omega runtime (`memory` or `firecracker`) |
 | `ARQONBUS_OMEGA_FIRECRACKER_BIN` | firecracker | Firecracker binary path/name |
 | `ARQONBUS_OMEGA_KERNEL_IMAGE` | None | Firecracker kernel image path |

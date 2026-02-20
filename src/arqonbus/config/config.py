@@ -211,6 +211,8 @@ class ArqonBusConfig:
     
     # Feature Flags
     holonomy_enabled: bool = False
+    infra_protocol: str = "protobuf"  # protobuf|json
+    allow_json_infra: bool = True
     
     # Environment-specific overrides
     environment: str = "development"
@@ -378,6 +380,12 @@ class ArqonBusConfig:
         raw_environment = os.getenv("ARQONBUS_ENVIRONMENT", config.environment)
         config.environment = normalize_environment_name(raw_environment)
         config.debug = os.getenv("ARQONBUS_DEBUG", "false").lower() == "true"
+        config.infra_protocol = os.getenv("ARQONBUS_INFRA_PROTOCOL", config.infra_protocol).strip().lower()
+        allow_json_raw = os.getenv("ARQONBUS_ALLOW_JSON_INFRA")
+        if allow_json_raw is None:
+            config.allow_json_infra = config.environment == "dev"
+        else:
+            config.allow_json_infra = allow_json_raw.strip().lower() == "true"
         
         return config
     
@@ -442,6 +450,8 @@ class ArqonBusConfig:
             errors.append(f"Unsupported JWT algorithm: {self.security.jwt_algorithm}")
         if self.environment not in ("dev", "staging", "prod"):
             errors.append(f"Unsupported environment profile: {self.environment}")
+        if self.infra_protocol not in ("protobuf", "json"):
+            errors.append(f"Unsupported infra protocol: {self.infra_protocol}")
 
         # CASIL validation
         if self.casil.mode not in ("monitor", "enforce"):
@@ -575,7 +585,9 @@ class ArqonBusConfig:
                 "max_vms": self.tier_omega.max_vms,
             },
             "environment": self.environment,
-            "debug": self.debug
+            "debug": self.debug,
+            "infra_protocol": self.infra_protocol,
+            "allow_json_infra": self.allow_json_infra,
         }
 
 
@@ -718,6 +730,11 @@ def startup_preflight_errors(config: Optional[ArqonBusConfig] = None) -> List[st
         errors.append(
             "JWT_SKIP_VALIDATION is forbidden in production preflight"
         )
+    if cfg_environment in ("staging", "prod"):
+        if cfg.infra_protocol != "protobuf":
+            errors.append("Infrastructure protocol must be protobuf in staging/prod")
+        if cfg.allow_json_infra:
+            errors.append("ARQONBUS_ALLOW_JSON_INFRA must be false in staging/prod")
 
     return errors
 

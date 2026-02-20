@@ -176,6 +176,25 @@ def test_prod_preflight_rejects_jwt_skip_validation_toggle(monkeypatch):
     assert any("JWT_SKIP_VALIDATION is forbidden" in e for e in errors)
 
 
+def test_prod_preflight_requires_protobuf_infra_protocol(monkeypatch):
+    monkeypatch.delenv("ARQONBUS_PREFLIGHT_STRICT", raising=False)
+    monkeypatch.setenv("ARQONBUS_SERVER_HOST", "127.0.0.1")
+    monkeypatch.setenv("ARQONBUS_SERVER_PORT", "9100")
+    monkeypatch.setenv("ARQONBUS_STORAGE_MODE", "strict")
+    monkeypatch.setenv("ARQONBUS_VALKEY_URL", "redis://127.0.0.1:6379/0")
+    monkeypatch.setenv("ARQONBUS_POSTGRES_URL", "postgresql://127.0.0.1:5432/arqonbus")
+
+    cfg = ArqonBusConfig()
+    cfg.environment = "prod"
+    cfg.storage.mode = "strict"
+    cfg.storage.backend = "postgres"
+    cfg.infra_protocol = "json"
+    cfg.allow_json_infra = True
+    errors = startup_preflight_errors(cfg)
+    assert any("Infrastructure protocol must be protobuf" in e for e in errors)
+    assert any("ARQONBUS_ALLOW_JSON_INFRA must be false" in e for e in errors)
+
+
 def test_environment_name_normalization_accepts_profile_aliases():
     assert normalize_environment_name("development") == "dev"
     assert normalize_environment_name("DEV") == "dev"

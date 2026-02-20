@@ -151,6 +151,32 @@ class EnvelopeValidator:
             
         errors = cls.validate_envelope(envelope)
         return envelope, errors
+
+    @classmethod
+    def validate_and_parse_protobuf(cls, payload: bytes) -> Tuple[Envelope, List[str]]:
+        """Parse protobuf payload into envelope and validate it."""
+        try:
+            envelope = Envelope.from_proto_bytes(payload)
+        except Exception as e:
+            raise ValidationError(f"Invalid protobuf envelope: {e}")
+
+        errors = cls.validate_envelope(envelope)
+        return envelope, errors
+
+    @classmethod
+    def validate_and_parse_wire(cls, wire_data: Any) -> Tuple[Envelope, List[str], str]:
+        """Parse incoming wire data.
+
+        Returns:
+            (envelope, validation_errors, wire_format) where wire_format is `json` or `protobuf`.
+        """
+        if isinstance(wire_data, (bytes, bytearray)):
+            envelope, errors = cls.validate_and_parse_protobuf(bytes(wire_data))
+            return envelope, errors, "protobuf"
+        if isinstance(wire_data, str):
+            envelope, errors = cls.validate_and_parse_json(wire_data)
+            return envelope, errors, "json"
+        raise ValidationError(f"Unsupported wire payload type: {type(wire_data).__name__}")
     
     @classmethod
     def is_valid(cls, envelope: Envelope) -> bool:

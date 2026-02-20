@@ -87,3 +87,27 @@ async def test_handle_telemetry_persists_with_defaults_without_room_channel():
 
     storage.store_message.assert_awaited_once()
     client_registry.broadcast_to_room_channel.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_json_infra_wire_rejected_when_protobuf_required():
+    config = ArqonBusConfig()
+    config.infra_protocol = "protobuf"
+    config.allow_json_infra = False
+    config.casil.enabled = False
+    client_registry = MagicMock()
+    client_registry.update_client_activity = AsyncMock()
+    bus = WebSocketBus(client_registry=client_registry, config=config)
+
+    websocket = MagicMock()
+    websocket.send = AsyncMock()
+    message = (
+        '{"id":"arq_msg_1","type":"command","timestamp":"2026-02-20T00:00:00+00:00",'
+        '"version":"1.0","command":"status","args":{}}'
+    )
+
+    await bus._handle_message_from_client("client-1", websocket, message)
+    websocket.send.assert_awaited_once()
+    sent = websocket.send.await_args.args[0]
+    assert isinstance(sent, str)
+    assert "INFRA_PROTOCOL_ERROR" in sent

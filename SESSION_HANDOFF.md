@@ -26,6 +26,19 @@ Productionization and Continuum integration slices are complete through projecto
   - `tests/unit/test_startup_preflight.py`
 - Added ignore for local Valkey snapshot artifact:
   - `.gitignore` (`dump.rdb`)
+- Added protobuf-first infrastructure envelope codec and wire parsing:
+  - `src/arqonbus/protocol/protobuf_codec.py`
+  - `src/arqonbus/protocol/envelope.py`
+  - `src/arqonbus/protocol/validator.py`
+  - `src/arqonbus/proto/envelope_pb2.py`
+  - `src/arqonbus/proto/bus_payload.proto`
+  - `src/arqonbus/proto/bus_payload_pb2.py`
+- Added protobuf-first storage persistence for infra envelopes:
+  - `src/arqonbus/storage/postgres.py` (`envelope_proto` bytea path)
+  - `src/arqonbus/storage/redis_streams.py` (`envelope_proto_b64` stream field)
+- Added strict preflight policy for protobuf infra in staging/prod:
+  - `src/arqonbus/config/config.py`
+  - `tests/unit/test_startup_preflight.py`
 
 ## Recent completed work (latest first)
 - `fe8a34a` - `hardening: require valkey+postgres stack in prod preflight`
