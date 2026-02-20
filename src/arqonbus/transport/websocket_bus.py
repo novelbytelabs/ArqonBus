@@ -353,6 +353,14 @@ class WebSocketBus:
         metadata = await self._client_metadata(client_id)
         return str(metadata.get("role", "")).lower() == "admin"
 
+    def _continuum_backend(self) -> Optional[Any]:
+        backend = getattr(self.storage, "backend", None) if self.storage else None
+        if backend is None:
+            return None
+        if hasattr(backend, "continuum_project_event"):
+            return backend
+        return None
+
     async def _require_admin(self, client_id: str, action: str) -> None:
         if not await self._client_is_admin(client_id):
             raise PermissionError(f"Only admin clients can {action}")
@@ -878,6 +886,9 @@ class WebSocketBus:
             raise ValueError("'payload.metadata' must be an object")
 
     async def _continuum_dlq_push(self, reason: str, event: Dict[str, Any]) -> Dict[str, Any]:
+        backend = self._continuum_backend()
+        if backend is not None:
+            return await backend.continuum_projector_dlq_push(reason, event)
         dlq_record = {
             "dlq_id": f"dlq_{uuid.uuid4().hex[:12]}",
             "topic": "continuum.episode.dlq.v1",
@@ -891,6 +902,10 @@ class WebSocketBus:
 
     async def _project_continuum_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
         self._validate_continuum_event(event)
+        backend = self._continuum_backend()
+        if backend is not None:
+            return await backend.continuum_project_event(event)
+
         tenant_id = str(event["tenant_id"])
         agent_id = str(event["agent_id"])
         episode_id = str(event["episode_id"])
@@ -951,6 +966,9 @@ class WebSocketBus:
         }
 
     async def _continuum_projector_status(self) -> Dict[str, Any]:
+        backend = self._continuum_backend()
+        if backend is not None:
+            return await backend.continuum_projector_status()
         async with self._ops_lock:
             return {
                 "projection_count": len(self._continuum_projection),
@@ -981,6 +999,12 @@ class WebSocketBus:
         episode_id = str(args.get("episode_id", "")).strip()
         if not tenant_id or not agent_id or not episode_id:
             raise ValueError("'tenant_id', 'agent_id', and 'episode_id' are required")
+        backend = self._continuum_backend()
+        if backend is not None:
+            projection = await backend.continuum_projector_get(tenant_id, agent_id, episode_id)
+            if projection is None:
+                return {"found": False, "tenant_id": tenant_id, "agent_id": agent_id, "episode_id": episode_id}
+            return {"found": True, "projection": projection}
         key = (tenant_id, agent_id, episode_id)
         async with self._ops_lock:
             projection = self._continuum_projection.get(key)
@@ -995,6 +1019,14 @@ class WebSocketBus:
         limit = int(args.get("limit", 100))
         if limit < 1:
             raise ValueError("'limit' must be >= 1")
+        backend = self._continuum_backend()
+        if backend is not None:
+            items = await backend.continuum_projector_list(
+                limit=limit,
+                tenant_id=tenant_filter,
+                agent_id=agent_filter,
+            )
+            return {"count": len(items), "items": items, "limit": limit}
         async with self._ops_lock:
             rows = list(self._continuum_projection.values())
         filtered = []
@@ -1013,6 +1045,10 @@ class WebSocketBus:
         limit = int(args.get("limit", 100))
         if limit < 1:
             raise ValueError("'limit' must be >= 1")
+        backend = self._continuum_backend()
+        if backend is not None:
+            items = await backend.continuum_projector_dlq_list(limit=limit)
+            return {"count": len(items), "items": items, "limit": limit}
         async with self._ops_lock:
             items = list(self._continuum_dlq)[-limit:]
         return {"count": len(items), "items": items, "limit": limit}
@@ -1022,6 +1058,16 @@ class WebSocketBus:
         dlq_id = str(args.get("dlq_id", "")).strip()
         if not dlq_id:
             raise ValueError("'dlq_id' is required")
+        backend = self._continuum_backend()
+        if backend is not None:
+            record = await backend.continuum_projector_dlq_get(dlq_id)
+            if record is None:
+                return {"replayed": False, "dlq_id": dlq_id, "reason": "not_found"}
+            result = await backend.continuum_project_event(record["event"])
+            if result.get("status") in {"projected", "duplicate", "stale_rejected"}:
+                await backend.continuum_projector_dlq_remove(dlq_id)
+                return {"replayed": True, "dlq_id": dlq_id, "result": result}
+            return {"replayed": False, "dlq_id": dlq_id, "result": result}
         async with self._ops_lock:
             record = next((item for item in self._continuum_dlq if item["dlq_id"] == dlq_id), None)
         if record is None:
@@ -1046,6 +1092,53 @@ class WebSocketBus:
         tenant_filter = str(args.get("tenant_id", "")).strip() or None
         agent_filter = str(args.get("agent_id", "")).strip() or None
         dry_run = bool(args.get("dry_run", False))
+        backend = self._continuum_backend()
+
+        if backend is not None:
+            selected_events = await backend.continuum_projector_events_between(
+                from_ts=from_ts,
+                to_ts=to_ts,
+                tenant_id=tenant_filter,
+                agent_id=agent_filter,
+            )
+            if dry_run:
+                return {
+                    "dry_run": True,
+                    "selected_count": len(selected_events),
+                    "from_ts": from_ts_raw,
+                    "to_ts": to_ts_raw,
+                    "tenant_id": tenant_filter,
+                    "agent_id": agent_filter,
+                }
+            projected = 0
+            duplicates = 0
+            stale_rejected = 0
+            dlq_queued = 0
+            for event in selected_events:
+                try:
+                    result = await backend.continuum_project_event(event)
+                    status = result.get("status")
+                    if status == "projected":
+                        projected += 1
+                    elif status == "duplicate":
+                        duplicates += 1
+                    elif status == "stale_rejected":
+                        stale_rejected += 1
+                except Exception as exc:
+                    await backend.continuum_projector_dlq_push(f"backfill_failed:{exc}", event)
+                    dlq_queued += 1
+            return {
+                "dry_run": False,
+                "selected_count": len(selected_events),
+                "projected": projected,
+                "duplicates": duplicates,
+                "stale_rejected": stale_rejected,
+                "dlq_queued": dlq_queued,
+                "from_ts": from_ts_raw,
+                "to_ts": to_ts_raw,
+                "tenant_id": tenant_filter,
+                "agent_id": agent_filter,
+            }
 
         async with self._ops_lock:
             source_items = list(self._continuum_event_log)

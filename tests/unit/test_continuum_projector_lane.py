@@ -9,6 +9,52 @@ from arqonbus.protocol.ids import generate_message_id
 from arqonbus.transport.websocket_bus import WebSocketBus
 
 
+class _FakeContinuumBackend:
+    def __init__(self):
+        self.projected = []
+        self.dlq = []
+
+    async def continuum_project_event(self, event: dict):
+        self.projected.append(event)
+        return {
+            "status": "projected",
+            "event_id": event["event_id"],
+            "projection_key": (event["tenant_id"], event["agent_id"], event["episode_id"]),
+            "deleted": event["event_type"] == "episode.deleted",
+        }
+
+    async def continuum_projector_status(self):
+        return {"projection_count": 7, "seen_event_count": 11, "dlq_count": 2}
+
+    async def continuum_projector_get(self, tenant_id: str, agent_id: str, episode_id: str):
+        return {
+            "tenant_id": tenant_id,
+            "agent_id": agent_id,
+            "episode_id": episode_id,
+            "last_event_id": "evt-from-backend",
+        }
+
+    async def continuum_projector_list(self, *, limit: int = 100, tenant_id=None, agent_id=None):
+        return [{"tenant_id": tenant_id or "tenant-a", "agent_id": agent_id or "agent-1", "episode_id": "ep-x"}]
+
+    async def continuum_projector_dlq_push(self, reason: str, event: dict):
+        record = {"dlq_id": "dlq-1", "reason": reason, "event": event}
+        self.dlq.append(record)
+        return record
+
+    async def continuum_projector_dlq_list(self, *, limit: int = 100):
+        return list(self.dlq)[:limit]
+
+    async def continuum_projector_dlq_get(self, dlq_id: str):
+        return {"dlq_id": dlq_id, "event": _event(event_id="evt-replay")}
+
+    async def continuum_projector_dlq_remove(self, dlq_id: str):
+        return True
+
+    async def continuum_projector_events_between(self, *, from_ts, to_ts, tenant_id=None, agent_id=None):
+        return [_event(event_id="evt-bf-db-1"), _event(event_id="evt-bf-db-2")]
+
+
 def _command(command: str, args: dict) -> Envelope:
     return Envelope(
         id=generate_message_id(),
@@ -199,3 +245,45 @@ async def test_backfill_dry_run_and_apply():
     apply_data = _response_data(bus)
     assert apply_data["dry_run"] is False
     assert apply_data["duplicates"] >= 2
+
+
+@pytest.mark.asyncio
+async def test_projector_uses_backend_hooks_when_available():
+    bus = _make_bus(role="admin")
+    fake_backend = _FakeContinuumBackend()
+    bus.storage = SimpleNamespace(backend=fake_backend)
+
+    await bus._handle_command(
+        _command("op.continuum.projector.project_event", {"event": _event(event_id="evt-db-1")}),
+        "client-1",
+    )
+    data = _response_data(bus)
+    assert data["status"] == "projected"
+    assert len(fake_backend.projected) == 1
+
+    await bus._handle_command(_command("op.continuum.projector.status", {}), "client-1")
+    status_data = _response_data(bus)
+    assert status_data["projection_count"] == 7
+
+
+@pytest.mark.asyncio
+async def test_backfill_uses_backend_event_source_when_available():
+    bus = _make_bus(role="admin")
+    fake_backend = _FakeContinuumBackend()
+    bus.storage = SimpleNamespace(backend=fake_backend)
+
+    await bus._handle_command(
+        _command(
+            "op.continuum.projector.backfill",
+            {
+                "from_ts": "2026-02-20T00:00:00+00:00",
+                "to_ts": "2026-02-20T00:00:03+00:00",
+                "dry_run": False,
+            },
+        ),
+        "client-1",
+    )
+    data = _response_data(bus)
+    assert data["dry_run"] is False
+    assert data["selected_count"] == 2
+    assert data["projected"] == 2
