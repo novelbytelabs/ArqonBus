@@ -60,3 +60,4 @@ Source plans:
 Release-gate closeout evidence:
 
 - `docs/ArqonBus/checklist/release_gate_closeout_2026-02-20.md`
+- `docs/ArqonBus/checklist/release_candidate_hardening_2026-02-20.md`

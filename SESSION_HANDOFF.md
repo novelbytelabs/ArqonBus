@@ -6,6 +6,23 @@ Last updated: 2026-02-20
 Productionization and Continuum integration slices are complete through projector persistence, operational hardening, CI postgres gating, and release-gate closeout hardening.
 
 ## Latest completed work (unreleased in this handoff snapshot)
+- Added websocket command-lane history semantics:
+  - `src/arqonbus/transport/websocket_bus.py` (`op.history.get|replay` + aliases)
+  - room-scoped fail-closed access for non-admin clients
+  - replay window and strict-sequence contract responses
+- Added history command-lane tests:
+  - `tests/unit/test_history_command_lane.py`
+  - `tests/integration/test_history_command_e2e.py`
+- Added protobuf/replay latency performance gates:
+  - `tests/performance/test_replay_protobuf_latency_gates.py`
+  - `.github/workflows/arqonbus-tests.yml` (performance selector now `performance and not external`)
+- Added RC hardening checklist:
+  - `docs/ArqonBus/checklist/release_candidate_hardening_2026-02-20.md`
+- Updated API/runbook/docs for history command-lane contracts:
+  - `docs/ArqonBus/spec/api.md`
+  - `docs/ArqonBus/checklist/runbook.md`
+  - `docs/ArqonBus/checklist/productionization_checklist.md`
+  - `docs/ArqonBus/vnext_status.md`
 - Added Phase C protocol/time semantics test closure:
   - `src/arqonbus/protocol/time_semantics.py`
   - `src/arqonbus/protocol/validator.py` (sequence/vector/causal metadata validation)
@@ -93,8 +110,12 @@ User-validated local runtime checks:
 - Integration: `tests/integration/test_continuum_projector_postgres.py` passed in native environment.
 
 Agent-run test highlights in this session:
+- `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_history_command_lane.py tests/integration/test_history_command_e2e.py tests/performance/test_replay_protobuf_latency_gates.py`
+  - Result: passed (6 passed)
 - `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_ids_validation.py tests/unit/test_timekeeper_sequence.py tests/unit/test_vector_clock.py tests/integration/test_history_get_replay.py tests/integration/test_json_adapter_compat.py tests/integration/test_proto_contract_crosslang.py tests/integration/test_time_ordering_e2e.py tests/integration/test_history_replay_e2e.py tests/regression/test_time_envelope_regressions.py tests/regression/test_proto_json_adapter_regressions.py tests/regression/test_proto_evolution_regressions.py`
   - Result: passed (17 passed)
+- `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_ids_validation.py tests/unit/test_timekeeper_sequence.py tests/unit/test_vector_clock.py tests/unit/test_history_command_lane.py tests/integration/test_history_get_replay.py tests/integration/test_json_adapter_compat.py tests/integration/test_proto_contract_crosslang.py tests/integration/test_time_ordering_e2e.py tests/integration/test_history_replay_e2e.py tests/integration/test_history_command_e2e.py tests/regression/test_time_envelope_regressions.py tests/regression/test_proto_json_adapter_regressions.py tests/regression/test_proto_evolution_regressions.py`
+  - Result: passed (21 passed)
 - `conda run -n helios-gpu-118 python scripts/ci/check_protobuf_first.py`
   - Result: passed
 - `conda run -n helios-gpu-118 python -m pytest -q tests/unit/test_continuum_projector_lane.py tests/unit/test_continuum_integration_contract.py tests/unit/test_tier_omega_lane.py tests/unit/test_startup_preflight.py tests/unit/test_postgres_storage.py --maxfail=20`

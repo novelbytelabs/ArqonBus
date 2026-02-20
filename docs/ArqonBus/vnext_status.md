@@ -51,6 +51,8 @@ Out of scope for this slice:
 | M13: Protobuf-first infrastructure closure | Completed | Added canonical Rust envelope protobuf codec in Python, protobuf wire support, and protobuf-first storage persistence with JSON adapters constrained to human-facing paths. |
 | M14: Protobuf anti-regression guardrails | Completed | Added CI hard-fail protobuf-first policy checks and shared Python/Rust protobuf fixture contract tests. |
 | M15: Protocol/time semantics test closure | Completed | Added monotonic sequence + vector-clock validation utilities, replay API strict sequence checks, and unit/integration/e2e/regression coverage including protobuf evolution regression. |
+| M16: History command-lane time semantics delivery | Completed | Added `op.history.get|replay` websocket command contracts, replay strict-sequence controls, and protobuf e2e command-lane coverage. |
+| M17: RC performance + CI hardening | Completed | Added replay/protobuf latency gates and aligned performance CI selector to run full performance marker suite. |
 
 ## Phase 0 Completion Checklist
 

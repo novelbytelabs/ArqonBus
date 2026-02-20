@@ -256,4 +256,4 @@ jobs:
           pip install -e .[dev]
       - name: Run performance tests
         run: |
-          python -m pytest -q -m "performance and socket and not external" tests/performance
+          python -m pytest -q -m "performance and not external" tests/performance

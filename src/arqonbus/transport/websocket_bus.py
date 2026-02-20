@@ -395,6 +395,120 @@ class WebSocketBus:
             return f"tenant:{tenant_id}"
         return "default"
 
+    @staticmethod
+    def _normalize_limit(raw_value: Any, field_name: str, *, default: int, max_value: int) -> int:
+        if raw_value is None:
+            return default
+        limit = int(raw_value)
+        if limit <= 0:
+            raise ValueError(f"'{field_name}' must be > 0")
+        if limit > max_value:
+            raise ValueError(f"'{field_name}' must be <= {max_value}")
+        return limit
+
+    @staticmethod
+    def _serialize_history_entries(entries: list[Any]) -> list[Dict[str, Any]]:
+        serialized: list[Dict[str, Any]] = []
+        for entry in entries:
+            serialized.append(
+                {
+                    "envelope": entry.envelope.to_dict(),
+                    "stored_at": entry.stored_at.isoformat(),
+                    "storage_metadata": dict(entry.storage_metadata or {}),
+                }
+            )
+        return serialized
+
+    async def _history_get(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.storage:
+            raise RuntimeError("History commands require configured storage backend")
+
+        room_raw = args.get("room")
+        channel_raw = args.get("channel")
+        room = str(room_raw).strip() if room_raw is not None else None
+        channel = str(channel_raw).strip() if channel_raw is not None else None
+        room = room or None
+        channel = channel or None
+        limit = self._normalize_limit(args.get("limit"), "limit", default=100, max_value=1000)
+        since = self._parse_iso8601(args["since"], "since") if args.get("since") else None
+        until = self._parse_iso8601(args["until"], "until") if args.get("until") else None
+
+        if until and since and until < since:
+            raise ValueError("'until' must be >= 'since'")
+
+        is_admin = await self._client_is_admin(client_id)
+        if not is_admin and not room:
+            raise PermissionError("Only admin clients can query global history; provide 'room'")
+
+        entries = await self.storage.backend.get_history(
+            room=room,
+            channel=channel,
+            limit=limit,
+            since=since,
+            until=until,
+        )
+
+        self._safe_record_counter("history_get_requests_total", 1, {"role": "admin" if is_admin else "user"})
+        self._safe_record_histogram("history_get_entries_returned", float(len(entries)), {"role": "admin" if is_admin else "user"})
+        return {
+            "entries": self._serialize_history_entries(entries),
+            "count": len(entries),
+            "room": room,
+            "channel": channel,
+            "since": since.isoformat() if since else None,
+            "until": until.isoformat() if until else None,
+            "limit": limit,
+        }
+
+    async def _history_replay(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.storage:
+            raise RuntimeError("History commands require configured storage backend")
+
+        room_raw = args.get("room")
+        channel_raw = args.get("channel")
+        room = str(room_raw).strip() if room_raw is not None else None
+        channel = str(channel_raw).strip() if channel_raw is not None else None
+        room = room or None
+        channel = channel or None
+        from_ts_raw = args.get("from_ts")
+        to_ts_raw = args.get("to_ts")
+        if from_ts_raw is None or to_ts_raw is None:
+            raise ValueError("'from_ts' and 'to_ts' are required")
+        from_ts = self._parse_iso8601(from_ts_raw, "from_ts")
+        to_ts = self._parse_iso8601(to_ts_raw, "to_ts")
+        strict_sequence = self._coerce_bool(args.get("strict_sequence", True), "strict_sequence")
+        limit = self._normalize_limit(args.get("limit"), "limit", default=1000, max_value=5000)
+
+        is_admin = await self._client_is_admin(client_id)
+        if not is_admin and not room:
+            raise PermissionError("Only admin clients can replay global history; provide 'room'")
+
+        started = time.perf_counter()
+        entries = await self.storage.get_history_replay(
+            room=room,
+            channel=channel,
+            from_ts=from_ts,
+            to_ts=to_ts,
+            limit=limit,
+            strict_sequence=strict_sequence,
+        )
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        self._safe_record_counter("history_replay_requests_total", 1, {"role": "admin" if is_admin else "user"})
+        self._safe_record_histogram("history_replay_entries_returned", float(len(entries)), {"role": "admin" if is_admin else "user"})
+        self._safe_record_histogram("history_replay_latency_ms", elapsed_ms, {"role": "admin" if is_admin else "user"})
+
+        return {
+            "entries": self._serialize_history_entries(entries),
+            "count": len(entries),
+            "room": room,
+            "channel": channel,
+            "from_ts": from_ts.isoformat(),
+            "to_ts": to_ts.isoformat(),
+            "strict_sequence": strict_sequence,
+            "limit": limit,
+            "latency_ms": elapsed_ms,
+        }
+
     async def _send_command_response(
         self,
         client_id: str,
@@ -2159,6 +2273,28 @@ class WebSocketBus:
                     envelope.id,
                     success=True,
                     message="Store keys listed",
+                    data=data,
+                )
+                return
+
+            if envelope.command in {"history.get", "op.history.get"}:
+                data = await self._history_get(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="History window retrieved",
+                    data=data,
+                )
+                return
+
+            if envelope.command in {"history.replay", "op.history.replay"}:
+                data = await self._history_replay(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="History replay window retrieved",
                     data=data,
                 )
                 return

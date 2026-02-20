@@ -144,6 +144,7 @@ Command envelopes (send via WebSocket client or `wscat`) supported:
 - `op.webhook.register|list|unregister`
 - `op.cron.schedule|list|cancel`
 - `op.store.set|get|list|delete`
+- `op.history.get|replay` (global history access is admin-only; non-admin requests must include `room`)
 
 Tier-Omega experimental lane (feature-flagged):
 
