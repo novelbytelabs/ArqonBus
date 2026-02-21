@@ -305,7 +305,7 @@ curl http://localhost:9100/status
 
 ```bash
 # Run the Redis connectivity test
-python test_redis_connection.py
+python scripts/manual_checks/redis_connection_check.py
 
 # Run comprehensive tests
 python -m pytest tests/integration/ -v

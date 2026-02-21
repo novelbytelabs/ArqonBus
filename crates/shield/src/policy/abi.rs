@@ -7,9 +7,9 @@
 //! raw pointers/lengths passed from the guest. The runtime will translate these
 //! into safe Rust types before invoking the implementation.
 
-use wasmtime::{Caller, Linker};
 use anyhow::Result;
 use std::sync::Arc;
+use wasmtime::{Caller, Linker};
 
 /// Configuration limits for the Wasm host.
 #[allow(dead_code)]
@@ -23,7 +23,7 @@ pub struct HostConfig {
 impl Default for HostConfig {
     fn default() -> Self {
         Self {
-            fuel_limit: 10_000, // ~5 ms on typical hardware
+            fuel_limit: 10_000,                  // ~5 ms on typical hardware
             memory_limit_bytes: 4 * 1024 * 1024, // 4 MiB
         }
     }
@@ -54,11 +54,12 @@ pub fn register_abi<T>(linker: &mut Linker<T>, _config: Arc<HostConfig>) -> Resu
 
     // host_get_header(name_ptr: i32, name_len: i32, out_ptr: i32) -> i32
     // Returns length of value written to out_ptr, or -1 if not found.
-    let host_get_header = move |_caller: Caller<'_, T>, _name_ptr: i32, _name_len: i32, _out_ptr: i32| {
-        // In a real implementation we would look up request headers stored in the caller's data.
-        // For now we return -1 to indicate not found.
-        Ok::<i32, anyhow::Error>(-1i32)
-    };
+    let host_get_header =
+        move |_caller: Caller<'_, T>, _name_ptr: i32, _name_len: i32, _out_ptr: i32| {
+            // In a real implementation we would look up request headers stored in the caller's data.
+            // For now we return -1 to indicate not found.
+            Ok::<i32, anyhow::Error>(-1i32)
+        };
     linker.func_wrap("env", "host_get_header", host_get_header)?;
 
     // host_reject(code: i32, msg_ptr: i32, msg_len: i32) -> i32
@@ -82,7 +83,7 @@ pub fn register_abi<T>(linker: &mut Linker<T>, _config: Arc<HostConfig>) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wasmtime::{Engine, Linker, Store, Config};
+    use wasmtime::{Config, Engine, Linker, Store};
 
     #[tokio::test]
     async fn test_host_abi_registration() -> Result<()> {

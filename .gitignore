@@ -13,7 +13,6 @@ simulation_results/
 string_data/
 benchmark_outputs/
 node_modules/
-crates/
 target/
 
 # Manually added
@@ -23,12 +22,8 @@ target/
 target/
 **/target/
 
-*.json
-*.jsonl
-*.json.gz
-*.jsonl.gz
-*.jsonl.bz2
-*.json.bz2
+# Do not globally ignore JSON/JSONL because this repo uses committed
+# protocol/config/test fixtures in those formats.
 
 # *.md
 *.bak
@@ -147,6 +142,7 @@ static/
 *.log
 *.sqlite
 *.sqlite3
+dump.rdb
 
 # Temporary files
 *~

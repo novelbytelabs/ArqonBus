@@ -1,8 +1,8 @@
 //! JWT authentication and claims extraction.
 
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use anyhow::{anyhow, Result};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
-use anyhow::{Result, anyhow};
 
 /// JWT claims structure for ArqonBus.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -29,37 +29,52 @@ pub struct JwtConfig {
 impl Default for JwtConfig {
     fn default() -> Self {
         Self {
-            secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "arqon-dev-secret".to_string()),
-            skip_validation: std::env::var("JWT_SKIP_VALIDATION").is_ok(),
+            secret: std::env::var("JWT_SECRET").unwrap_or_default(),
+            // Skip-validation is test-only and never enabled from runtime env vars.
+            skip_validation: false,
         }
     }
 }
 
 /// Decode and validate a JWT token.
 pub fn decode_token(token: &str, config: &JwtConfig) -> Result<Claims> {
+    if config.secret.trim().is_empty() {
+        return Err(anyhow!("JWT secret is not configured"));
+    }
+
     if config.skip_validation {
-        // Dev mode: decode without validation
-        let parts: Vec<&str> = token.split('.').collect();
-        if parts.len() != 3 {
-            return Err(anyhow!("Invalid JWT format"));
+        #[cfg(not(test))]
+        {
+            return Err(anyhow!(
+                "JWT skip-validation is not allowed outside test builds"
+            ));
         }
-        
-        use base64::Engine;
-        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(parts[1])
-            .map_err(|e| anyhow!("Failed to decode JWT payload: {}", e))?;
-        let claims: Claims = serde_json::from_slice(&payload)
-            .map_err(|e| anyhow!("Failed to parse JWT claims: {}", e))?;
-        return Ok(claims);
+
+        #[cfg(test)]
+        // Dev mode: decode without validation
+        {
+            let parts: Vec<&str> = token.split('.').collect();
+            if parts.len() != 3 {
+                return Err(anyhow!("Invalid JWT format"));
+            }
+
+            use base64::Engine;
+            let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(parts[1])
+                .map_err(|e| anyhow!("Failed to decode JWT payload: {}", e))?;
+            let claims: Claims = serde_json::from_slice(&payload)
+                .map_err(|e| anyhow!("Failed to parse JWT claims: {}", e))?;
+            return Ok(claims);
+        }
     }
 
     let key = DecodingKey::from_secret(config.secret.as_bytes());
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
-    
+
     let token_data = decode::<Claims>(token, &key, &validation)
         .map_err(|e| anyhow!("JWT validation failed: {}", e))?;
-    
+
     Ok(token_data.claims)
 }
 
@@ -83,20 +98,21 @@ mod tests {
             secret: "test-secret".to_string(),
             skip_validation: false,
         };
-        
+
         let claims = Claims {
             sub: "user123".to_string(),
             tenant_id: "tenant-abc".to_string(),
             exp: (chrono::Utc::now().timestamp() + 3600) as usize,
             iat: chrono::Utc::now().timestamp() as usize,
         };
-        
+
         let token = encode(
             &Header::default(),
             &claims,
             &EncodingKey::from_secret(config.secret.as_bytes()),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         let decoded = decode_token(&token, &config).unwrap();
         assert_eq!(decoded.sub, "user123");
         assert_eq!(decoded.tenant_id, "tenant-abc");
@@ -115,7 +131,17 @@ mod tests {
             secret: "test-secret".to_string(),
             skip_validation: false,
         };
-        
+
+        let result = decode_token("invalid.token.here", &config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_missing_secret_fails_closed() {
+        let config = JwtConfig {
+            secret: String::new(),
+            skip_validation: false,
+        };
         let result = decode_token("invalid.token.here", &config);
         assert!(result.is_err());
     }

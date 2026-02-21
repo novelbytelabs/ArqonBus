@@ -2,7 +2,7 @@
 import asyncio
 from collections import defaultdict, deque
 from typing import List, Dict, Any, Optional, Iterator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import threading
 import logging
 
@@ -40,15 +40,22 @@ class MemoryStorageBackend(StorageBackend):
         self._message_index = {}
         
         # Statistics
+        now = datetime.now(timezone.utc)
         self._stats = {
             "total_messages": 0,
             "messages_by_room": defaultdict(int),
             "messages_by_channel": defaultdict(lambda: defaultdict(int)),
             "storage_backend": "memory",
             "max_size": max_size,
-            "created_at": datetime.utcnow(),
-            "last_accessed": datetime.utcnow()
+            "created_at": now,
+            "last_accessed": now
         }
+
+    @staticmethod
+    def _as_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
     
     async def append(self, envelope: Envelope, **kwargs) -> StorageResult:
         """Append a message to memory storage.
@@ -68,7 +75,7 @@ class MemoryStorageBackend(StorageBackend):
                 # Create history entry
                 entry = HistoryEntry(
                     envelope=envelope,
-                    stored_at=datetime.utcnow(),
+                    stored_at=datetime.now(timezone.utc),
                     storage_metadata={"backend": "memory", "size": self.max_size}
                 )
                 
@@ -89,7 +96,7 @@ class MemoryStorageBackend(StorageBackend):
                 self._stats["total_messages"] += 1
                 self._stats["messages_by_room"][room] += 1
                 self._stats["messages_by_channel"][room][channel] += 1
-                self._stats["last_accessed"] = datetime.utcnow()
+                self._stats["last_accessed"] = datetime.now(timezone.utc)
                 
                 logger.debug(f"Stored message {envelope.id} in room '{room}', channel '{channel}'")
                 
@@ -137,6 +144,9 @@ class MemoryStorageBackend(StorageBackend):
                 else:
                     rooms_to_search = [room]
                 
+                since_utc = self._as_utc(since) if since else None
+                until_utc = self._as_utc(until) if until else None
+
                 for current_room in rooms_to_search:
                     if room is not None and current_room != room:
                         continue
@@ -152,10 +162,11 @@ class MemoryStorageBackend(StorageBackend):
                         
                         # Filter by time range if specified
                         for entry in reversed(messages):  # Most recent first
+                            entry_time = self._as_utc(entry.stored_at)
                             # Check time range
-                            if since and entry.stored_at <= since:
+                            if since_utc and entry_time <= since_utc:
                                 continue
-                            if until and entry.stored_at >= until:
+                            if until_utc and entry_time >= until_utc:
                                 continue
                                 
                             results.append(entry)
@@ -170,7 +181,7 @@ class MemoryStorageBackend(StorageBackend):
                         break
                         
                 # Update statistics
-                self._stats["last_accessed"] = datetime.utcnow()
+                self._stats["last_accessed"] = datetime.now(timezone.utc)
                 
                 logger.debug(f"Retrieved {len(results)} messages (limit: {limit})")
                 return results[:limit]
@@ -213,14 +224,14 @@ class MemoryStorageBackend(StorageBackend):
                 self._stats["total_messages"] -= 1
                 self._stats["messages_by_room"][room] -= 1
                 self._stats["messages_by_channel"][room][channel] -= 1
-                self._stats["last_accessed"] = datetime.utcnow()
+                self._stats["last_accessed"] = datetime.now(timezone.utc)
                 
                 logger.debug(f"Deleted message {message_id}")
                 
                 return StorageResult(
                     success=True,
                     message_id=message_id,
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(timezone.utc)
                 )
                 
         except Exception as e:
@@ -250,7 +261,7 @@ class MemoryStorageBackend(StorageBackend):
         try:
             with self._lock:
                 cleared_count = 0
-                current_time = datetime.utcnow()
+                current_time = datetime.now(timezone.utc)
                 
                 if room is None:
                     # Clear all rooms
@@ -277,8 +288,9 @@ class MemoryStorageBackend(StorageBackend):
                         # Filter messages to keep
                         kept_messages = deque()
                         if before:
+                            before_utc = self._as_utc(before)
                             for entry in messages:
-                                if entry.stored_at < before:
+                                if self._as_utc(entry.stored_at) < before_utc:
                                     # Remove from index
                                     if entry.envelope.id in self._message_index:
                                         del self._message_index[entry.envelope.id]
@@ -348,7 +360,7 @@ class MemoryStorageBackend(StorageBackend):
                 "messages_per_room": {room: count for room, count in stats["messages_by_room"].items()},
                 "messages_per_channel": {room: dict(channels) for room, channels in stats["messages_by_channel"].items()}
             }
-            stats["last_updated"] = datetime.utcnow()
+            stats["last_updated"] = datetime.now(timezone.utc)
             return stats
     
     async def health_check(self) -> bool:
@@ -378,15 +390,16 @@ class MemoryStorageBackend(StorageBackend):
                 self._message_index.clear()
                 
                 # Reset statistics
+                now = datetime.now(timezone.utc)
                 self._stats = {
                     "total_messages": 0,
                     "messages_by_room": defaultdict(int),
                     "messages_by_channel": defaultdict(lambda: defaultdict(int)),
                     "storage_backend": "memory",
                     "max_size": self.max_size,
-                    "created_at": datetime.utcnow(),
-                    "last_accessed": datetime.utcnow(),
-                    "closed_at": datetime.utcnow()
+                    "created_at": now,
+                    "last_accessed": now,
+                    "closed_at": now
                 }
                 
                 logger.info("Memory storage backend closed")
@@ -405,7 +418,7 @@ class MemoryStorageBackend(StorageBackend):
         """
         try:
             with self._lock:
-                cutoff_time = datetime.utcnow() - timedelta(hours=24)  # Keep last 24 hours
+                cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)  # Keep last 24 hours
                 
                 cleared_count = await self.clear_history(before=cutoff_time)
                 

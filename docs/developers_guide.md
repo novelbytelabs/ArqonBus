@@ -915,13 +915,16 @@ pytest
 ### Pull Request Process
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
+2. Create a development branch from `dev`: `git checkout dev && git pull origin dev && git checkout -b dev/amazing-feature`
 3. Make your changes with tests
 4. Run the test suite: `pytest`
 5. Update documentation if needed
 6. Commit your changes: `git commit -m 'Add amazing feature'`
-7. Push to the branch: `git push origin feature/amazing-feature`
-8. Open a Pull Request
+7. Push to the branch: `git push origin dev/amazing-feature`
+8. Open a Pull Request to merge your `dev/` branch into `dev`
+9. After review and approval, merge to `dev`; periodic releases merge `dev` to `main`
+
+> **Note:** For detailed contribution guidelines, including branch naming conventions and workflow, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ### Release Process
 

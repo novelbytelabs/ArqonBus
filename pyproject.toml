@@ -11,7 +11,9 @@ dependencies = [
     "websockets",
     "aiohttp",
     "redis",
-    "pydantic"
+    "asyncpg",
+    "pydantic",
+    "python-dotenv"
 ]
 
 [project.scripts]

@@ -339,46 +339,85 @@ Get detailed channel information:
 }
 ```
 
-#### History Command
+#### History Commands
 
-Get message history:
+ArqonBus exposes explicit command-lane history APIs for time semantics:
+
+- `op.history.get` (alias: `history.get`)
+- `op.history.replay` (alias: `history.replay`)
+
+`op.history.get` request:
 
 ```json
 {
+  "id": "arq_cmd_history_get_001",
+  "type": "command",
+  "timestamp": "2026-02-20T10:00:00Z",
+  "version": "1.0",
+  "command": "op.history.get",
+  "args": {
+    "room": "ops",
+    "channel": "events",
+    "limit": 100,
+    "since": "2026-02-20T00:00:00Z",
+    "until": "2026-02-20T12:00:00Z"
+  }
+}
+```
+
+`op.history.replay` request:
+
+```json
+{
+  "id": "arq_cmd_history_replay_001",
+  "type": "command",
+  "timestamp": "2026-02-20T10:00:00Z",
+  "version": "1.0",
+  "command": "op.history.replay",
+  "args": {
+    "room": "ops",
+    "channel": "events",
+    "from_ts": "2026-02-20T00:00:00Z",
+    "to_ts": "2026-02-20T12:00:00Z",
+    "strict_sequence": true,
+    "limit": 1000
+  }
+}
+```
+
+Response envelope (`type=response`):
+
+```json
+{
+  "type": "response",
+  "status": "success",
+  "request_id": "arq_cmd_history_replay_001",
   "payload": {
-    "command": "history",
-    "parameters": {
-      "client_id": "arq_client_alice",
-      "limit": 50
+    "message": "History replay window retrieved",
+    "data": {
+      "count": 2,
+      "entries": [
+        {
+          "envelope": {
+            "id": "arq_1700000000000000000_7_c0ffee",
+            "type": "message",
+            "timestamp": "2026-02-20T10:00:01+00:00",
+            "payload": {"idx": 1},
+            "metadata": {"sequence": 1}
+          },
+          "stored_at": "2026-02-20T10:00:01.123456+00:00",
+          "storage_metadata": {"backend": "memory"}
+        }
+      ]
     }
   }
 }
 ```
 
-**Response:**
-```json
-{
-  "id": "arq_cmd_006_response",
-  "type": "command_response",
-  "command": "history",
-  "result": {
-    "messages": [
-      {
-        "id": "arq_msg_001",
-        "type": "message",
-        "timestamp": "2025-11-30T23:15:00Z",
-        "from_client": "arq_client_alice",
-        "to_client": "arq_client_bob",
-        "payload": {
-          "content": "Hello Bob!"
-        }
-      }
-    ],
-    "total": 1,
-    "returned": 1
-  }
-}
-```
+Authorization constraints:
+
+- Non-admin clients must provide `room`; global history access is admin-only.
+- `op.history.replay` enforces bounded replay windows and optional strict sequence monotonicity checks.
 
 #### Help Command
 
@@ -599,7 +638,7 @@ arqonbus_command_executions_total{command="ping"} 50
   "description": "ArqonBus Core Message Bus",
   "architecture": {
     "transport": "WebSocket",
-    "protocol": "JSON Envelope",
+    "protocol": "Protobuf Envelope (infra), JSON adapters (human-facing)",
     "storage": "Memory (optional Redis Streams)",
     "telemetry": "WebSocket",
     "monitoring": "HTTP Endpoints"

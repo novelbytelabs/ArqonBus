@@ -226,3 +226,33 @@ class TestRedisStreamsStorage:
             # Verify Redis client methods were called
             assert mock_redis_client.xadd.called
             assert mock_redis_client.xrange.called
+
+    @pytest.mark.asyncio
+    async def test_strict_mode_raises_when_redis_unavailable(self, redis_config):
+        """Strict mode must fail-closed on Redis connection failure."""
+        strict_config = dict(redis_config)
+        strict_config["storage_mode"] = "strict"
+
+        with patch("redis.asyncio.from_url") as mock_redis:
+            mock_redis.side_effect = Exception("Connection refused")
+
+            with pytest.raises(RuntimeError, match="strict storage mode"):
+                await RedisStreamsStorage.create(strict_config)
+
+    @pytest.mark.asyncio
+    async def test_strict_mode_does_not_fallback_on_runtime_redis_errors(
+        self, redis_config, test_envelope
+    ):
+        """Strict mode must propagate runtime Redis failures instead of fallback."""
+        strict_config = dict(redis_config)
+        strict_config["storage_mode"] = "strict"
+
+        with patch("redis.asyncio.from_url") as mock_redis:
+            mock_redis_client = AsyncMock()
+            mock_redis.return_value = mock_redis_client
+            mock_redis_client.xadd.side_effect = Exception("Redis write failure")
+
+            storage = await RedisStreamsStorage.create(strict_config)
+
+            with pytest.raises(RuntimeError, match="strict storage mode"):
+                await storage.append(test_envelope)

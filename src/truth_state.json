@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "a": 1,
+    "alice": 2,
+    "manager": 3,
+    "bob": 4
+  },
+  "id_to_name": {
+    "1": "a",
+    "2": "alice",
+    "3": "manager",
+    "4": "bob"
+  },
+  "next_entity_id": 5,
+  "assertions": [
+    [
+      1,
+      1,
+      0
+    ],
+    [
+      2,
+      3,
+      0
+    ],
+    [
+      4,
+      3,
+      1
+    ]
+  ]
+}

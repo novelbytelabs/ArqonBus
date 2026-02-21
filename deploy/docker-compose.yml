@@ -16,6 +16,17 @@ services:
     ports:
       - "6379:6379"
 
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: arqonbus
+      POSTGRES_PASSWORD: arqonbus
+      POSTGRES_DB: arqonbus
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
@@ -38,3 +49,4 @@ services:
 
 volumes:
   nats_data:
+  postgres_data:

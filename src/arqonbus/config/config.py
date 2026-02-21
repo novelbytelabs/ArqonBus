@@ -7,6 +7,47 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+_ENV_ALIASES = {
+    "development": "dev",
+    "dev": "dev",
+    "staging": "staging",
+    "production": "prod",
+    "prod": "prod",
+}
+
+_STORAGE_BACKEND_ALIASES = {
+    "memory": "memory",
+    "memory_storage": "memory_storage",
+    "redis": "redis",
+    "redis_streams": "redis_streams",
+    "valkey": "valkey",
+    "valkey_streams": "valkey_streams",
+    "postgres": "postgres",
+    "postgresql": "postgres",
+}
+
+
+def normalize_environment_name(environment: str) -> str:
+    """Normalize runtime profile names to dev|staging|prod."""
+    normalized = _ENV_ALIASES.get(environment.strip().lower())
+    if normalized is None:
+        raise ValueError(
+            f"Unsupported environment profile: {environment}. "
+            "Expected one of: dev, staging, prod."
+        )
+    return normalized
+
+
+def normalize_storage_backend_name(backend: str) -> str:
+    """Normalize storage backend aliases."""
+    normalized = _STORAGE_BACKEND_ALIASES.get(backend.strip().lower())
+    if normalized is None:
+        raise ValueError(
+            f"Unsupported storage backend: {backend}. "
+            "Expected one of: memory, redis, redis_streams, valkey, valkey_streams, postgres."
+        )
+    return normalized
+
 
 @dataclass
 class ServerConfig:
@@ -41,9 +82,24 @@ class RedisConfig:
 
 
 @dataclass
+class PostgresConfig:
+    """Postgres configuration for durable state."""
+    host: str = "localhost"
+    port: int = 5432
+    database: str = "arqonbus"
+    user: str = "arqonbus"
+    password: Optional[str] = None
+    ssl: bool = False
+    connect_timeout: float = 5.0
+
+
+@dataclass
 class StorageConfig:
     """Storage backend configuration."""
     backend: str = "memory"  # memory, redis
+    mode: str = "degraded"  # degraded, strict
+    redis_url: Optional[str] = None
+    postgres_url: Optional[str] = None
     max_history_size: int = 10000
     retention_hours: int = 24
     enable_persistence: bool = False
@@ -130,6 +186,14 @@ class TierOmegaConfig:
     lab_channel: str = "signals"
     max_events: int = 1000
     max_substrates: int = 128
+    runtime: str = "memory"  # memory|firecracker
+    firecracker_bin: str = "firecracker"
+    jailer_bin: str = "jailer"
+    kernel_image: Optional[str] = None
+    rootfs_image: Optional[str] = None
+    workspace_dir: str = "/tmp/arqonbus-omega"
+    vm_timeout_seconds: float = 30.0
+    max_vms: int = 8
 
 
 @dataclass
@@ -138,6 +202,7 @@ class ArqonBusConfig:
     server: ServerConfig = field(default_factory=ServerConfig)
     websocket: WebSocketConfig = field(default_factory=WebSocketConfig)
     redis: RedisConfig = field(default_factory=RedisConfig)
+    postgres: PostgresConfig = field(default_factory=PostgresConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
@@ -146,6 +211,8 @@ class ArqonBusConfig:
     
     # Feature Flags
     holonomy_enabled: bool = False
+    infra_protocol: str = "protobuf"  # protobuf|json
+    allow_json_infra: bool = True
     
     # Environment-specific overrides
     environment: str = "development"
@@ -164,6 +231,13 @@ class ArqonBusConfig:
             ARQONBUS_REDIS_HOST=redis.example.com
         """
         config = cls()
+
+        def _env_first(*names: str, default: Optional[str] = None) -> Optional[str]:
+            for name in names:
+                value = os.getenv(name)
+                if value is not None:
+                    return value
+            return default
         
         # Server configuration
         config.server.host = os.getenv("ARQONBUS_SERVER_HOST", config.server.host)
@@ -176,13 +250,39 @@ class ArqonBusConfig:
         config.websocket.compression = "deflate" if compression_val == "true" else None
         
         # Redis configuration
-        config.redis.host = os.getenv("ARQONBUS_REDIS_HOST", config.redis.host)
-        config.redis.port = int(os.getenv("ARQONBUS_REDIS_PORT", config.redis.port))
-        config.redis.password = os.getenv("ARQONBUS_REDIS_PASSWORD")
-        config.redis.ssl = os.getenv("ARQONBUS_REDIS_SSL", "false").lower() == "true"
+        config.redis.host = _env_first(
+            "ARQONBUS_VALKEY_HOST",
+            "ARQONBUS_REDIS_HOST",
+            default=config.redis.host,
+        )
+        config.redis.port = int(
+            _env_first("ARQONBUS_VALKEY_PORT", "ARQONBUS_REDIS_PORT", default=str(config.redis.port))
+        )
+        config.redis.password = _env_first("ARQONBUS_VALKEY_PASSWORD", "ARQONBUS_REDIS_PASSWORD")
+        config.redis.ssl = _env_first(
+            "ARQONBUS_VALKEY_SSL",
+            "ARQONBUS_REDIS_SSL",
+            default="false",
+        ).lower() == "true"
+
+        # Postgres configuration
+        config.postgres.host = os.getenv("ARQONBUS_POSTGRES_HOST", config.postgres.host)
+        config.postgres.port = int(os.getenv("ARQONBUS_POSTGRES_PORT", config.postgres.port))
+        config.postgres.database = os.getenv("ARQONBUS_POSTGRES_DATABASE", config.postgres.database)
+        config.postgres.user = os.getenv("ARQONBUS_POSTGRES_USER", config.postgres.user)
+        config.postgres.password = os.getenv("ARQONBUS_POSTGRES_PASSWORD")
+        config.postgres.ssl = os.getenv("ARQONBUS_POSTGRES_SSL", "false").lower() == "true"
         
         # Storage configuration
-        config.storage.backend = os.getenv("ARQONBUS_STORAGE_BACKEND", config.storage.backend)
+        raw_backend = os.getenv("ARQONBUS_STORAGE_BACKEND", config.storage.backend)
+        config.storage.backend = normalize_storage_backend_name(raw_backend)
+        config.storage.mode = os.getenv("ARQONBUS_STORAGE_MODE", config.storage.mode).lower()
+        config.storage.redis_url = _env_first(
+            "ARQONBUS_VALKEY_URL",
+            "ARQONBUS_REDIS_URL",
+            default=config.storage.redis_url,
+        )
+        config.storage.postgres_url = os.getenv("ARQONBUS_POSTGRES_URL", config.storage.postgres_url)
         config.storage.max_history_size = int(os.getenv("ARQONBUS_MAX_HISTORY_SIZE", config.storage.max_history_size))
         config.storage.enable_persistence = os.getenv("ARQONBUS_ENABLE_PERSISTENCE", "false").lower() == "true"
         
@@ -242,13 +342,50 @@ class ArqonBusConfig:
         config.tier_omega.max_substrates = int(
             os.getenv("ARQONBUS_OMEGA_MAX_SUBSTRATES", config.tier_omega.max_substrates)
         )
+        config.tier_omega.runtime = os.getenv(
+            "ARQONBUS_OMEGA_RUNTIME",
+            config.tier_omega.runtime,
+        ).strip().lower()
+        config.tier_omega.firecracker_bin = os.getenv(
+            "ARQONBUS_OMEGA_FIRECRACKER_BIN",
+            config.tier_omega.firecracker_bin,
+        )
+        config.tier_omega.jailer_bin = os.getenv(
+            "ARQONBUS_OMEGA_JAILER_BIN",
+            config.tier_omega.jailer_bin,
+        )
+        config.tier_omega.kernel_image = os.getenv(
+            "ARQONBUS_OMEGA_KERNEL_IMAGE",
+            config.tier_omega.kernel_image or "",
+        ) or None
+        config.tier_omega.rootfs_image = os.getenv(
+            "ARQONBUS_OMEGA_ROOTFS_IMAGE",
+            config.tier_omega.rootfs_image or "",
+        ) or None
+        config.tier_omega.workspace_dir = os.getenv(
+            "ARQONBUS_OMEGA_WORKSPACE_DIR",
+            config.tier_omega.workspace_dir,
+        )
+        config.tier_omega.vm_timeout_seconds = float(
+            os.getenv("ARQONBUS_OMEGA_VM_TIMEOUT_SECONDS", config.tier_omega.vm_timeout_seconds)
+        )
+        config.tier_omega.max_vms = int(
+            os.getenv("ARQONBUS_OMEGA_MAX_VMS", config.tier_omega.max_vms)
+        )
         
         # Feature Flags
         config.holonomy_enabled = os.getenv("ARQONBUS_HOLONOMY_ENABLED", "false").lower() == "true"
         
         # Global configuration
-        config.environment = os.getenv("ARQONBUS_ENVIRONMENT", config.environment)
+        raw_environment = os.getenv("ARQONBUS_ENVIRONMENT", config.environment)
+        config.environment = normalize_environment_name(raw_environment)
         config.debug = os.getenv("ARQONBUS_DEBUG", "false").lower() == "true"
+        config.infra_protocol = os.getenv("ARQONBUS_INFRA_PROTOCOL", config.infra_protocol).strip().lower()
+        allow_json_raw = os.getenv("ARQONBUS_ALLOW_JSON_INFRA")
+        if allow_json_raw is None:
+            config.allow_json_infra = config.environment == "dev"
+        else:
+            config.allow_json_infra = allow_json_raw.strip().lower() == "true"
         
         return config
     
@@ -272,13 +409,31 @@ class ArqonBusConfig:
             errors.append(f"Message size too small: {self.websocket.max_message_size}")
             
         # Redis validation (only if Redis backend is used)
-        if self.storage.backend == "redis":
+        if self.storage.backend in ("redis", "redis_streams", "valkey", "valkey_streams"):
             if not self.redis.host:
                 errors.append("Redis host is required when using Redis backend")
             if self.redis.port < 1 or self.redis.port > 65535:
                 errors.append(f"Invalid Redis port: {self.redis.port}")
+
+        if self.storage.backend == "postgres":
+            if not self.postgres.host:
+                errors.append("Postgres host is required when using Postgres backend")
+            if self.postgres.port < 1 or self.postgres.port > 65535:
+                errors.append(f"Invalid Postgres port: {self.postgres.port}")
                 
         # Storage validation
+        if self.storage.mode not in ("degraded", "strict"):
+            errors.append(f"Invalid storage mode: {self.storage.mode}")
+        if self.storage.backend not in (
+            "memory",
+            "memory_storage",
+            "redis",
+            "redis_streams",
+            "valkey",
+            "valkey_streams",
+            "postgres",
+        ):
+            errors.append(f"Unsupported storage backend: {self.storage.backend}")
         if self.storage.max_history_size < 1:
             errors.append(f"Invalid history size: {self.storage.max_history_size}")
             
@@ -293,6 +448,10 @@ class ArqonBusConfig:
             errors.append("JWT secret is required when authentication is enabled")
         if self.security.jwt_algorithm not in ("HS256",):
             errors.append(f"Unsupported JWT algorithm: {self.security.jwt_algorithm}")
+        if self.environment not in ("dev", "staging", "prod"):
+            errors.append(f"Unsupported environment profile: {self.environment}")
+        if self.infra_protocol not in ("protobuf", "json"):
+            errors.append(f"Unsupported infra protocol: {self.infra_protocol}")
 
         # CASIL validation
         if self.casil.mode not in ("monitor", "enforce"):
@@ -315,6 +474,21 @@ class ArqonBusConfig:
             errors.append("Tier-Omega max_events must be >= 1")
         if self.tier_omega.max_substrates < 1:
             errors.append("Tier-Omega max_substrates must be >= 1")
+        if self.tier_omega.runtime not in ("memory", "firecracker"):
+            errors.append("Tier-Omega runtime must be one of: memory, firecracker")
+        if self.tier_omega.vm_timeout_seconds <= 0:
+            errors.append("Tier-Omega vm_timeout_seconds must be > 0")
+        if self.tier_omega.max_vms < 1:
+            errors.append("Tier-Omega max_vms must be >= 1")
+        if self.tier_omega.runtime == "firecracker" and self.tier_omega.enabled:
+            if not self.tier_omega.kernel_image:
+                errors.append(
+                    "Tier-Omega firecracker runtime requires ARQONBUS_OMEGA_KERNEL_IMAGE"
+                )
+            if not self.tier_omega.rootfs_image:
+                errors.append(
+                    "Tier-Omega firecracker runtime requires ARQONBUS_OMEGA_ROOTFS_IMAGE"
+                )
             
         return errors
     
@@ -339,8 +513,19 @@ class ArqonBusConfig:
                 "ssl": self.redis.ssl,
                 "connection_pool_size": self.redis.connection_pool_size
             },
+            "postgres": {
+                "host": self.postgres.host,
+                "port": self.postgres.port,
+                "database": self.postgres.database,
+                "user": self.postgres.user,
+                "ssl": self.postgres.ssl,
+                "connect_timeout": self.postgres.connect_timeout,
+            },
             "storage": {
                 "backend": self.storage.backend,
+                "mode": self.storage.mode,
+                "redis_url": self.storage.redis_url,
+                "postgres_url": self.storage.postgres_url,
                 "max_history_size": self.storage.max_history_size,
                 "enable_persistence": self.storage.enable_persistence
             },
@@ -390,9 +575,19 @@ class ArqonBusConfig:
                 "lab_channel": self.tier_omega.lab_channel,
                 "max_events": self.tier_omega.max_events,
                 "max_substrates": self.tier_omega.max_substrates,
+                "runtime": self.tier_omega.runtime,
+                "firecracker_bin": self.tier_omega.firecracker_bin,
+                "jailer_bin": self.tier_omega.jailer_bin,
+                "kernel_image": self.tier_omega.kernel_image,
+                "rootfs_image": self.tier_omega.rootfs_image,
+                "workspace_dir": self.tier_omega.workspace_dir,
+                "vm_timeout_seconds": self.tier_omega.vm_timeout_seconds,
+                "max_vms": self.tier_omega.max_vms,
             },
             "environment": self.environment,
-            "debug": self.debug
+            "debug": self.debug,
+            "infra_protocol": self.infra_protocol,
+            "allow_json_infra": self.allow_json_infra,
         }
 
 
@@ -426,18 +621,19 @@ def get_config() -> ArqonBusConfig:
     return _config
 
 
-def load_config(environment: str = "development") -> ArqonBusConfig:
+def load_config(environment: Optional[str] = None) -> ArqonBusConfig:
     """Load configuration for the given environment.
     
     Args:
-        environment: Environment name (development, production, test)
+        environment: Optional environment override (dev, staging, prod)
         
     Returns:
         Loaded configuration
     """
     global _config
     _config = ArqonBusConfig.from_environment()
-    _config.environment = environment
+    if environment is not None:
+        _config.environment = normalize_environment_name(environment)
     return _config
 
 
@@ -460,6 +656,87 @@ def validate_config() -> List[str]:
     """
     config = get_config()
     return config.validate()
+
+
+def startup_preflight_errors(config: Optional[ArqonBusConfig] = None) -> List[str]:
+    """Return startup preflight errors for stricter production readiness checks.
+
+    Preflight is strict when:
+    - `ARQONBUS_PREFLIGHT_STRICT=true`, or
+    - `environment=production`.
+    """
+    cfg = config or get_config()
+    errors: List[str] = []
+
+    strict_preflight = os.getenv("ARQONBUS_PREFLIGHT_STRICT", "false").lower() == "true"
+    cfg_environment = normalize_environment_name(cfg.environment)
+    if cfg_environment in ("staging", "prod"):
+        strict_preflight = True
+
+    if not strict_preflight:
+        return errors
+
+    required_vars = (
+        "ARQONBUS_SERVER_HOST",
+        "ARQONBUS_SERVER_PORT",
+        "ARQONBUS_STORAGE_MODE",
+    )
+    for var_name in required_vars:
+        if not os.getenv(var_name):
+            errors.append(f"Missing required environment variable in strict preflight: {var_name}")
+
+    if cfg.storage.mode == "strict":
+        if cfg.storage.backend in ("redis", "redis_streams", "valkey", "valkey_streams"):
+            if not (
+                cfg.storage.redis_url
+                or os.getenv("ARQONBUS_REDIS_URL")
+                or os.getenv("ARQONBUS_VALKEY_URL")
+            ):
+                errors.append(
+                    "Storage mode 'strict' with Redis/Valkey backend requires ARQONBUS_REDIS_URL or ARQONBUS_VALKEY_URL"
+                )
+        elif cfg.storage.backend == "postgres":
+            if not (cfg.storage.postgres_url or os.getenv("ARQONBUS_POSTGRES_URL")):
+                errors.append("Storage mode 'strict' with Postgres backend requires ARQONBUS_POSTGRES_URL")
+        else:
+            errors.append(
+                "Storage mode 'strict' requires one of: redis, redis_streams, valkey, valkey_streams, postgres"
+            )
+
+    # Production policy: require both shared hot-state (Valkey/Redis URL)
+    # and durable projection/state (Postgres URL), independent of selected
+    # primary storage backend. Can be disabled only with explicit override.
+    require_dual_data_stack_raw = os.getenv("ARQONBUS_REQUIRE_DUAL_DATA_STACK")
+    if require_dual_data_stack_raw is None:
+        require_dual_data_stack = cfg_environment == "prod"
+    else:
+        require_dual_data_stack = require_dual_data_stack_raw.strip().lower() == "true"
+
+    if require_dual_data_stack:
+        if not (
+            cfg.storage.redis_url
+            or os.getenv("ARQONBUS_REDIS_URL")
+            or os.getenv("ARQONBUS_VALKEY_URL")
+        ):
+            errors.append(
+                "Dual data stack requires ARQONBUS_VALKEY_URL (or ARQONBUS_REDIS_URL) for shared hot-state"
+            )
+        if not (cfg.storage.postgres_url or os.getenv("ARQONBUS_POSTGRES_URL")):
+            errors.append(
+                "Dual data stack requires ARQONBUS_POSTGRES_URL for durable shared state"
+            )
+
+    if cfg_environment == "prod" and os.getenv("JWT_SKIP_VALIDATION") is not None:
+        errors.append(
+            "JWT_SKIP_VALIDATION is forbidden in production preflight"
+        )
+    if cfg_environment in ("staging", "prod"):
+        if cfg.infra_protocol != "protobuf":
+            errors.append("Infrastructure protocol must be protobuf in staging/prod")
+        if cfg.allow_json_infra:
+            errors.append("ARQONBUS_ALLOW_JSON_INFRA must be false in staging/prod")
+
+    return errors
 
 # Backward compatibility alias for older tests/config consumers
 Config = ArqonBusConfig

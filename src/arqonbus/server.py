@@ -33,12 +33,46 @@ class ArqonBusServer:
         self.running = False
 
     async def start(self):
+        from arqonbus.config.config import startup_preflight_errors
+
+        preflight_errors = startup_preflight_errors(self.config)
+        if preflight_errors:
+            raise ValueError(f"Startup preflight failed: {'; '.join(preflight_errors)}")
+
         self.routing_coordinator = RoutingCoordinator()
         await self.routing_coordinator.initialize()
 
+        storage_kwargs = {"max_size": self.config.storage.max_history_size}
+        if self.config.storage.backend in ("redis", "redis_streams", "valkey", "valkey_streams"):
+            storage_kwargs["storage_mode"] = self.config.storage.mode
+            redis_url = self.config.storage.redis_url
+            if not redis_url:
+                protocol = "rediss" if self.config.redis.ssl else "redis"
+                auth = f":{self.config.redis.password}@" if self.config.redis.password else ""
+                redis_url = (
+                    f"{protocol}://{auth}{self.config.redis.host}:"
+                    f"{self.config.redis.port}/{self.config.redis.db}"
+                )
+            storage_kwargs["redis_url"] = redis_url
+        elif self.config.storage.backend == "postgres":
+            storage_kwargs["storage_mode"] = self.config.storage.mode
+            postgres_url = self.config.storage.postgres_url
+            if not postgres_url:
+                protocol = "postgresql"
+                auth = self.config.postgres.user
+                if self.config.postgres.password:
+                    auth = f"{auth}:{self.config.postgres.password}"
+                postgres_url = (
+                    f"{protocol}://{auth}@{self.config.postgres.host}:"
+                    f"{self.config.postgres.port}/{self.config.postgres.database}"
+                )
+                if self.config.postgres.ssl:
+                    postgres_url = f"{postgres_url}?ssl=require"
+            storage_kwargs["postgres_url"] = postgres_url
+
         storage_backend = await StorageRegistry.create_backend(
             self.config.storage.backend,
-            max_size=self.config.storage.max_history_size
+            **storage_kwargs,
         )
         self.storage = MessageStorage(storage_backend)
         self.routing_coordinator.operator_registry.storage = self.storage

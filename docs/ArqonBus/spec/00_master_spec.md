@@ -190,6 +190,11 @@ graph TD
     *   Integration Tests (Chaos/Network Partitions).
     *   Safety Policy Verification (Wasm Logic Checks).
 
+## 9. Companion Contracts
+
+- Continuum integration contract: `docs/ArqonBus/spec/continuum_integration_contract.md`
+- Reflex integration boundary: `docs/ArqonBus/spec/reflex_integration_boundary.md`
+
 ---
 **End of Specification**
 **Approved By:** ____________________ (Product Owner)

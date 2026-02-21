@@ -5,6 +5,7 @@ for scalable message persistence and history retrieval.
 """
 
 import json
+import base64
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
@@ -23,6 +24,7 @@ except ImportError:
     REDIS_AVAILABLE = False
 
 from ..protocol.envelope import Envelope
+from ..protocol.protobuf_codec import envelope_from_proto_bytes, envelope_to_proto_bytes
 from ..utils.logging import get_logger
 from .interface import StorageBackend, StorageResult, HistoryEntry
 from .memory import MemoryStorageBackend
@@ -43,6 +45,7 @@ class RedisStreamsStorage(StorageBackend):
         max_size: int = 1000,
         redis_client: Optional[Any] = None,
         redis_url: str = "redis://localhost:6379/0",
+        storage_mode: str = "degraded",
         stream_prefix: str = "arqonbus",
         history_limit: int = 1000,
         key_ttl: int = 3600,
@@ -55,6 +58,7 @@ class RedisStreamsStorage(StorageBackend):
             max_size: Maximum number of messages to keep (for compatibility)
             redis_client: Optional pre-configured Redis client
             redis_url: Redis connection URL
+            storage_mode: degraded|strict storage behavior
             stream_prefix: Prefix for Redis Stream keys
             history_limit: Maximum number of messages to keep in history
             key_ttl: Time-to-live for stream keys in seconds
@@ -63,6 +67,8 @@ class RedisStreamsStorage(StorageBackend):
         self.max_size = max_size
         self.redis_client = redis_client if REDIS_AVAILABLE else None
         self.redis_url = redis_url
+        self.storage_mode = storage_mode
+        self.strict_mode = storage_mode == "strict"
         self.stream_prefix = stream_prefix
         self.history_limit = history_limit
         self.key_ttl = key_ttl
@@ -80,7 +86,8 @@ class RedisStreamsStorage(StorageBackend):
             "redis_operations": 0,
             "fallback_operations": 0,
             "connection_failures": 0,
-            "last_redis_error": None
+            "last_redis_error": None,
+            "degraded_mode_active": self.redis_client is None,
         }
     
     async def connect(self):
@@ -126,6 +133,7 @@ class RedisStreamsStorage(StorageBackend):
             Exception: If Redis connection fails and no fallback configured
         """
         redis_url = config.get("redis_url", "redis://localhost:6379/0")
+        storage_mode = config.get("storage_mode", "degraded")
         stream_prefix = config.get("stream_prefix", "arqonbus")
         history_limit = config.get("history_limit", 1000)
         key_ttl = config.get("key_ttl", 3600)
@@ -138,11 +146,14 @@ class RedisStreamsStorage(StorageBackend):
         redis_client = None
         try:
             if not REDIS_AVAILABLE:
+                if storage_mode == "strict":
+                    raise RuntimeError("Redis dependency is unavailable in strict storage mode")
                 logger.warning("Redis not available, falling back to memory storage")
                 return cls(
                     max_size=max_size,
                     redis_client=None,
                     redis_url=redis_url,
+                    storage_mode=storage_mode,
                     stream_prefix=stream_prefix,
                     history_limit=history_limit,
                     key_ttl=key_ttl,
@@ -162,6 +173,10 @@ class RedisStreamsStorage(StorageBackend):
             
         except Exception as e:
             logger.error(f"Redis connection failed: {e}")
+            if storage_mode == "strict":
+                raise RuntimeError(
+                    f"Redis connection failed in strict storage mode: {e}"
+                ) from e
             logger.info("Falling back to memory storage")
             
             # Return with failed connection, use fallback
@@ -169,6 +184,7 @@ class RedisStreamsStorage(StorageBackend):
                 max_size=max_size,
                 redis_client=None,
                 redis_url=redis_url,
+                storage_mode=storage_mode,
                 stream_prefix=stream_prefix,
                 history_limit=history_limit,
                 key_ttl=key_ttl,
@@ -179,11 +195,21 @@ class RedisStreamsStorage(StorageBackend):
             max_size=max_size,
             redis_client=redis_client,
             redis_url=redis_url,
+            storage_mode=storage_mode,
             stream_prefix=stream_prefix,
             history_limit=history_limit,
             key_ttl=key_ttl,
             fallback_storage=fallback_storage
         )
+
+    async def _handle_redis_failure(self, error: Exception) -> None:
+        self._stats["connection_failures"] += 1
+        self._stats["last_redis_error"] = str(error)
+        self._stats["degraded_mode_active"] = True
+        if self.strict_mode:
+            raise RuntimeError(
+                f"Redis operation failed in strict storage mode: {error}"
+            ) from error
     
     async def append(self, envelope: Envelope, **kwargs) -> StorageResult:
         """Append message to Redis Streams.
@@ -211,7 +237,8 @@ class RedisStreamsStorage(StorageBackend):
                 "sender": envelope.sender or "",
                 "room": envelope.room or "",
                 "channel": envelope.channel or "",
-                "payload": json.dumps(envelope.payload) if envelope.payload else "{}"
+                "payload": json.dumps(envelope.payload) if envelope.payload else "{}",
+                "envelope_proto_b64": base64.b64encode(envelope_to_proto_bytes(envelope)).decode("ascii"),
             }
             
             # Main message stream
@@ -250,8 +277,7 @@ class RedisStreamsStorage(StorageBackend):
             
         except Exception as e:
             logger.error(f"Redis storage error: {e}")
-            self._stats["connection_failures"] += 1
-            self._stats["last_redis_error"] = str(e)
+            await self._handle_redis_failure(e)
             
             # Fallback to memory storage
             self._stats["fallback_operations"] += 1
@@ -321,15 +347,19 @@ class RedisStreamsStorage(StorageBackend):
                     if until and timestamp >= until:
                         continue
                     
-                    envelope = Envelope(
-                        id=msg_data.get("id", ""),
-                        type=msg_data.get("type", ""),
-                        timestamp=timestamp,
-                        sender=msg_data.get("sender") or None,
-                        room=msg_data.get("room") or None,
-                        channel=msg_data.get("channel") or None,
-                        payload=json.loads(msg_data.get("payload", "{}"))
-                    )
+                    proto_b64 = msg_data.get("envelope_proto_b64")
+                    if proto_b64:
+                        envelope = envelope_from_proto_bytes(base64.b64decode(proto_b64))
+                    else:
+                        envelope = Envelope(
+                            id=msg_data.get("id", ""),
+                            type=msg_data.get("type", ""),
+                            timestamp=timestamp,
+                            sender=msg_data.get("sender") or None,
+                            room=msg_data.get("room") or None,
+                            channel=msg_data.get("channel") or None,
+                            payload=json.loads(msg_data.get("payload", "{}"))
+                        )
                     
                     history_entry = HistoryEntry(
                         envelope=envelope,
@@ -347,8 +377,7 @@ class RedisStreamsStorage(StorageBackend):
             
         except Exception as e:
             logger.error(f"Redis history retrieval error: {e}")
-            self._stats["connection_failures"] += 1
-            self._stats["last_redis_error"] = str(e)
+            await self._handle_redis_failure(e)
             
             # Fallback to memory storage
             self._stats["fallback_operations"] += 1
@@ -381,8 +410,7 @@ class RedisStreamsStorage(StorageBackend):
             
         except Exception as e:
             logger.error(f"Redis delete message error: {e}")
-            self._stats["connection_failures"] += 1
-            self._stats["last_redis_error"] = str(e)
+            await self._handle_redis_failure(e)
             
             # Fallback to memory storage
             self._stats["fallback_operations"] += 1
@@ -421,8 +449,7 @@ class RedisStreamsStorage(StorageBackend):
             
         except Exception as e:
             logger.error(f"Redis clear history error: {e}")
-            self._stats["connection_failures"] += 1
-            self._stats["last_redis_error"] = str(e)
+            await self._handle_redis_failure(e)
             
             # Fallback to memory storage
             self._stats["fallback_operations"] += 1
@@ -436,6 +463,7 @@ class RedisStreamsStorage(StorageBackend):
         """
         base_stats = {
             "backend_type": "redis_streams",
+            "storage_mode": self.storage_mode,
             "redis_available": self.redis_client is not None,
             "configuration": {
                 "redis_url": self.redis_url,
@@ -555,8 +583,12 @@ class RedisStreamsStorage(StorageBackend):
                     if isinstance(v_str, str) and (v_str.startswith("{") or v_str.startswith("[")):
                         try:
                             v_str = json.loads(v_str)
-                        except:
-                            pass
+                        except json.JSONDecodeError as exc:
+                            logger.debug(
+                                "Failed to decode Redis stream field '%s' as JSON: %s",
+                                k_str,
+                                exc,
+                            )
                     decoded_data[k_str] = v_str
                 
                 decoded_messages.append((msg_id, decoded_data))

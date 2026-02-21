@@ -35,3 +35,20 @@
 - Reason code breakdown (secrets, oversize)
 - Internal error count (should remain zero)
 - Hotspot detection by room/channel/client (repeated violations)
+
+## Continuum Projector Metrics
+
+- `arqonbus_continuum_projector_projection_count`
+- `arqonbus_continuum_projector_seen_event_count`
+- `arqonbus_continuum_projector_dlq_depth`
+- `arqonbus_continuum_projector_events_total{status,event_type,backend}`
+- `arqonbus_continuum_projector_event_lag_seconds{event_type}`
+- `arqonbus_continuum_projector_dlq_replay_total{replayed,reason,backend}`
+- `arqonbus_continuum_projector_backfill_total{dry_run,backend}`
+- `arqonbus_continuum_projector_backfill_events_total{outcome}`
+
+Alerting defaults:
+
+- lag p95 > 30s for 5m
+- DLQ depth > 100 for 10m
+- replay failure ratio > 5% for 15m

@@ -1,2 +1,2 @@
-pub mod nats_bridge;
 pub mod mirroring;
+pub mod nats_bridge;

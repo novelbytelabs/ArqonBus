@@ -1,8 +1,8 @@
 # ArqonBus vNext Status (Single Source of Truth)
 
-Last updated: 2026-02-18
-Branch: `feature/vnext-phase0-phase1`
-Program status: Phase0/Phase1 slice complete; broader vNext roadmap in progress
+Last updated: 2026-02-20
+Branch: `dev/vnext-innovation-execution`
+Program status: Phase0-7 complete for current slice; Continuum/Reflex integration track now active
 
 ## Why this file exists
 
@@ -22,6 +22,9 @@ Current implementation scope:
 - Epoch 3 Tier-Omega experimental lane bootstrap (feature-flagged, isolated)
 - Tier-Omega lifecycle hardening (bounded substrates/events with admin controls)
 - Stability hardening discovered during manual gate validation
+- Storage substrate expansion (Valkey aliases + Postgres backend)
+- Tier-Omega Firecracker runtime integration (`op.omega.vm.*`)
+- Continuum/Reflex integration contract baseline
 
 Out of scope for this slice:
 
@@ -38,6 +41,20 @@ Out of scope for this slice:
 | M3: Epoch 2 Factory gate | Completed | CLI + SDK + standard operators + CASIL hot reload checkpoint closed. |
 | M4: Tier-Omega experimental lane | Completed | Added feature-flagged `op.omega.*` path with unit/integration/e2e/regression coverage. |
 | M5: Tier-Omega lifecycle hardening | Completed | Added substrate/event lifecycle controls and bounded lane governance. |
+| M6: Valkey/Postgres + Tier-Omega Firecracker runtime | Completed | Added `valkey*` aliases, `postgres` backend, compose service, and `op.omega.vm.probe|list|launch|stop`. |
+| M7: Continuum/Reflex integration contract baseline | Completed | Added contract spec + executable contract stubs for event/idempotency/failure semantics. |
+| M8: Continuum projector/replay implementation | Completed | Added `op.continuum.projector.*` command lane with projection, stale guard, DLQ replay/list, and backfill controls. |
+| M9: Postgres-backed projector persistence | Completed | Added Postgres projection/events/DLQ tables and backend hooks consumed by projector lane. |
+| M10: Production data-stack hardening | Completed | Production preflight now requires both Valkey and Postgres URLs by default, plus real connectivity checks. |
+| M11: Continuum projector operational hardening | Completed | Added Postgres-backed socket e2e, projector metrics/alerts, migration+backup/restore runbook, and CI Postgres integration stage. |
+| M12: Release-gate closeout hardening | Completed | Removed synthesis prototype path, blocked `JWT_SKIP_VALIDATION` in prod preflight, and validated full Python+Shield gates. |
+| M13: Protobuf-first infrastructure closure | Completed | Added canonical Rust envelope protobuf codec in Python, protobuf wire support, and protobuf-first storage persistence with JSON adapters constrained to human-facing paths. |
+| M14: Protobuf anti-regression guardrails | Completed | Added CI hard-fail protobuf-first policy checks and shared Python/Rust protobuf fixture contract tests. |
+| M15: Protocol/time semantics test closure | Completed | Added monotonic sequence + vector-clock validation utilities, replay API strict sequence checks, and unit/integration/e2e/regression coverage including protobuf evolution regression. |
+| M16: History command-lane time semantics delivery | Completed | Added `op.history.get|replay` websocket command contracts, replay strict-sequence controls, and protobuf e2e command-lane coverage. |
+| M17: RC performance + CI hardening | Completed | Added replay/protobuf latency gates and aligned performance CI selector to run full performance marker suite. |
+| M18: Cross-project boundary codification (Continuum/Reflex) | Completed | Promoted Continuum contract to Active and codified Reflex integration boundary with executable contract tests. |
+| M19: Release candidate execution + rollout smoke artifacts | Completed | Published RC notes, added rollout smoke script, and captured full matrix verification evidence. |
 
 ## Phase 0 Completion Checklist
 
@@ -119,6 +136,37 @@ python -m pytest -q -m performance
 - [x] Added admin lifecycle commands (`op.omega.unregister_substrate`, `op.omega.clear_events`)
 - [x] Added event query filters (`substrate_id`, `signal`) for `op.omega.list_events`
 - [x] Added unit/integration/e2e/regression coverage for lifecycle controls and filter isolation
+
+## Phase 8: Storage + Runtime Substrate Expansion (Completed)
+
+- [x] Added storage backend aliases (`valkey`, `valkey_streams`) and strict preflight support for Valkey envs
+- [x] Added Postgres storage backend and runtime wiring (`ARQONBUS_STORAGE_BACKEND=postgres`)
+- [x] Added Postgres service in `deploy/docker-compose.yml`
+- [x] Added Tier-Omega Firecracker runtime integration and admin VM controls (`op.omega.vm.*`)
+- [x] Added unit/integration coverage for new storage/runtime behavior
+
+## Phase 9: Continuum/Reflex Integration Contract (Completed Baseline)
+
+- [x] Added contract spec: `docs/ArqonBus/spec/continuum_integration_contract.md`
+- [x] Linked contract from `docs/ArqonBus/spec/00_master_spec.md`
+- [x] Added executable contract stubs: `tests/unit/test_continuum_integration_contract.py`
+
+## Active Next Slice: Projector + Replay Delivery (In Progress)
+
+- [x] Implement Continuum episode projector (Bus -> Postgres) with idempotent upsert keying
+- [x] Implement stale update rejection by monotonic `source_ts`
+- [x] Implement DLQ emission path: `continuum.episode.dlq.v1`
+- [x] Implement replay/backfill control path (`from_ts`, `to_ts`, `tenant_id`, `agent_id`, `dry_run`)
+- [x] Add integration/regression suites for projector/replay/failure injection
+
+## Verification Evidence (2026-02-20)
+
+- [x] Valkey connection check passed (`ARQONBUS_VALKEY_URL=redis://127.0.0.1:6379/0`)
+- [x] Postgres connection check passed (`ARQONBUS_POSTGRES_URL=postgresql://arqonbus:arqonbus@127.0.0.1:5432/arqonbus`)
+- [x] Real Postgres integration test passed (`tests/integration/test_continuum_projector_postgres.py`)
+- [x] Socket command-lane e2e projector persistence test added (`tests/integration/test_continuum_projector_postgres_e2e.py`)
+- [x] CI Postgres projector stage added (`.github/workflows/arqonbus-tests.yml`)
+- [x] Projector migration/backup restore runbook added (`docs/ArqonBus/runbooks/continuum_projector_postgres_migration_backup_restore.md`)
 
 ## Epoch 1 Checkpoint 2.2 Progress
 

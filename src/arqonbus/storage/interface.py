@@ -1,4 +1,5 @@
 """Storage backend interface for ArqonBus."""
+import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -239,6 +240,44 @@ class MessageStorage:
             List of history entries
         """
         return await self.backend.get_history(limit=limit, since=since)
+
+    async def get_history_replay(
+        self,
+        *,
+        room: Optional[str] = None,
+        channel: Optional[str] = None,
+        from_ts: datetime,
+        to_ts: datetime,
+        limit: int = 1000,
+        strict_sequence: bool = True,
+    ) -> List[HistoryEntry]:
+        """Get replay window in chronological order with optional sequence monotonicity check."""
+        if to_ts < from_ts:
+            raise ValueError("to_ts must be >= from_ts")
+
+        entries = await self.backend.get_history(
+            room=room,
+            channel=channel,
+            limit=limit,
+            since=from_ts,
+            until=to_ts,
+        )
+        entries = sorted(entries, key=lambda entry: entry.stored_at)
+
+        if strict_sequence:
+            last_sequence: Optional[int] = None
+            for entry in entries:
+                metadata = entry.envelope.metadata or {}
+                sequence = metadata.get("sequence") if isinstance(metadata, dict) else None
+                if sequence is None:
+                    continue
+                if not isinstance(sequence, int):
+                    raise ValueError("metadata.sequence must be an integer for strict_sequence replay")
+                if last_sequence is not None and sequence < last_sequence:
+                    raise ValueError("Sequence regression detected in replay window")
+                last_sequence = sequence
+
+        return entries
     
     async def search_messages(
         self,
@@ -439,20 +478,40 @@ class StorageRegistry:
         if backend_class is None:
             available = ", ".join(cls.list_backends())
             raise ValueError(f"Unknown storage backend '{name}'. Available: {available}")
-            
+
+        # Some backends (e.g., Redis) expose an async factory to validate
+        # connectivity/capabilities before the instance is returned.
+        create_fn = getattr(backend_class, "create", None)
+        if create_fn and asyncio.iscoroutinefunction(create_fn):
+            return await create_fn(kwargs)
+
         return backend_class(**kwargs)
 
 
-# Register built-in backends
-# Import inside a try block to avoid hard dependency loops.
+# Register built-in backends.
+# Imports are intentionally isolated so one optional backend import failure
+# does not prevent core backends from being available.
 try:
     from .memory import MemoryStorageBackend
-    from .redis_streams import RedisStreamsStorage
-    
+
     StorageRegistry.register("memory", MemoryStorageBackend)
     StorageRegistry.register("memory_storage", MemoryStorageBackend)
+except ImportError:
+    pass
+
+try:
+    from .redis_streams import RedisStreamsStorage
+
     StorageRegistry.register("redis", RedisStreamsStorage)
     StorageRegistry.register("redis_streams", RedisStreamsStorage)
+    StorageRegistry.register("valkey", RedisStreamsStorage)
+    StorageRegistry.register("valkey_streams", RedisStreamsStorage)
 except ImportError:
-    # Backends remain unregistered if optional deps are missing.
+    pass
+
+try:
+    from .postgres import PostgresStorageBackend
+
+    StorageRegistry.register("postgres", PostgresStorageBackend)
+except ImportError:
     pass

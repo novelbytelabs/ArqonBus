@@ -2,17 +2,18 @@ name: Rust CI
 
 on:
   push:
-    branches: ["main", "003-core-spine"]
+    branches: ["main", "dev", "feature/**", "dev/**"]
     paths:
       - "crates/**"
       - ".github/workflows/ci-rust.yml"
   pull_request:
-    branches: ["main"]
+    branches: ["main", "dev"]
     paths:
       - "crates/**"
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.82.0"
 
 jobs:
   test:
@@ -21,7 +22,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        toolchain: [stable]
+        toolchain: ["1.82.0"]
 
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +30,20 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: clippy, rustfmt
+
+      - name: Verify Rust version
+        run: rustc --version
+        working-directory: crates
+
+      - name: Verify rust-toolchain pin matches CI toolchain
+        shell: bash
+        run: |
+          pinned="$(sed -n 's/^channel = "\(.*\)"/\1/p' ../rust-toolchain.toml)"
+          test -n "$pinned"
+          test "$pinned" = "$RUST_TOOLCHAIN"
+        working-directory: crates
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v3

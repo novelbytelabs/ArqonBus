@@ -1,6 +1,5 @@
-use clap::{Parser, Subcommand};
 use anyhow::Result;
-
+use clap::{Parser, Subcommand};
 
 mod commands;
 use commands::dev::{handle_dev, DevCommands};

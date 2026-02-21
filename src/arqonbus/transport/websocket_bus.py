@@ -3,6 +3,7 @@ import asyncio
 from copy import deepcopy
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -21,7 +22,9 @@ from ..routing.client_registry import ClientRegistry
 from ..config.config import get_config
 from ..casil.integration import CasilIntegration
 from ..casil.outcome import CASILDecision
+from ..omega.firecracker_runtime import FirecrackerOmegaRuntime
 from ..security.jwt_auth import JWTAuthError, validate_jwt
+from ..utils.metrics import record_counter, record_gauge, record_histogram
 
 
 logger = logging.getLogger(__name__)
@@ -60,6 +63,23 @@ class _OmegaSubstrate:
     owner_client_id: str
     metadata: Dict[str, Any]
     created_at: str
+
+
+@dataclass
+class _ContinuumProjection:
+    tenant_id: str
+    agent_id: str
+    episode_id: str
+    event_type: str
+    content_ref: str
+    summary: Optional[str]
+    tags: list[str]
+    embedding_ref: Optional[str]
+    metadata: Dict[str, Any]
+    last_event_id: str
+    last_event_ts: str
+    updated_at: str
+    deleted: bool = False
 
 
 class _FeatureDisabledError(RuntimeError):
@@ -114,6 +134,11 @@ class WebSocketBus:
         self._store: Dict[str, Dict[str, Any]] = {}
         self._omega_substrates: Dict[str, _OmegaSubstrate] = {}
         self._omega_events: list[Dict[str, Any]] = []
+        self._omega_firecracker = FirecrackerOmegaRuntime(self.config.tier_omega)
+        self._continuum_projection: Dict[tuple[str, str, str], _ContinuumProjection] = {}
+        self._continuum_seen_events: Set[tuple[str, str, str]] = set()
+        self._continuum_dlq: list[Dict[str, Any]] = []
+        self._continuum_event_log: list[Dict[str, Any]] = []
         self._ops_lock = asyncio.Lock()
         
         # Statistics
@@ -202,6 +227,7 @@ class WebSocketBus:
 
         # Cleanup scheduled operator jobs.
         await self._cancel_all_cron_jobs()
+        await self._omega_firecracker.close()
         
         # Close server
         self.server.close()
@@ -269,6 +295,36 @@ class WebSocketBus:
         return datetime.now(timezone.utc).isoformat()
 
     @staticmethod
+    def _safe_record_counter(name: str, value: float = 1, labels: Optional[Dict[str, str]] = None) -> None:
+        try:
+            record_counter(name, value, labels)
+        except Exception:
+            logger.debug("Metric counter recording failed", exc_info=True)
+
+    @staticmethod
+    def _safe_record_gauge(name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
+        try:
+            record_gauge(name, value, labels)
+        except Exception:
+            logger.debug("Metric gauge recording failed", exc_info=True)
+
+    @staticmethod
+    def _safe_record_histogram(name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
+        try:
+            record_histogram(name, value, labels)
+        except Exception:
+            logger.debug("Metric histogram recording failed", exc_info=True)
+
+    @staticmethod
+    def _parse_iso8601(raw_value: Any, field_name: str) -> datetime:
+        if not isinstance(raw_value, str):
+            raise ValueError(f"'{field_name}' must be an ISO8601 timestamp string")
+        normalized = raw_value.strip()
+        if normalized.endswith("Z"):
+            normalized = normalized[:-1] + "+00:00"
+        return datetime.fromisoformat(normalized)
+
+    @staticmethod
     def _parse_positive_float(raw_value: Any, field_name: str) -> float:
         value = float(raw_value)
         if value <= 0:
@@ -320,12 +376,138 @@ class WebSocketBus:
         metadata = await self._client_metadata(client_id)
         return str(metadata.get("role", "")).lower() == "admin"
 
+    def _continuum_backend(self) -> Optional[Any]:
+        backend = getattr(self.storage, "backend", None) if self.storage else None
+        if backend is None:
+            return None
+        if hasattr(backend, "continuum_project_event"):
+            return backend
+        return None
+
+    async def _require_admin(self, client_id: str, action: str) -> None:
+        if not await self._client_is_admin(client_id):
+            raise PermissionError(f"Only admin clients can {action}")
+
     async def _default_store_namespace(self, client_id: str) -> str:
         metadata = await self._client_metadata(client_id)
         tenant_id = metadata.get("tenant_id")
         if tenant_id:
             return f"tenant:{tenant_id}"
         return "default"
+
+    @staticmethod
+    def _normalize_limit(raw_value: Any, field_name: str, *, default: int, max_value: int) -> int:
+        if raw_value is None:
+            return default
+        limit = int(raw_value)
+        if limit <= 0:
+            raise ValueError(f"'{field_name}' must be > 0")
+        if limit > max_value:
+            raise ValueError(f"'{field_name}' must be <= {max_value}")
+        return limit
+
+    @staticmethod
+    def _serialize_history_entries(entries: list[Any]) -> list[Dict[str, Any]]:
+        serialized: list[Dict[str, Any]] = []
+        for entry in entries:
+            serialized.append(
+                {
+                    "envelope": entry.envelope.to_dict(),
+                    "stored_at": entry.stored_at.isoformat(),
+                    "storage_metadata": dict(entry.storage_metadata or {}),
+                }
+            )
+        return serialized
+
+    async def _history_get(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.storage:
+            raise RuntimeError("History commands require configured storage backend")
+
+        room_raw = args.get("room")
+        channel_raw = args.get("channel")
+        room = str(room_raw).strip() if room_raw is not None else None
+        channel = str(channel_raw).strip() if channel_raw is not None else None
+        room = room or None
+        channel = channel or None
+        limit = self._normalize_limit(args.get("limit"), "limit", default=100, max_value=1000)
+        since = self._parse_iso8601(args["since"], "since") if args.get("since") else None
+        until = self._parse_iso8601(args["until"], "until") if args.get("until") else None
+
+        if until and since and until < since:
+            raise ValueError("'until' must be >= 'since'")
+
+        is_admin = await self._client_is_admin(client_id)
+        if not is_admin and not room:
+            raise PermissionError("Only admin clients can query global history; provide 'room'")
+
+        entries = await self.storage.backend.get_history(
+            room=room,
+            channel=channel,
+            limit=limit,
+            since=since,
+            until=until,
+        )
+
+        self._safe_record_counter("history_get_requests_total", 1, {"role": "admin" if is_admin else "user"})
+        self._safe_record_histogram("history_get_entries_returned", float(len(entries)), {"role": "admin" if is_admin else "user"})
+        return {
+            "entries": self._serialize_history_entries(entries),
+            "count": len(entries),
+            "room": room,
+            "channel": channel,
+            "since": since.isoformat() if since else None,
+            "until": until.isoformat() if until else None,
+            "limit": limit,
+        }
+
+    async def _history_replay(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.storage:
+            raise RuntimeError("History commands require configured storage backend")
+
+        room_raw = args.get("room")
+        channel_raw = args.get("channel")
+        room = str(room_raw).strip() if room_raw is not None else None
+        channel = str(channel_raw).strip() if channel_raw is not None else None
+        room = room or None
+        channel = channel or None
+        from_ts_raw = args.get("from_ts")
+        to_ts_raw = args.get("to_ts")
+        if from_ts_raw is None or to_ts_raw is None:
+            raise ValueError("'from_ts' and 'to_ts' are required")
+        from_ts = self._parse_iso8601(from_ts_raw, "from_ts")
+        to_ts = self._parse_iso8601(to_ts_raw, "to_ts")
+        strict_sequence = self._coerce_bool(args.get("strict_sequence", True), "strict_sequence")
+        limit = self._normalize_limit(args.get("limit"), "limit", default=1000, max_value=5000)
+
+        is_admin = await self._client_is_admin(client_id)
+        if not is_admin and not room:
+            raise PermissionError("Only admin clients can replay global history; provide 'room'")
+
+        started = time.perf_counter()
+        entries = await self.storage.get_history_replay(
+            room=room,
+            channel=channel,
+            from_ts=from_ts,
+            to_ts=to_ts,
+            limit=limit,
+            strict_sequence=strict_sequence,
+        )
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        self._safe_record_counter("history_replay_requests_total", 1, {"role": "admin" if is_admin else "user"})
+        self._safe_record_histogram("history_replay_entries_returned", float(len(entries)), {"role": "admin" if is_admin else "user"})
+        self._safe_record_histogram("history_replay_latency_ms", elapsed_ms, {"role": "admin" if is_admin else "user"})
+
+        return {
+            "entries": self._serialize_history_entries(entries),
+            "count": len(entries),
+            "room": room,
+            "channel": channel,
+            "from_ts": from_ts.isoformat(),
+            "to_ts": to_ts.isoformat(),
+            "strict_sequence": strict_sequence,
+            "limit": limit,
+            "latency_ms": elapsed_ms,
+        }
 
     async def _send_command_response(
         self,
@@ -583,7 +765,7 @@ class WebSocketBus:
             try:
                 await task
             except asyncio.CancelledError:
-                pass
+                logger.debug("Cron job %s cancelled", job_id)
         return True
 
     async def _list_cron_jobs(self, client_id: str) -> Dict[str, Any]:
@@ -639,9 +821,9 @@ class WebSocketBus:
             try:
                 await task
             except asyncio.CancelledError:
-                pass
-            except Exception:
-                pass
+                logger.debug("Cron task cancelled during shutdown")
+            except Exception as exc:
+                logger.warning("Cron task cleanup failed during shutdown: %s", exc)
 
     async def _store_set(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
         key = str(args.get("key", "")).strip()
@@ -788,6 +970,507 @@ class WebSocketBus:
 
         return self._casil_snapshot(candidate)
 
+    @staticmethod
+    def _continuum_required_keys() -> tuple[set[str], set[str]]:
+        envelope_fields = {
+            "event_id",
+            "event_type",
+            "tenant_id",
+            "agent_id",
+            "episode_id",
+            "source_ts",
+            "schema_version",
+            "payload",
+        }
+        payload_fields = {"content_ref", "tags", "metadata"}
+        return envelope_fields, payload_fields
+
+    def _validate_continuum_event(self, event: Dict[str, Any]) -> None:
+        envelope_fields, payload_fields = self._continuum_required_keys()
+        missing_envelope = envelope_fields.difference(event.keys())
+        if missing_envelope:
+            raise ValueError(f"Missing required envelope fields: {sorted(missing_envelope)}")
+
+        event_type = str(event.get("event_type", "")).strip()
+        allowed_types = {
+            "episode.created",
+            "episode.updated",
+            "episode.deleted",
+            "episode.summarized",
+        }
+        if event_type not in allowed_types:
+            raise ValueError(f"Unsupported event_type: {event_type}")
+
+        schema_version = int(event.get("schema_version", 0))
+        if schema_version != 1:
+            raise ValueError(f"Unsupported schema_version: {schema_version}")
+
+        self._parse_iso8601(event["source_ts"], "source_ts")
+
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            raise ValueError("'payload' must be an object")
+
+        missing_payload = payload_fields.difference(payload.keys())
+        if missing_payload:
+            raise ValueError(f"Missing required payload fields: {sorted(missing_payload)}")
+
+        if not isinstance(payload.get("tags"), list) or any(
+            not isinstance(tag, str) for tag in payload.get("tags", [])
+        ):
+            raise ValueError("'payload.tags' must be a list of strings")
+        if not isinstance(payload.get("metadata"), dict):
+            raise ValueError("'payload.metadata' must be an object")
+
+    async def _continuum_dlq_push(self, reason: str, event: Dict[str, Any]) -> Dict[str, Any]:
+        backend = self._continuum_backend()
+        if backend is not None:
+            dlq_record = await backend.continuum_projector_dlq_push(reason, event)
+            self._safe_record_counter(
+                "continuum_projector_dlq_events_total",
+                labels={"action": "push", "backend": "postgres"},
+            )
+            return dlq_record
+        dlq_record = {
+            "dlq_id": f"dlq_{uuid.uuid4().hex[:12]}",
+            "topic": "continuum.episode.dlq.v1",
+            "reason": reason,
+            "event": deepcopy(event),
+            "queued_at": self._utc_now_iso(),
+        }
+        async with self._ops_lock:
+            self._continuum_dlq.append(dlq_record)
+            dlq_depth = len(self._continuum_dlq)
+        self._safe_record_counter(
+            "continuum_projector_dlq_events_total",
+            labels={"action": "push", "backend": "memory"},
+        )
+        self._safe_record_gauge("continuum_projector_dlq_depth", dlq_depth)
+        return dlq_record
+
+    async def _project_continuum_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        self._validate_continuum_event(event)
+        event_type = str(event.get("event_type", "unknown"))
+        source_ts = str(event.get("source_ts", ""))
+        try:
+            source_dt = self._parse_iso8601(source_ts, "source_ts")
+            lag_seconds = max(0.0, (datetime.now(timezone.utc) - source_dt).total_seconds())
+            self._safe_record_histogram(
+                "continuum_projector_event_lag_seconds",
+                lag_seconds,
+                labels={"event_type": event_type},
+            )
+        except Exception:
+            logger.debug("Unable to compute continuum event lag", exc_info=True)
+        backend = self._continuum_backend()
+        if backend is not None:
+            result = await backend.continuum_project_event(event)
+            status = str(result.get("status", "unknown"))
+            self._safe_record_counter(
+                "continuum_projector_events_total",
+                labels={"status": status, "event_type": event_type, "backend": "postgres"},
+            )
+            return result
+
+        tenant_id = str(event["tenant_id"])
+        agent_id = str(event["agent_id"])
+        episode_id = str(event["episode_id"])
+        event_id = str(event["event_id"])
+        source_ts = str(event["source_ts"])
+        event_type = str(event["event_type"])
+        payload = event["payload"]
+        dedup_key = (tenant_id, agent_id, event_id)
+        projection_key = (tenant_id, agent_id, episode_id)
+
+        incoming_ts = self._parse_iso8601(source_ts, "source_ts")
+
+        async with self._ops_lock:
+            if dedup_key in self._continuum_seen_events:
+                result = {
+                    "status": "duplicate",
+                    "event_id": event_id,
+                    "projection_key": projection_key,
+                }
+                self._safe_record_counter(
+                    "continuum_projector_events_total",
+                    labels={"status": "duplicate", "event_type": event_type, "backend": "memory"},
+                )
+                return result
+
+            existing = self._continuum_projection.get(projection_key)
+            if existing:
+                existing_ts = self._parse_iso8601(existing.last_event_ts, "last_event_ts")
+                if incoming_ts < existing_ts:
+                    result = {
+                        "status": "stale_rejected",
+                        "event_id": event_id,
+                        "projection_key": projection_key,
+                        "existing_last_event_ts": existing.last_event_ts,
+                    }
+                    self._safe_record_counter(
+                        "continuum_projector_events_total",
+                        labels={"status": "stale_rejected", "event_type": event_type, "backend": "memory"},
+                    )
+                    return result
+
+            projection = _ContinuumProjection(
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+                episode_id=episode_id,
+                event_type=event_type,
+                content_ref=str(payload.get("content_ref")),
+                summary=payload.get("summary"),
+                tags=[str(tag) for tag in payload.get("tags", [])],
+                embedding_ref=payload.get("embedding_ref"),
+                metadata=dict(payload.get("metadata", {})),
+                last_event_id=event_id,
+                last_event_ts=source_ts,
+                updated_at=self._utc_now_iso(),
+                deleted=event_type == "episode.deleted",
+            )
+            self._continuum_projection[projection_key] = projection
+            self._continuum_seen_events.add(dedup_key)
+            self._continuum_event_log.append(
+                {"event": deepcopy(event), "projected_at": self._utc_now_iso()}
+            )
+
+        result = {
+            "status": "projected",
+            "event_id": event_id,
+            "projection_key": projection_key,
+            "deleted": projection.deleted,
+        }
+        self._safe_record_counter(
+            "continuum_projector_events_total",
+            labels={"status": "projected", "event_type": event_type, "backend": "memory"},
+        )
+        return result
+
+    async def _continuum_projector_status(self) -> Dict[str, Any]:
+        backend = self._continuum_backend()
+        if backend is not None:
+            status = await backend.continuum_projector_status()
+            self._safe_record_gauge("continuum_projector_projection_count", float(status.get("projection_count", 0)))
+            self._safe_record_gauge("continuum_projector_seen_event_count", float(status.get("seen_event_count", 0)))
+            self._safe_record_gauge("continuum_projector_dlq_depth", float(status.get("dlq_count", 0)))
+            return status
+        async with self._ops_lock:
+            status = {
+                "projection_count": len(self._continuum_projection),
+                "seen_event_count": len(self._continuum_seen_events),
+                "dlq_count": len(self._continuum_dlq),
+                "event_log_count": len(self._continuum_event_log),
+            }
+        self._safe_record_gauge("continuum_projector_projection_count", float(status["projection_count"]))
+        self._safe_record_gauge("continuum_projector_seen_event_count", float(status["seen_event_count"]))
+        self._safe_record_gauge("continuum_projector_dlq_depth", float(status["dlq_count"]))
+        self._safe_record_gauge("continuum_projector_event_log_count", float(status["event_log_count"]))
+        return status
+
+    async def _continuum_project_event_command(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "project Continuum events")
+        event = args.get("event")
+        if not isinstance(event, dict):
+            raise ValueError("'event' is required and must be an object")
+        try:
+            return await self._project_continuum_event(event)
+        except Exception as exc:
+            dlq = await self._continuum_dlq_push(f"projection_failed:{exc}", event)
+            self._safe_record_counter(
+                "continuum_projector_events_total",
+                labels={"status": "dlq_queued", "event_type": str(event.get("event_type", "unknown"))},
+            )
+            return {
+                "status": "dlq_queued",
+                "error": str(exc),
+                "dlq_id": dlq["dlq_id"],
+            }
+
+    async def _continuum_projector_get(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "read Continuum projector state")
+        tenant_id = str(args.get("tenant_id", "")).strip()
+        agent_id = str(args.get("agent_id", "")).strip()
+        episode_id = str(args.get("episode_id", "")).strip()
+        if not tenant_id or not agent_id or not episode_id:
+            raise ValueError("'tenant_id', 'agent_id', and 'episode_id' are required")
+        backend = self._continuum_backend()
+        if backend is not None:
+            projection = await backend.continuum_projector_get(tenant_id, agent_id, episode_id)
+            if projection is None:
+                return {"found": False, "tenant_id": tenant_id, "agent_id": agent_id, "episode_id": episode_id}
+            return {"found": True, "projection": projection}
+        key = (tenant_id, agent_id, episode_id)
+        async with self._ops_lock:
+            projection = self._continuum_projection.get(key)
+        if projection is None:
+            return {"found": False, "tenant_id": tenant_id, "agent_id": agent_id, "episode_id": episode_id}
+        return {"found": True, "projection": projection.__dict__}
+
+    async def _continuum_projector_list(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "list Continuum projector state")
+        tenant_filter = str(args.get("tenant_id", "")).strip() or None
+        agent_filter = str(args.get("agent_id", "")).strip() or None
+        limit = int(args.get("limit", 100))
+        if limit < 1:
+            raise ValueError("'limit' must be >= 1")
+        backend = self._continuum_backend()
+        if backend is not None:
+            items = await backend.continuum_projector_list(
+                limit=limit,
+                tenant_id=tenant_filter,
+                agent_id=agent_filter,
+            )
+            return {"count": len(items), "items": items, "limit": limit}
+        async with self._ops_lock:
+            rows = list(self._continuum_projection.values())
+        filtered = []
+        for row in rows:
+            if tenant_filter and row.tenant_id != tenant_filter:
+                continue
+            if agent_filter and row.agent_id != agent_filter:
+                continue
+            filtered.append(row.__dict__)
+        filtered.sort(key=lambda row: row["updated_at"], reverse=True)
+        filtered = filtered[:limit]
+        return {"count": len(filtered), "items": filtered, "limit": limit}
+
+    async def _continuum_projector_dlq_list(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "list Continuum DLQ")
+        limit = int(args.get("limit", 100))
+        if limit < 1:
+            raise ValueError("'limit' must be >= 1")
+        backend = self._continuum_backend()
+        if backend is not None:
+            items = await backend.continuum_projector_dlq_list(limit=limit)
+            return {"count": len(items), "items": items, "limit": limit}
+        async with self._ops_lock:
+            items = list(self._continuum_dlq)[-limit:]
+        return {"count": len(items), "items": items, "limit": limit}
+
+    async def _continuum_projector_dlq_replay(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "replay Continuum DLQ items")
+        dlq_id = str(args.get("dlq_id", "")).strip()
+        if not dlq_id:
+            raise ValueError("'dlq_id' is required")
+        backend = self._continuum_backend()
+        if backend is not None:
+            record = await backend.continuum_projector_dlq_get(dlq_id)
+            if record is None:
+                self._safe_record_counter(
+                    "continuum_projector_dlq_replay_total",
+                    labels={"replayed": "false", "reason": "not_found", "backend": "postgres"},
+                )
+                return {"replayed": False, "dlq_id": dlq_id, "reason": "not_found"}
+            result = await backend.continuum_project_event(record["event"])
+            if result.get("status") in {"projected", "duplicate", "stale_rejected"}:
+                await backend.continuum_projector_dlq_remove(dlq_id)
+                self._safe_record_counter(
+                    "continuum_projector_dlq_events_total",
+                    labels={"action": "remove", "backend": "postgres"},
+                )
+                self._safe_record_counter(
+                    "continuum_projector_dlq_replay_total",
+                    labels={"replayed": "true", "reason": "accepted", "backend": "postgres"},
+                )
+                return {"replayed": True, "dlq_id": dlq_id, "result": result}
+            self._safe_record_counter(
+                "continuum_projector_dlq_replay_total",
+                labels={"replayed": "false", "reason": "rejected", "backend": "postgres"},
+            )
+            return {"replayed": False, "dlq_id": dlq_id, "result": result}
+        async with self._ops_lock:
+            record = next((item for item in self._continuum_dlq if item["dlq_id"] == dlq_id), None)
+        if record is None:
+            self._safe_record_counter(
+                "continuum_projector_dlq_replay_total",
+                labels={"replayed": "false", "reason": "not_found", "backend": "memory"},
+            )
+            return {"replayed": False, "dlq_id": dlq_id, "reason": "not_found"}
+        result = await self._project_continuum_event(record["event"])
+        if result.get("status") in {"projected", "duplicate", "stale_rejected"}:
+            async with self._ops_lock:
+                self._continuum_dlq = [item for item in self._continuum_dlq if item["dlq_id"] != dlq_id]
+                dlq_depth = len(self._continuum_dlq)
+            self._safe_record_counter(
+                "continuum_projector_dlq_events_total",
+                labels={"action": "remove", "backend": "memory"},
+            )
+            self._safe_record_gauge("continuum_projector_dlq_depth", float(dlq_depth))
+            self._safe_record_counter(
+                "continuum_projector_dlq_replay_total",
+                labels={"replayed": "true", "reason": "accepted", "backend": "memory"},
+            )
+            return {"replayed": True, "dlq_id": dlq_id, "result": result}
+        self._safe_record_counter(
+            "continuum_projector_dlq_replay_total",
+            labels={"replayed": "false", "reason": "rejected", "backend": "memory"},
+        )
+        return {"replayed": False, "dlq_id": dlq_id, "result": result}
+
+    async def _continuum_projector_backfill(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        await self._require_admin(client_id, "run Continuum projector backfill")
+        started_at = time.perf_counter()
+        from_ts_raw = args.get("from_ts")
+        to_ts_raw = args.get("to_ts")
+        if from_ts_raw is None or to_ts_raw is None:
+            raise ValueError("'from_ts' and 'to_ts' are required")
+        from_ts = self._parse_iso8601(from_ts_raw, "from_ts")
+        to_ts = self._parse_iso8601(to_ts_raw, "to_ts")
+        if to_ts < from_ts:
+            raise ValueError("'to_ts' must be >= 'from_ts'")
+        tenant_filter = str(args.get("tenant_id", "")).strip() or None
+        agent_filter = str(args.get("agent_id", "")).strip() or None
+        dry_run = bool(args.get("dry_run", False))
+        backend = self._continuum_backend()
+
+        if backend is not None:
+            selected_events = await backend.continuum_projector_events_between(
+                from_ts=from_ts,
+                to_ts=to_ts,
+                tenant_id=tenant_filter,
+                agent_id=agent_filter,
+            )
+            if dry_run:
+                self._safe_record_counter(
+                    "continuum_projector_backfill_total",
+                    labels={"dry_run": "true", "backend": "postgres"},
+                )
+                return {
+                    "dry_run": True,
+                    "selected_count": len(selected_events),
+                    "from_ts": from_ts_raw,
+                    "to_ts": to_ts_raw,
+                    "tenant_id": tenant_filter,
+                    "agent_id": agent_filter,
+                }
+            projected = 0
+            duplicates = 0
+            stale_rejected = 0
+            dlq_queued = 0
+            for event in selected_events:
+                try:
+                    result = await backend.continuum_project_event(event)
+                    status = result.get("status")
+                    if status == "projected":
+                        projected += 1
+                    elif status == "duplicate":
+                        duplicates += 1
+                    elif status == "stale_rejected":
+                        stale_rejected += 1
+                except Exception as exc:
+                    await backend.continuum_projector_dlq_push(f"backfill_failed:{exc}", event)
+                    dlq_queued += 1
+            result = {
+                "dry_run": False,
+                "selected_count": len(selected_events),
+                "projected": projected,
+                "duplicates": duplicates,
+                "stale_rejected": stale_rejected,
+                "dlq_queued": dlq_queued,
+                "from_ts": from_ts_raw,
+                "to_ts": to_ts_raw,
+                "tenant_id": tenant_filter,
+                "agent_id": agent_filter,
+            }
+            self._safe_record_counter(
+                "continuum_projector_backfill_total",
+                labels={"dry_run": "false", "backend": "postgres"},
+            )
+            self._safe_record_counter("continuum_projector_backfill_events_total", projected, {"outcome": "projected"})
+            self._safe_record_counter("continuum_projector_backfill_events_total", duplicates, {"outcome": "duplicate"})
+            self._safe_record_counter(
+                "continuum_projector_backfill_events_total",
+                stale_rejected,
+                {"outcome": "stale_rejected"},
+            )
+            self._safe_record_counter("continuum_projector_backfill_events_total", dlq_queued, {"outcome": "dlq_queued"})
+            self._safe_record_histogram(
+                "continuum_projector_backfill_duration_seconds",
+                time.perf_counter() - started_at,
+                labels={"backend": "postgres"},
+            )
+            return result
+
+        async with self._ops_lock:
+            source_items = list(self._continuum_event_log)
+
+        selected_events: list[Dict[str, Any]] = []
+        for item in source_items:
+            event = item.get("event", {})
+            if not isinstance(event, dict):
+                continue
+            event_ts = self._parse_iso8601(event.get("source_ts"), "source_ts")
+            if event_ts < from_ts or event_ts > to_ts:
+                continue
+            if tenant_filter and str(event.get("tenant_id")) != tenant_filter:
+                continue
+            if agent_filter and str(event.get("agent_id")) != agent_filter:
+                continue
+            selected_events.append(event)
+
+        if dry_run:
+            self._safe_record_counter(
+                "continuum_projector_backfill_total",
+                labels={"dry_run": "true", "backend": "memory"},
+            )
+            return {
+                "dry_run": True,
+                "selected_count": len(selected_events),
+                "from_ts": from_ts_raw,
+                "to_ts": to_ts_raw,
+                "tenant_id": tenant_filter,
+                "agent_id": agent_filter,
+            }
+
+        projected = 0
+        duplicates = 0
+        stale_rejected = 0
+        dlq_queued = 0
+        for event in selected_events:
+            try:
+                result = await self._project_continuum_event(event)
+                status = result.get("status")
+                if status == "projected":
+                    projected += 1
+                elif status == "duplicate":
+                    duplicates += 1
+                elif status == "stale_rejected":
+                    stale_rejected += 1
+            except Exception as exc:
+                await self._continuum_dlq_push(f"backfill_failed:{exc}", event)
+                dlq_queued += 1
+
+        result = {
+            "dry_run": False,
+            "selected_count": len(selected_events),
+            "projected": projected,
+            "duplicates": duplicates,
+            "stale_rejected": stale_rejected,
+            "dlq_queued": dlq_queued,
+            "from_ts": from_ts_raw,
+            "to_ts": to_ts_raw,
+            "tenant_id": tenant_filter,
+            "agent_id": agent_filter,
+        }
+        self._safe_record_counter(
+            "continuum_projector_backfill_total",
+            labels={"dry_run": "false", "backend": "memory"},
+        )
+        self._safe_record_counter("continuum_projector_backfill_events_total", projected, {"outcome": "projected"})
+        self._safe_record_counter("continuum_projector_backfill_events_total", duplicates, {"outcome": "duplicate"})
+        self._safe_record_counter(
+            "continuum_projector_backfill_events_total",
+            stale_rejected,
+            {"outcome": "stale_rejected"},
+        )
+        self._safe_record_counter("continuum_projector_backfill_events_total", dlq_queued, {"outcome": "dlq_queued"})
+        self._safe_record_histogram(
+            "continuum_projector_backfill_duration_seconds",
+            time.perf_counter() - started_at,
+            labels={"backend": "memory"},
+        )
+        return result
+
     def _omega_snapshot(self) -> Dict[str, Any]:
         return {
             "enabled": self.config.tier_omega.enabled,
@@ -797,6 +1480,8 @@ class WebSocketBus:
             "max_substrates": self.config.tier_omega.max_substrates,
             "substrate_count": len(self._omega_substrates),
             "event_count": len(self._omega_events),
+            "runtime": self.config.tier_omega.runtime,
+            "firecracker": self._omega_firecracker.snapshot(),
         }
 
     def _require_omega_enabled(self) -> None:
@@ -833,6 +1518,20 @@ class WebSocketBus:
                 raise ValueError("Tier-Omega substrate limit reached")
             self._omega_substrates[substrate.substrate_id] = substrate
 
+        if self._omega_requires_firecracker(substrate.kind, substrate.metadata):
+            try:
+                vm_info = await self._omega_firecracker.launch_vm(substrate.substrate_id, substrate.metadata)
+            except Exception:
+                async with self._ops_lock:
+                    self._omega_substrates.pop(substrate.substrate_id, None)
+                raise
+            async with self._ops_lock:
+                existing = self._omega_substrates.get(substrate.substrate_id)
+                if existing:
+                    existing.metadata = dict(existing.metadata)
+                    existing.metadata["runtime"] = "firecracker"
+                    existing.metadata["firecracker_vm"] = vm_info
+
         return {
             "substrate_id": substrate.substrate_id,
             "name": substrate.name,
@@ -860,6 +1559,11 @@ class WebSocketBus:
             ]
             removed_events = previous_count - len(self._omega_events)
 
+        vm_info = (substrate.metadata or {}).get("firecracker_vm", {})
+        vm_id = vm_info.get("vm_id") if isinstance(vm_info, dict) else None
+        if vm_id:
+            await self._omega_firecracker.stop_vm(vm_id)
+
         return {
             "removed": True,
             "substrate_id": substrate_id,
@@ -867,6 +1571,58 @@ class WebSocketBus:
             "kind": substrate.kind,
             "removed_events": removed_events,
         }
+
+    def _omega_requires_firecracker(self, kind: str, metadata: Dict[str, Any]) -> bool:
+        normalized_kind = str(kind).strip().lower()
+        runtime = str(metadata.get("runtime", "")).strip().lower() if isinstance(metadata, dict) else ""
+        return (
+            self.config.tier_omega.runtime == "firecracker"
+            or normalized_kind in {"firecracker", "microvm", "vm"}
+            or runtime == "firecracker"
+        )
+
+    async def _omega_probe_firecracker(self) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        return self._omega_firecracker.snapshot()
+
+    async def _omega_list_vms(self) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        return await self._omega_firecracker.list_vms()
+
+    async def _omega_launch_vm(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can launch Tier-Omega VMs")
+
+        substrate_id = str(args.get("substrate_id", "")).strip()
+        if not substrate_id:
+            raise ValueError("'substrate_id' is required")
+
+        async with self._ops_lock:
+            substrate = self._omega_substrates.get(substrate_id)
+            if substrate is None:
+                raise ValueError(f"Unknown substrate_id: {substrate_id}")
+            metadata = dict(substrate.metadata or {})
+
+        vm_info = await self._omega_firecracker.launch_vm(substrate_id, metadata)
+        async with self._ops_lock:
+            substrate = self._omega_substrates.get(substrate_id)
+            if substrate:
+                substrate.metadata = dict(substrate.metadata)
+                substrate.metadata["runtime"] = "firecracker"
+                substrate.metadata["firecracker_vm"] = vm_info
+        return vm_info
+
+    async def _omega_stop_vm(self, client_id: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        self._require_omega_enabled()
+        if not await self._client_is_admin(client_id):
+            raise PermissionError("Only admin clients can stop Tier-Omega VMs")
+
+        vm_id = str(args.get("vm_id", "")).strip()
+        if not vm_id:
+            raise ValueError("'vm_id' is required")
+
+        return await self._omega_firecracker.stop_vm(vm_id)
 
     async def _omega_list_substrates(self) -> Dict[str, Any]:
         self._require_omega_enabled()
@@ -986,6 +1742,20 @@ class WebSocketBus:
             "signal": signal,
         }
 
+    def _wire_format_for_websocket(self, websocket: Any) -> str:
+        wire_format = getattr(websocket, "_arqon_wire_format", None)
+        if wire_format in ("json", "protobuf"):
+            return wire_format
+        if self.config.infra_protocol == "protobuf" and not self.config.allow_json_infra:
+            return "protobuf"
+        return "json"
+
+    async def _send_envelope_wire(self, websocket: Any, envelope: Envelope, wire_format: str) -> None:
+        if wire_format == "protobuf":
+            await websocket.send(envelope.to_proto_bytes())
+            return
+        await websocket.send(envelope.to_json())
+
     async def _handle_connection(self, websocket: Any):
         """Handle new WebSocket connection.
         
@@ -1029,14 +1799,17 @@ class WebSocketBus:
                 payload={"welcome": "Connected to ArqonBus", "client_id": client_id},
                 sender="arqonbus"
             )
-            await websocket.send(welcome_msg.to_json())
+            await self._send_envelope_wire(
+                websocket,
+                welcome_msg,
+                self._wire_format_for_websocket(websocket),
+            )
             # Track connection event for telemetry-style stats
             self._stats["events_emitted"] += 1
             
             # Handle incoming messages
-            async for message_str in websocket:
-
-                await self._handle_message_from_client(client_id, websocket, message_str)
+            async for message_data in websocket:
+                await self._handle_message_from_client(client_id, websocket, message_data)
                 
         except ConnectionClosed:
             logger.info(f"Client {client_id} disconnected normally")
@@ -1048,17 +1821,35 @@ class WebSocketBus:
             if client_id:
                 await self._disconnect_client(client_id)
     
-    async def _handle_message_from_client(self, client_id: str, websocket: Any, message_str: str):
+    async def _handle_message_from_client(self, client_id: str, websocket: Any, message_data: Any):
         """Handle incoming message from client.
         
         Args:
             client_id: Client who sent the message
             websocket: Client's WebSocket connection
-            message_str: Raw message string
+            message_data: Raw message payload (JSON text or protobuf bytes)
         """
         try:
             # Parse and validate message
-            envelope, validation_errors = EnvelopeValidator.validate_and_parse_json(message_str)
+            envelope, validation_errors, wire_format = EnvelopeValidator.validate_and_parse_wire(message_data)
+            setattr(websocket, "_arqon_wire_format", wire_format)
+
+            if (
+                wire_format == "json"
+                and self.config.infra_protocol == "protobuf"
+                and not self.config.allow_json_infra
+                and envelope.type in {"message", "command", "response", "error", "telemetry", "operator.join"}
+            ):
+                error_msg = Envelope(
+                    type="error",
+                    request_id=envelope.id,
+                    error="JSON wire format is forbidden for infrastructure traffic",
+                    error_code="INFRA_PROTOCOL_ERROR",
+                    payload={"required_protocol": "protobuf"},
+                    sender="arqonbus",
+                )
+                await self._send_envelope_wire(websocket, error_msg, wire_format)
+                return
             
             if validation_errors:
                 error_msg = Envelope(
@@ -1069,7 +1860,7 @@ class WebSocketBus:
                     payload={"errors": validation_errors},
                     sender="arqonbus"
                 )
-                await websocket.send(error_msg.to_json())
+                await self._send_envelope_wire(websocket, error_msg, wire_format)
                 return
             
             # Add client info to envelope
@@ -1099,7 +1890,7 @@ class WebSocketBus:
                         room=envelope.room,
                         channel=envelope.channel,
                     )
-                    await websocket.send(error_msg.to_json())
+                    await self._send_envelope_wire(websocket, error_msg, wire_format)
                     return
             
             # Route message based on type
@@ -1117,7 +1908,7 @@ class WebSocketBus:
                     payload=envelope.payload,
                     sender="arqonbus"
                 )
-                await websocket.send(ack.to_json())
+                await self._send_envelope_wire(websocket, ack, wire_format)
             elif envelope.type == "command":
                 ack = Envelope(
                     id=envelope.id,
@@ -1126,7 +1917,7 @@ class WebSocketBus:
                     payload={"result": "ok"},
                     sender="arqonbus"
                 )
-                await websocket.send(ack.to_json())
+                await self._send_envelope_wire(websocket, ack, wire_format)
             
         except Exception as e:
             logger.error(f"Error processing message from client {client_id}: {e}")
@@ -1140,9 +1931,17 @@ class WebSocketBus:
                 sender="arqonbus"
             )
             try:
-                await websocket.send(error_msg.to_json())
-            except Exception:
-                pass  # Client may already be disconnected
+                await self._send_envelope_wire(
+                    websocket,
+                    error_msg,
+                    self._wire_format_for_websocket(websocket),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to send error envelope to client %s: %s",
+                    client_id,
+                    exc,
+                )
     
     async def _handle_message(self, envelope: Envelope, client_id: str):
         """Handle regular message routing.
@@ -1272,6 +2071,50 @@ class WebSocketBus:
                     envelope.id,
                     success=True,
                     message="Tier-Omega events listed",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.vm.probe":
+                data = await self._omega_probe_firecracker()
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega Firecracker runtime probe",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.vm.list":
+                data = await self._omega_list_vms()
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega Firecracker VMs listed",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.vm.launch":
+                data = await self._omega_launch_vm(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega Firecracker VM launched",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.omega.vm.stop":
+                data = await self._omega_stop_vm(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Tier-Omega Firecracker VM stop requested",
                     data=data,
                 )
                 return
@@ -1430,6 +2273,106 @@ class WebSocketBus:
                     envelope.id,
                     success=True,
                     message="Store keys listed",
+                    data=data,
+                )
+                return
+
+            if envelope.command in {"history.get", "op.history.get"}:
+                data = await self._history_get(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="History window retrieved",
+                    data=data,
+                )
+                return
+
+            if envelope.command in {"history.replay", "op.history.replay"}:
+                data = await self._history_replay(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="History replay window retrieved",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.status":
+                await self._require_admin(client_id, "read Continuum projector status")
+                data = await self._continuum_projector_status()
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector status",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.project_event":
+                data = await self._continuum_project_event_command(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum event projection processed",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.get":
+                data = await self._continuum_projector_get(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector get result",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.list":
+                data = await self._continuum_projector_list(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector list result",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.dlq.list":
+                data = await self._continuum_projector_dlq_list(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector DLQ list result",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.dlq.replay":
+                data = await self._continuum_projector_dlq_replay(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector DLQ replay result",
+                    data=data,
+                )
+                return
+
+            if envelope.command == "op.continuum.projector.backfill":
+                data = await self._continuum_projector_backfill(client_id, args)
+                await self._send_command_response(
+                    client_id,
+                    envelope.id,
+                    success=True,
+                    message="Continuum projector backfill result",
                     data=data,
                 )
                 return
@@ -1652,7 +2595,7 @@ class WebSocketBus:
                 try:
                     await task
                 except asyncio.CancelledError:
-                    pass
+                    logger.debug("Operator task for %s cancelled", client_id)
             
             # Unregister from operator registry
             if self.routing_coordinator and self.routing_coordinator.operator_registry:
@@ -1693,7 +2636,8 @@ class WebSocketBus:
         try:
             client_info = await self.client_registry.get_client(client_id)
             if client_info:
-                await client_info.websocket.send(envelope.to_json())
+                wire_format = self._wire_format_for_websocket(client_info.websocket)
+                await self._send_envelope_wire(client_info.websocket, envelope, wire_format)
                 return True
         except ConnectionClosed:
             logger.info(f"Client {client_id} disconnected during send")
@@ -1790,8 +2734,16 @@ async def run_server():
     )
     
     # Initialize components
+    config = get_config()
+    from ..config.config import startup_preflight_errors
+    preflight_errors = startup_preflight_errors(config)
+    if preflight_errors:
+        raise RuntimeError(
+            "Startup preflight failed: " + "; ".join(preflight_errors)
+        )
+
     client_registry = ClientRegistry()
-    ws_bus = WebSocketBus(client_registry)
+    ws_bus = WebSocketBus(client_registry, config=config)
     
     try:
         # Start server
